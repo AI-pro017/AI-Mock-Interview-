@@ -1,0 +1,41 @@
+// AI-Mock-Interview-/app/verification-sent/page.jsx
+'use client';
+
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+
+export default function VerificationSentPage() {
+  const searchParams = useSearchParams();
+  const email = searchParams.get('email') || 'your email';
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#fbefe5] p-4">
+      <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full text-center">
+        <h1 className="text-3xl font-bold text-[#2c5f73] mb-6">
+          Verification Email Sent
+        </h1>
+        
+        <div className="mb-8 text-6xl">✉️</div>
+        
+        <p className="text-lg mb-6 text-gray-700">
+          We've sent a verification link to <strong>{email}</strong>.
+          Please check your inbox and click the link to activate your account.
+        </p>
+        
+        <p className="text-gray-600 mb-8 text-sm">
+          If you don't see the email, check your spam folder. The email may take a few minutes to arrive.
+        </p>
+
+        <Link href="/sign-in">
+          <button className="w-full bg-[#2c5f73] hover:bg-[#234d5f] text-white font-bold py-3 px-4 rounded-md focus:outline-none focus:shadow-outline transition duration-150">
+            Return to Sign In
+          </button>
+        </Link>
+        
+        <p className="text-sm text-gray-500 mt-6">
+          Didn't receive the email? <a href="#" className="text-[#2c5f73] hover:underline">Resend verification</a>
+        </p>
+      </div>
+    </div>
+  );
+}
