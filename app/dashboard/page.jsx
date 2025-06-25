@@ -1,55 +1,35 @@
 // app/dashboard/page.jsx
-"use client";
-import React from "react";
-import { useRouter } from "next/navigation";
-import AddNewInterview from "./_components/AddNewInterview";
-import InterviewList from "./_components/InterviewList";
+import { auth } from "@/app/api/auth/[...auth]/route"
+import { db } from "@/utils/db";
+import { users, MockInterview } from "@/utils/schema";
+import { eq, desc } from "drizzle-orm";
+import { redirect } from 'next/navigation';
+import DashboardClient from "./DashboardClient";
 
-function Dashboard() {
-  const router = useRouter();
+async function DashboardPage() {
+    const session = await auth();
+    if (!session?.user) {
+        redirect('/api/auth/signin');
+    }
 
-  const handlePersonalityAnalysis = () => {
-    router.push("/personality");
-  };
+    // Fetch user details
+    const userResult = await db.select().from(users).where(eq(users.id, session.user.id));
+    const user = userResult[0];
 
-  const handleFindJob = () => {
-    router.push("/find-job");
-  };
+    if (!user) {
+        console.error("User from session not found in DB, redirecting to sign-in.");
+        redirect('/api/auth/signin');
+    }
 
-  return (
-    <div className="p-10">
-      <h2 className="font-bold text-2xl">Dashboard</h2>
-      <h2 className="text-grey-500"> Create and Start your AI Mockup Interview </h2>
+    // Fetch interview history on the server
+    const interviews = await db.select()
+        .from(MockInterview)
+        .where(eq(MockInterview.createdBy, session.user.email)) // Assumes createdBy uses email
+        .orderBy(desc(MockInterview.id));
 
-      <div className="grid grid-cols-1 md:grid-cols-3 my-5">
-        <AddNewInterview />
-      </div>
-
-      {/* Button Container with Flex Layout */}
-      <div className="flex space-x-4 mt-5">
-        {/* Personality Analysis Button */}
-        <button
-          onClick={handlePersonalityAnalysis}
-          className="p-2 text-white rounded"
-          style={{ backgroundColor: '#3f92b4' }}
-        >
-          Personality Analysis
-        </button>
-
-        {/* Find Job Button */}
-        <button
-          onClick={handleFindJob}
-          className="p-2 text-black rounded"
-          style={{ backgroundColor: '#FBEEC1' }}
-        >
-          Find Job
-        </button>
-      </div>
-
-      {/* Previous Interview List */}
-      <InterviewList />
-    </div>
-  );
+    return (
+        <DashboardClient user={user} interviews={interviews} />
+    )
 }
 
-export default Dashboard;
+export default DashboardPage;

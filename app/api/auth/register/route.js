@@ -35,6 +35,10 @@ export async function POST(req) {
         name,
         email,
         passwordHash,
+        experienceLevel: null,
+        targetRoles: null,
+        resumeUrl: null,
+        timezone: null,
       });
     }
 

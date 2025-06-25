@@ -15,20 +15,24 @@ import {
 // Existing tables
 export const MockInterview = pgTable('mockInterview', {
     id: serial('id').primaryKey(),
-    jsonMockResp: text('jsonMockResp').notNull(),
-    jobPosition: varchar('jobPosition').notNull(),
-    jobDesc: varchar('jobDesc').notNull(),
-    jobExperience: varchar('jobExperience').notNull(),
-    createdBy: varchar('createdBy').notNull(),
-    createdAt: varchar('createdAt'),
-    mockId: varchar('mockId').notNull(),
-    userId: text("userId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    type: text("type").notNull(),
-    provider: text("provider").notNull(),
-    providerAccountId: text("providerAccountId").notNull(),
-    refresh_token: text("refresh_token"),
+    mockId: varchar('jsonMockResp', { length: 255 }).notNull().unique(),
+    jobPosition: varchar('jobPosition', { length: 255 }).notNull(),
+    jobDesc: text('jobDesc').notNull(),
+    jobExperience: varchar('jobExperience', { length: 255 }).notNull(),
+    
+    // New Configuration Fields
+    industry: varchar('industry', { length: 255 }),
+    skills: text('skills'),
+    difficulty: varchar('difficulty', { length: 50 }).default('Medium'),
+    focus: varchar('focus', { length: 50 }).default('Balanced'), // e.g., 'Technical', 'Behavioral', 'Balanced'
+    duration: integer('duration').default(30), // in minutes
+    interviewStyle: varchar('interviewStyle', { length: 50 }).default('Conversational'),
+    interviewMode: varchar('interviewMode', { length: 50 }).default('Practice'),
+    questionCategories: text('questionCategories'), // User-defined categories
+
+    createdBy: varchar('createdBy', { length: 255 }).notNull(),
+    createdAt: varchar('createdAt', { length: 255 }),
+    // jsonMockResp is now mockId, assuming response is stored elsewhere or generated later
 });
 
 export const UserAnswer = pgTable('userAnswer', {
@@ -62,6 +66,12 @@ export const users = pgTable("users", {
   passwordHash: varchar('passwordHash'), // For credentials-based auth
   resetToken: varchar('resetToken'), // For password reset
   resetTokenExpiry: timestamp('resetTokenExpiry'), // For password reset
+  
+  // New fields for User Profile
+  experienceLevel: varchar('experienceLevel'), // e.g., 'Entry-level', 'Mid-level', 'Senior'
+  targetRoles: text('targetRoles'), // Can be a JSON string of roles
+  resumeUrl: varchar('resumeUrl'),
+  timezone: varchar('timezone'),
 });
 
 export const accounts = pgTable(
@@ -98,11 +108,8 @@ export const sessions = pgTable("sessions", {
 export const verificationTokens = pgTable(
   "verificationToken",
   {
-    identifier: text("identifier").notNull().unique(),
+    identifier: text("identifier").notNull().primaryKey(),
     token: text("token").notNull(),
     expires: timestamp("expires", { mode: "date" }).notNull(),
-  },
-  (vt) => ({
-    compoundKey: primaryKey({ columns: [vt.identifier, vt.token] }),
-  })
+  }
 )

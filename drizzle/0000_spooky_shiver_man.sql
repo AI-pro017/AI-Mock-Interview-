@@ -1,17 +1,20 @@
 CREATE TABLE IF NOT EXISTS "mockInterview" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"jsonMockResp" text NOT NULL,
-	"jobPosition" varchar NOT NULL,
-	"jobDesc" varchar NOT NULL,
-	"jobExperience" varchar NOT NULL,
-	"createdBy" varchar NOT NULL,
-	"createdAt" varchar,
-	"mockId" varchar NOT NULL,
-	"userId" text NOT NULL,
-	"type" text NOT NULL,
-	"provider" text NOT NULL,
-	"providerAccountId" text NOT NULL,
-	"refresh_token" text
+	"jsonMockResp" varchar(255) NOT NULL,
+	"jobPosition" varchar(255) NOT NULL,
+	"jobDesc" text NOT NULL,
+	"jobExperience" varchar(255) NOT NULL,
+	"industry" varchar(255),
+	"skills" text,
+	"difficulty" varchar(50) DEFAULT 'Medium',
+	"focus" varchar(50) DEFAULT 'Balanced',
+	"duration" integer DEFAULT 30,
+	"interviewStyle" varchar(50) DEFAULT 'Conversational',
+	"interviewMode" varchar(50) DEFAULT 'Practice',
+	"questionCategories" text,
+	"createdBy" varchar(255) NOT NULL,
+	"createdAt" varchar(255),
+	CONSTRAINT "mockInterview_jsonMockResp_unique" UNIQUE("jsonMockResp")
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "personalityFeedback" (
@@ -64,21 +67,18 @@ CREATE TABLE IF NOT EXISTS "users" (
 	"passwordHash" varchar,
 	"resetToken" varchar,
 	"resetTokenExpiry" timestamp,
+	"experienceLevel" varchar,
+	"targetRoles" text,
+	"resumeUrl" varchar,
+	"timezone" varchar,
 	CONSTRAINT "users_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "verificationToken" (
-	"identifier" text NOT NULL,
+	"identifier" text PRIMARY KEY NOT NULL,
 	"token" text NOT NULL,
-	"expires" timestamp NOT NULL,
-	CONSTRAINT "verificationToken_identifier_token_pk" PRIMARY KEY("identifier","token")
+	"expires" timestamp NOT NULL
 );
---> statement-breakpoint
-DO $$ BEGIN
- ALTER TABLE "mockInterview" ADD CONSTRAINT "mockInterview_userId_users_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION
- WHEN duplicate_object THEN null;
-END $$;
 --> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "accounts" ADD CONSTRAINT "accounts_userId_users_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;

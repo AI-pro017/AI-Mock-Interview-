@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { chatSession } from '@/utils/GeminiAIModal';
-import { LoaderCircle } from 'lucide-react';
+import { LoaderCircle, PlusSquare } from 'lucide-react';
 import { MockInterview } from '@/utils/schema';
 import { v4 as uuidv4 } from 'uuid';
 import moment from 'moment';
@@ -79,57 +79,25 @@ function AddNewInterview() {
         }
     }
 
+    const onStartNewInterview = () => {
+        router.push('/dashboard/interview'); 
+    };
+
     return (
-        <div>
-            <div className='p-10 border rounded-lg bg-secondary hover:scale-105 hover:shadow-md cursor-pointer transition-all'
-                onClick={() => setOpenDialog(true)}>
-                <h2 className='text-lg text-center'>+ Add New</h2>
+        <div className="p-8 bg-gradient-to-br from-primary to-blue-600 rounded-xl text-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <div className="flex flex-col items-center text-center">
+                <PlusSquare className="h-16 w-16 mb-4" />
+                <h2 className="text-2xl font-bold mb-2">Start a New Mock Interview</h2>
+                <p className="mb-6 max-w-sm">
+                    Configure a new interview based on your target role and get instant AI-powered feedback.
+                </p>
+                <button
+                    onClick={onStartNewInterview}
+                    className="bg-white text-primary font-bold py-3 px-8 rounded-lg shadow-md hover:bg-gray-100 transition-colors duration-300"
+                >
+                    Let's Go
+                </button>
             </div>
-
-            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-                <DialogContent className="max-w-2xl bg-white">
-                    <DialogHeader>
-                        <DialogTitle className='text-2xl'>Create New Mock Interview</DialogTitle>
-                        <DialogDescription asChild>
-                            <form onSubmit={onSubmit}>
-                                <div>
-                                    <h2 className="text-lg font-semibold text-gray-800 mb-1">Tell us more about your job interview</h2>
-                                    <p className="text-sm text-gray-600 mb-4">Add details about your job position/role, job description, and years of experience.</p>
-                                    
-                                    <div className='mt-7 my-3'>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Job Role/Job Position</label>
-                                        <Input placeholder="Ex. Full Stack Developer" className="text-gray-700" required
-                                            onChange={(event) => setJobPosition(event.target.value)} />
-                                    </div>
-
-                                    <div className='my-3'>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Job Description / Required Skills</label>
-                                        <Textarea placeholder="Ex. React, Angular, NodeJs, MySql, etc." required
-                                            onChange={(event) => setJobDesc(event.target.value)} />
-                                    </div>
-
-                                    <div className='my-3'>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Years of Experience</label>
-                                        <Input placeholder="Ex. 5" type="number" max="50" min="0" required
-                                            onChange={(event) => setJobExperience(event.target.value)} />
-                                    </div>
-                                </div>
-
-                                <div className='flex gap-5 justify-end mt-6'>
-                                    <Button type="button" variant="ghost" onClick={() => setOpenDialog(false)}>Cancel</Button>
-                                    <Button type="submit" disabled={loading}>
-                                        {loading ? (
-                                            <>
-                                                <LoaderCircle className='animate-spin mr-2' /> Generating from AI...
-                                            </>
-                                        ) : 'Start Interview'}
-                                    </Button>
-                                </div>
-                            </form>
-                        </DialogDescription>
-                    </DialogHeader>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }

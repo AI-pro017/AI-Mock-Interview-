@@ -64,3 +64,37 @@ const questions = [
   
   export default questions;
   
+// This file stores constants for the interview setup form
+
+export const PRECONFIGURED_ROLES = [
+  'Software Engineer (Frontend)',
+  'Software Engineer (Backend)',
+  'Software Engineer (Full-stack)',
+  'Data Scientist',
+  'Data Analyst',
+  'Product Manager',
+  'Project Manager',
+  'Business Analyst',
+  'DevOps Engineer',
+  'UI/UX Designer',
+  'Sales Representative',
+  'Marketing Manager',
+  'HR Manager',
+];
+
+export const DIFFICULTIES = ['Easy', 'Medium', 'Hard', 'Expert'];
+export const INTERVIEW_FOCUS_OPTIONS = ['Balanced', 'Technical', 'Behavioral'];
+export const INTERVIEW_STYLES = ['Conversational', 'Formal'];
+export const INTERVIEW_MODES = ['Practice', 'Assessment'];
+
+export const INDUSTRIES = [
+    'Technology',
+    'Finance',
+    'Healthcare',
+    'Retail & E-commerce',
+    'Education',
+    'Manufacturing',
+    'Real Estate',
+    'Other'
+];
+  

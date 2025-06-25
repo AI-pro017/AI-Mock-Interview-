@@ -10,6 +10,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
   } from "@/components/ui/dropdown-menu"
+import Link from 'next/link'
   
 
 function Header() {
@@ -33,7 +34,9 @@ function Header() {
                  <DropdownMenuContent>
                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
                    <DropdownMenuSeparator />
-                   <DropdownMenuItem>Profile</DropdownMenuItem>
+                   <Link href="/dashboard/profile">
+                        <DropdownMenuItem className="cursor-pointer">Profile</DropdownMenuItem>
+                    </Link>
                    <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/sign-in' })}>
                         Logout
                     </DropdownMenuItem>
