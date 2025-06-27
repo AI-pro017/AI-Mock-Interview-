@@ -4,13 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Mic, MicOff, VideoOff } from 'lucide-react';
-import { useConversationManager } from './hooks/useConversationManager';
+import { useInterviewEngine } from './hooks/useInterviewEngine';
 import ConversationDisplay from './ConversationDisplay';
 
 // This function now safely checks for client-side environment first
 function safelyAccessCamera(video = true) {
-  if (typeof window === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    return Promise.reject(new Error("Media device access is not supported in this browser."));
+  if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+    return Promise.reject(new Error("Media device access not supported."));
   }
   return navigator.mediaDevices.getUserMedia({ video, audio: true });
 }
@@ -20,8 +20,8 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [remainingTime, setRemainingTime] = useState(interview.duration * 60);
   const [cameraStream, setCameraStream] = useState(null);
-  const [cameraError, setCameraError] = useState(null);
-  const [isCameraLoading, setIsCameraLoading] = useState(false);
+  const [mediaError, setMediaError] = useState(null);
+  const [isMediaLoading, setIsMediaLoading] = useState(false);
 
   const timerRef = useRef(null);
   const videoRef = useRef(null);
@@ -32,53 +32,45 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     interimTranscript,
     isUserSpeaking,
     isAISpeaking,
+    isListening,
+    error: engineError,
     startConversation,
     endConversation,
-    speechError,
-    isListening,
-  } = useConversationManager(interview, isMicMuted);
+  } = useInterviewEngine(interview, isMicMuted);
 
   const initializeMedia = async () => {
-    let stream = null;
-    setIsCameraLoading(true);
-    setCameraError(null);
-
+    setIsMediaLoading(true);
+    setMediaError(null);
+    let stream;
     try {
-      // First, try to get video if requested
-      if (useCameraInInterview) {
-        stream = await safelyAccessCamera(true);
-      } else {
-        // Otherwise, just get audio
-        stream = await safelyAccessCamera(false);
-      }
+      stream = useCameraInInterview 
+        ? await safelyAccessCamera(true)
+        : await safelyAccessCamera(false);
     } catch (error) {
-      console.warn("Could not access camera, falling back to audio-only.", error);
-      setCameraError("Camera not available. Proceeding with audio only.");
-      // If camera fails, explicitly try for audio-only
+      console.warn("Camera access failed, trying audio-only.", error);
       try {
         stream = await safelyAccessCamera(false);
+        setMediaError("Camera not available. Using audio only.");
       } catch (audioError) {
         console.error("Fatal: Could not access microphone.", audioError);
-        setCameraError("Microphone is required to start the interview and could not be accessed.");
-        stream = null; // Ensure stream is null on failure
+        setMediaError("Microphone access is required and was denied.");
+        setIsMediaLoading(false);
+        return null;
       }
-    } finally {
-      setIsCameraLoading(false);
-      if (stream) {
-        setCameraStream(stream);
-        if (useCameraInInterview && videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      }
-      return stream;
     }
+    
+    setIsMediaLoading(false);
+    setCameraStream(stream);
+    if (stream && useCameraInInterview && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+    return stream;
   };
 
   const startInterview = async () => {
-    setIsInterviewActive(true);
     const mediaStream = await initializeMedia();
-
     if (mediaStream) {
+      setIsInterviewActive(true);
       startConversation(mediaStream);
       timerRef.current = setInterval(() => {
         setRemainingTime(prev => {
@@ -90,15 +82,12 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
           return prev - 1;
         });
       }, 1000);
-    } else {
-      // If no media stream is available, we can't start.
-      setIsInterviewActive(false);
     }
   };
 
   const endInterview = () => {
     setIsInterviewActive(false);
-    if(timerRef.current) clearInterval(timerRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
     endConversation();
     if (cameraStream) {
       cameraStream.getTracks().forEach(track => track.stop());
@@ -109,9 +98,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-      }
+      if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
       endConversation();
     };
   }, []);
@@ -121,6 +108,8 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const currentError = engineError || mediaError;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
@@ -150,9 +139,9 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
               <Button
                 variant={isInterviewActive ? "destructive" : "default"}
                 onClick={isInterviewActive ? endInterview : startInterview}
-                disabled={isCameraLoading}
+                disabled={isMediaLoading}
               >
-                {isCameraLoading ? "Starting..." : isInterviewActive ? "End Interview" : "Start Interview"}
+                {isMediaLoading ? "Starting..." : isInterviewActive ? "End Interview" : "Start Interview"}
               </Button>
             </div>
           </div>
@@ -171,10 +160,10 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
             )}
           </div>
 
-          {speechError && (
+          {currentError && (
             <div className="mt-4 p-3 bg-red-100 border border-red-300 text-red-800 rounded-md">
-              <p className="font-bold">A speech recognition error occurred:</p>
-              <p className="text-sm mt-1">{speechError.message}</p>
+              <p className="font-bold">An error occurred:</p>
+              <p className="text-sm mt-1">{currentError.toString()}</p>
             </div>
           )}
         </Card>
@@ -184,7 +173,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
         <Card className="p-6">
           <h2 className="text-xl font-bold mb-4">Camera Feed</h2>
           <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center" style={{ minHeight: '400px' }}>
-            {useCameraInInterview && cameraStream && !cameraError?.includes("Camera not available") ? (
+            {useCameraInInterview && cameraStream && !mediaError?.includes("Camera") ? (
               <video
                 ref={videoRef}
                 autoPlay
@@ -195,16 +184,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-white p-4 text-center">
                 <VideoOff className="h-12 w-12 mb-2" />
-                {cameraError ? (
-                  <p>{cameraError}</p>
-                ) : (
-                  <p>{isCameraLoading ? "Requesting camera..." : "Camera disabled"}</p>
-                )}
-                 {!isInterviewActive && cameraError && !cameraError.includes("Microphone is required") && (
-                    <Button variant="outline" size="sm" onClick={startInterview} className="mt-4">
-                      Proceed with Audio Only
-                    </Button>
-                )}
+                <p>{isMediaLoading ? "Requesting media..." : mediaError || "Camera is disabled"}</p>
               </div>
             )}
           </div>
