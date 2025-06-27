@@ -1,7 +1,7 @@
 // AI-Mock-Interview-/app/(auth)/sign-in/[[...sign-in]]/page.jsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
@@ -16,6 +16,38 @@ export default function Page() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+
+  useEffect(() => {
+    const debugAuth = async () => {
+      try {
+        console.log("🔍 DEBUGGING AUTH CONFIGURATION");
+        
+        const providersResponse = await fetch('/api/auth/providers');
+        const providers = await providersResponse.json();
+        
+        console.log("📋 AVAILABLE PROVIDERS:", providers);
+        
+        if (providers.google) {
+          console.log("✅ GOOGLE PROVIDER FOUND:", {
+            id: providers.google.id,
+            name: providers.google.name,
+            type: providers.google.type,
+          });
+        } else {
+          console.log("❌ GOOGLE PROVIDER NOT CONFIGURED");
+        }
+        
+        const csrfResponse = await fetch('/api/auth/csrf');
+        const csrfData = await csrfResponse.json();
+        console.log("🔒 CSRF STATUS:", csrfData ? "Working" : "Failed");
+        
+      } catch (error) {
+        console.error("🚨 AUTH DEBUGGING ERROR:", error);
+      }
+    };
+    
+    debugAuth();
+  }, []);
 
   const handleCredentialSignIn = async (e) => {
     e.preventDefault();
@@ -36,6 +68,7 @@ export default function Page() {
   };
 
   const handleGoogleSignIn = () => {
+    console.log("🔄 ATTEMPTING GOOGLE SIGN-IN");
     signIn('google', { callbackUrl });
   };
 
