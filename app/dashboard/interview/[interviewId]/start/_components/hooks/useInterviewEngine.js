@@ -127,20 +127,18 @@ export function useInterviewEngine(interview, isMicMuted) {
   
   // --- SPEECH RECOGNITION LOGIC ---
   const handleTranscript = useCallback((transcript, isFinal) => {
-    if (isAISpeaking) {
-        stopSpeaking();
-    }
-    
-    // Always update the live, interim transcript for immediate feedback
-    setInterimTranscript(transcript);
+    if (isAISpeaking) stopSpeaking();
 
     if (isFinal && transcript.trim()) {
-      // When a final segment is received, add it to the buffer
+      // When a segment is final, append it to the main buffer.
       userResponseBufferRef.current += transcript + ' ';
-      // Update the "finalized" part of the current response
+      // The "stable" part of the user's response is now this buffer.
       setCurrentUserResponse(userResponseBufferRef.current.trim());
-      // Clear the interim transcript since this part is now final
+      // The interim transcript can be cleared as this piece is now final.
       setInterimTranscript('');
+    } else if (transcript) {
+      // For any non-final result, just update the live interim display.
+      setInterimTranscript(transcript);
     }
   }, [isAISpeaking, stopSpeaking]);
 

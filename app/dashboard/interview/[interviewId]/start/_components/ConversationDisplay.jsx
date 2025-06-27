@@ -12,7 +12,7 @@ export default function ConversationDisplay({ conversation, isAISpeaking, isUser
     }
   }, [conversation, isAISpeaking, isUserSpeaking, currentUserResponse, interimTranscript]);
   
-  // This logic correctly combines the stable, finalized text with the live, changing interim text.
+  // This logic is key: It combines the finalized text with the live interim part.
   const liveUserResponse = `${currentUserResponse}${interimTranscript ? (currentUserResponse ? ' ' : '') + interimTranscript : ''}`;
 
   return (
@@ -37,10 +37,11 @@ export default function ConversationDisplay({ conversation, isAISpeaking, isUser
             </div>
           )}
           
-          {/* This block will now display the user's speech in real-time correctly */}
+          {/* This block will now correctly display the live caption */}
           {(isUserSpeaking || liveUserResponse) && (
             <div className="p-3 rounded-lg bg-green-100 self-end max-w-[90%] w-fit">
               <div className="font-bold">You</div>
+              {/* We show the combined live response. If it's empty, we show "Listening..." */}
               <div>{liveUserResponse || "Listening..."}</div>
             </div>
           )}
