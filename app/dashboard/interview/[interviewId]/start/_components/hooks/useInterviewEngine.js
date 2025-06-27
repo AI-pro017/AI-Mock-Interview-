@@ -19,9 +19,7 @@ export function useInterviewEngine(interview, isMicMuted) {
   const silenceTimerRef = useRef(null);
   const audioRef = useRef(null);
   const deepgramConnectionRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
   const abortControllerRef = useRef(null);
-  const keepAliveIntervalRef = useRef(null);
 
   // --- AI RESPONSE LOGIC ---
   const stopSpeaking = useCallback(() => {
@@ -175,23 +173,16 @@ export function useInterviewEngine(interview, isMicMuted) {
       const connection = deepgram.listen.live({
         model: "nova-2", language: "en-US", smart_format: true,
         interim_results: true, vad_events: true, utterance_end_ms: 1000,
-        keepalive: 'true'
+        encoding: 'linear16', sample_rate: 16000,
       });
 
       connection.on("open", () => {
         console.log("3. [Deepgram] Connection OPENED successfully.");
         setIsListening(true);
-        if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
-        keepAliveIntervalRef.current = setInterval(() => {
-          if (connection.getReadyState() === 1) {
-            connection.keepAlive();
-          }
-        }, 10000);
       });
       connection.on("close", () => {
         console.log("X. [Deepgram] Connection CLOSED.");
         setIsListening(false);
-        if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
       });
       connection.on('error', (e) => { 
         console.error("X. [Deepgram] ERROR:", e); 
@@ -203,43 +194,28 @@ export function useInterviewEngine(interview, isMicMuted) {
         if (event.label === 'speech_end') handleSpeechEnd();
       });
 
-      let mediaRecorder;
-      const mimeTypes = ['audio/webm', 'audio/mp4', 'audio/ogg'];
-      const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      const source = audioContext.createMediaStreamSource(audioStream);
+      const processor = audioContext.createScriptProcessor(1024, 1, 1);
 
-      if (!supportedMimeType) {
-        const e = new Error("Your browser does not support the required audio formats for recording.");
-        console.error("4a. [MediaRecorder] ERROR:", e);
-        setError(e);
-        return;
-      }
-      
-      try {
-        console.log(`4. [MediaRecorder] Attempting to create with supported MIME type: ${supportedMimeType}`);
-        mediaRecorder = new MediaRecorder(audioStream, { mimeType: supportedMimeType });
-      } catch (e) {
-        console.error("4a. [MediaRecorder] ERROR with preferred MIME type. Trying default.", e);
-        try {
-          mediaRecorder = new MediaRecorder(audioStream);
-        } catch (fallbackError) {
-          const e = new Error("Could not initialize audio recorder.");
-          console.error("4b. [MediaRecorder] FATAL ERROR with default.", fallbackError);
-          setError(e);
-          return;
-        }
-      }
+      processor.onaudioprocess = (e) => {
+        if (isMicMuted || connection.getReadyState() !== 1) return;
+        
+        const inputData = e.inputBuffer.getChannelData(0);
+        const downsampled = downsampleBuffer(inputData, audioContext.sampleRate, 16000);
+        const int16 = new Int16Array(downsampled.length);
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && !isMicMuted && connection.getReadyState() === 1) {
-          console.log(`5. [ondataavailable] Sending audio data chunk of size: ${event.data.size}`);
-          connection.send(event.data);
+        for (let i = 0; i < downsampled.length; i++) {
+          int16[i] = Math.max(-32768, Math.min(32767, downsampled[i] * 32767));
         }
+        
+        connection.send(int16.buffer);
       };
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
       
-      console.log("6. [MediaRecorder] Starting recording...");
-      mediaRecorder.start(250);
-      mediaRecorderRef.current = mediaRecorder;
-      deepgramConnectionRef.current = connection;
+      deepgramConnectionRef.current = { connection, audioContext, processor, source };
     } catch (e) {
       console.error("X. [startListening] CRITICAL ERROR in setup:", e);
       setError(e);
@@ -247,12 +223,13 @@ export function useInterviewEngine(interview, isMicMuted) {
   }, [isMicMuted, handleTranscript, handleSpeechStart, handleSpeechEnd]);
 
   const stopListening = useCallback(() => {
-    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
     if (deepgramConnectionRef.current) {
-      deepgramConnectionRef.current.finish();
+      deepgramConnectionRef.current.processor?.disconnect();
+      deepgramConnectionRef.current.source?.disconnect();
+      deepgramConnectionRef.current.audioContext?.close();
+      deepgramConnectionRef.current.connection?.finish();
       deepgramConnectionRef.current = null;
     }
-    if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
     setIsListening(false);
   }, []);
 
@@ -276,6 +253,30 @@ export function useInterviewEngine(interview, isMicMuted) {
   useEffect(() => {
     return () => endConversation();
   }, [endConversation]);
+
+  // Helper function for resampling audio
+  const downsampleBuffer = (buffer, inputSampleRate, outputSampleRate) => {
+      if (inputSampleRate === outputSampleRate) {
+          return buffer;
+      }
+      const sampleRateRatio = inputSampleRate / outputSampleRate;
+      const newLength = Math.round(buffer.length / sampleRateRatio);
+      const result = new Float32Array(newLength);
+      let offsetResult = 0;
+      let offsetBuffer = 0;
+      while (offsetResult < result.length) {
+          const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+          let accum = 0, count = 0;
+          for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+              accum += buffer[i];
+              count++;
+          }
+          result[offsetResult] = accum / count;
+          offsetResult++;
+          offsetBuffer = nextOffsetBuffer;
+      }
+      return result;
+  };
 
   return { conversation, currentUserResponse, interimTranscript, isUserSpeaking, isAISpeaking, isListening, error, startConversation, endConversation };
 } 
