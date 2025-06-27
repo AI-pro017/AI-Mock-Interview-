@@ -12,8 +12,8 @@ export default function ConversationDisplay({ conversation, isAISpeaking, isUser
     }
   }, [conversation, isAISpeaking, isUserSpeaking, currentUserResponse, interimTranscript]);
   
-  // Combine the final part of the user's response with the live, interim transcript
-  const liveUserResponse = `${currentUserResponse}${currentUserResponse ? ' ' : ''}${interimTranscript}`;
+  // This logic correctly combines the stable, finalized text with the live, changing interim text.
+  const liveUserResponse = `${currentUserResponse}${interimTranscript ? (currentUserResponse ? ' ' : '') + interimTranscript : ''}`;
 
   return (
     <div ref={scrollRef} className="h-96 overflow-y-auto border rounded-md p-4 mb-4 bg-gray-50 flex flex-col space-y-4">
@@ -37,7 +37,7 @@ export default function ConversationDisplay({ conversation, isAISpeaking, isUser
             </div>
           )}
           
-          {/* This block will now display the user's speech in real-time */}
+          {/* This block will now display the user's speech in real-time correctly */}
           {(isUserSpeaking || liveUserResponse) && (
             <div className="p-3 rounded-lg bg-green-100 self-end max-w-[90%] w-fit">
               <div className="font-bold">You</div>
