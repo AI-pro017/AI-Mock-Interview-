@@ -194,28 +194,22 @@ export function useInterviewEngine(interview, isMicMuted) {
         if (event.label === 'speech_end') handleSpeechEnd();
       });
 
-      const audioContext = new AudioContext({ sampleRate: 16000 });
+      const audioContext = new AudioContext();
+      await audioContext.audioWorklet.addModule('/audio-processor.js'); 
       const source = audioContext.createMediaStreamSource(audioStream);
-      const processor = audioContext.createScriptProcessor(1024, 1, 1);
+      const workletNode = new AudioWorkletNode(audioContext, 'audio-processor');
 
-      processor.onaudioprocess = (e) => {
-        if (isMicMuted || connection.getReadyState() !== 1) return;
-        
-        const inputData = e.inputBuffer.getChannelData(0);
-        const downsampled = downsampleBuffer(inputData, audioContext.sampleRate, 16000);
-        const int16 = new Int16Array(downsampled.length);
-
-        for (let i = 0; i < downsampled.length; i++) {
-          int16[i] = Math.max(-32768, Math.min(32767, downsampled[i] * 32767));
+      workletNode.port.onmessage = (event) => {
+        const audioData = event.data;
+        if (!isMicMuted && connection.getReadyState() === 1) {
+          connection.send(audioData);
         }
-        
-        connection.send(int16.buffer);
       };
 
-      source.connect(processor);
-      processor.connect(audioContext.destination);
+      source.connect(workletNode);
+      workletNode.connect(audioContext.destination);
       
-      deepgramConnectionRef.current = { connection, audioContext, processor, source };
+      deepgramConnectionRef.current = { connection, audioContext, workletNode, source };
     } catch (e) {
       console.error("X. [startListening] CRITICAL ERROR in setup:", e);
       setError(e);
@@ -224,7 +218,8 @@ export function useInterviewEngine(interview, isMicMuted) {
 
   const stopListening = useCallback(() => {
     if (deepgramConnectionRef.current) {
-      deepgramConnectionRef.current.processor?.disconnect();
+      deepgramConnectionRef.current.workletNode?.port.close();
+      deepgramConnectionRef.current.workletNode?.disconnect();
       deepgramConnectionRef.current.source?.disconnect();
       deepgramConnectionRef.current.audioContext?.close();
       deepgramConnectionRef.current.connection?.finish();
@@ -253,30 +248,6 @@ export function useInterviewEngine(interview, isMicMuted) {
   useEffect(() => {
     return () => endConversation();
   }, [endConversation]);
-
-  // Helper function for resampling audio
-  const downsampleBuffer = (buffer, inputSampleRate, outputSampleRate) => {
-      if (inputSampleRate === outputSampleRate) {
-          return buffer;
-      }
-      const sampleRateRatio = inputSampleRate / outputSampleRate;
-      const newLength = Math.round(buffer.length / sampleRateRatio);
-      const result = new Float32Array(newLength);
-      let offsetResult = 0;
-      let offsetBuffer = 0;
-      while (offsetResult < result.length) {
-          const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
-          let accum = 0, count = 0;
-          for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
-              accum += buffer[i];
-              count++;
-          }
-          result[offsetResult] = accum / count;
-          offsetResult++;
-          offsetBuffer = nextOffsetBuffer;
-      }
-      return result;
-  };
 
   return { conversation, currentUserResponse, interimTranscript, isUserSpeaking, isAISpeaking, isListening, error, startConversation, endConversation };
 } 
