@@ -2,7 +2,7 @@
 import sgMail from '@sendgrid/mail';
 import { NextResponse } from 'next/server';
 import { db } from '../../../../utils/db';
-import { Users } from '../../../../utils/schema';
+import { users } from '../../../../utils/schema';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
 
@@ -20,15 +20,15 @@ export async function POST(request) {
     const verificationToken = crypto.randomBytes(32).toString('hex');
     
     // Check if user exists
-    const existingUser = await db.query.Users.findFirst({
-      where: eq(Users.email, email),
+    const existingUser = await db.query.users.findFirst({
+      where: eq(users.email, email),
     });
     
     if (existingUser) {
       // Update existing user with new verification token
-      await db.update(Users)
+      await db.update(users)
         .set({ verificationToken })
-        .where(eq(Users.email, email));
+        .where(eq(users.email, email));
     } else {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }

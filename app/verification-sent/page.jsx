@@ -3,8 +3,12 @@
 
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
-export default function VerificationSentPage() {
+// This tells Next.js not to statically generate this page
+export const dynamic = 'force-dynamic';
+
+function VerificationSentContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get('email') || 'your email';
 
@@ -37,5 +41,13 @@ export default function VerificationSentPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function VerificationSentPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center min-h-screen">Loading...</div>}>
+      <VerificationSentContent />
+    </Suspense>
   );
 }

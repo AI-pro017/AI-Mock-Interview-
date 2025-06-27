@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function ResetPassword() {
+// This tells Next.js not to statically generate this page
+export const dynamic = 'force-dynamic';
+
+function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const [token, setToken] = useState('');
   const [password, setPassword] = useState('');
@@ -133,5 +136,13 @@ export default function ResetPassword() {
         </div>
       </div>
     </section>
+  );
+}
+
+export default function ResetPassword() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center min-h-screen">Loading...</div>}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 } 

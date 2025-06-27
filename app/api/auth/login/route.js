@@ -1,7 +1,7 @@
 // AI-Mock-Interview-/app/api/auth/login/route.js
 import { NextResponse } from 'next/server';
 import { db } from '../../../../utils/db';
-import { Users } from '../../../../utils/schema';
+import { users } from '../../../../utils/schema'; // Changed from Users to users
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -16,8 +16,8 @@ export async function POST(request) {
     }
 
     // Find user by email
-    const user = await db.query.Users.findFirst({
-      where: eq(Users.email, email),
+    const user = await db.query.users.findFirst({ // Changed from Users to users
+      where: eq(users.email, email), // Changed from Users to users
     });
 
     if (!user) {
@@ -39,11 +39,10 @@ export async function POST(request) {
     const sessionToken = crypto.randomBytes(32).toString('hex');
     const sessionExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    // Store session token in database (ensure you have a sessionTokenExpiresAt field or similar)
-    // For simplicity, I'm just updating the sessionToken. Add expiry handling as needed.
-    await db.update(Users)
-      .set({ sessionToken: sessionToken /*, sessionTokenExpiresAt: sessionExpiry */ })
-      .where(eq(Users.id, user.id));
+    // Store session token in database
+    await db.update(users) // Changed from Users to users
+      .set({ sessionToken: sessionToken })
+      .where(eq(users.id, user.id)); // Changed from Users to users
 
     // Set session cookie
     cookies().set('auth-token', sessionToken, {
