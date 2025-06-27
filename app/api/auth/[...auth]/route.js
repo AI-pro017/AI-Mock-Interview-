@@ -8,6 +8,9 @@ import { eq } from "drizzle-orm"
 import bcrypt from "bcryptjs"
 import { CredentialsSignin } from "@auth/core/errors"
 
+// --- DEBUGGING LINE ---
+console.log("SERVER-SIDE GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID);
+
 export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db, {
     usersTable: users,
@@ -17,6 +20,8 @@ export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
   }),
   providers: [
     Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       profile(profile) {
         return {
           id: profile.sub,
