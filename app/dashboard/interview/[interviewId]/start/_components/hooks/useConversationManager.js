@@ -4,9 +4,10 @@ import { useState, useRef, useCallback } from 'react';
 import { useAIResponse } from './useAIResponse';
 import { useSpeechRecognition } from './useSpeechRecognition';
 
-export function useConversationManager(interview) {
+export function useConversationManager(interview, isMicMuted) {
   const [conversation, setConversation] = useState([]);
   const [currentUserResponse, setCurrentUserResponse] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState('');
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   
   const userResponseBufferRef = useRef('');
@@ -22,70 +23,61 @@ export function useConversationManager(interview) {
   
   // Handle user speech start
   const handleSpeechStart = useCallback(() => {
+    clearTimeout(silenceTimerRef.current);
     setIsUserSpeaking(true);
-    
-    // If AI is speaking, stop it
     if (isAISpeaking) {
       stopSpeaking();
     }
-    
-    // Clear silence timer
-    clearTimeout(silenceTimerRef.current);
   }, [isAISpeaking, stopSpeaking]);
   
   // Handle user speech end
   const handleSpeechEnd = useCallback(() => {
-    // Process response after a brief silence
-    if (userResponseBufferRef.current.trim()) {
-      processUserResponse();
-    }
-    
-    setIsUserSpeaking(false);
-  }, []);
+    silenceTimerRef.current = setTimeout(() => {
+      if (userResponseBufferRef.current.trim()) {
+        processUserResponse();
+      } else {
+        setIsUserSpeaking(false);
+      }
+    }, 1500);
+  }, [processUserResponse]);
   
   // Handle transcript updates
-  const handleTranscript = useCallback((transcript, isFinal) => {
-    if (!isFinal) return;
-    
-    // Add to current response buffer
-    userResponseBufferRef.current += ' ' + transcript;
-    setCurrentUserResponse(userResponseBufferRef.current.trim());
-    
-    // If AI is speaking, stop it
+  const handleTranscriptUpdate = useCallback((transcript, isFinal) => {
     if (isAISpeaking) {
       stopSpeaking();
+    }
+    
+    if (isFinal) {
+      userResponseBufferRef.current += transcript + ' ';
+      setCurrentUserResponse(userResponseBufferRef.current.trim());
+      setInterimTranscript('');
+    } else {
+      setInterimTranscript(transcript);
     }
   }, [isAISpeaking, stopSpeaking]);
   
   // Process completed user response
   const processUserResponse = useCallback(async () => {
     const userResponse = userResponseBufferRef.current.trim();
+    if (!userResponse) {
+      setIsUserSpeaking(false);
+      return;
+    }
+
+    setConversation(prev => [...prev, { role: 'user', text: userResponse }]);
     
-    if (!userResponse) return;
-    
-    // Add to conversation history
-    setConversation(prev => [...prev, { 
-      role: 'user', 
-      text: userResponse 
-    }]);
-    
-    // Generate AI response
-    const conversationHistory = [
-      ...conversation, 
-      { role: 'user', text: userResponse }
-    ];
-    
+    const conversationHistory = [...conversation, { role: 'user', text: userResponse }];
     const prompt = createPromptFromConversation(conversationHistory, 'response');
     const aiResponse = await generateAndSpeak(prompt, interview);
     
     if (aiResponse) {
       setConversation(prev => [...prev, { role: 'ai', text: aiResponse }]);
     }
-    
-    // Clear buffer for next speech
+
     userResponseBufferRef.current = '';
     setCurrentUserResponse('');
-  }, [conversation, interview, generateAndSpeak]);
+    setIsUserSpeaking(false);
+  }, [conversation, generateAndSpeak, interview]);
   
   // Create a prompt from conversation history
   const createPromptFromConversation = (conversationHistory, type) => {
@@ -137,7 +129,8 @@ export function useConversationManager(interview) {
   } = useSpeechRecognition({
     onSpeechStart: handleSpeechStart,
     onSpeechEnd: handleSpeechEnd,
-    onFinalTranscript: handleTranscript
+    onTranscript: handleTranscriptUpdate,
+    muted: isMicMuted,
   });
   
   // Clean up function
@@ -150,6 +143,7 @@ export function useConversationManager(interview) {
   return {
     conversation,
     currentUserResponse,
+    interimTranscript,
     isUserSpeaking,
     isAISpeaking,
     isListening,

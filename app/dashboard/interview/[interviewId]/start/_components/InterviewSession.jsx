@@ -29,11 +29,13 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const {
     conversation,
     currentUserResponse,
+    interimTranscript,
     isUserSpeaking,
     isAISpeaking,
     startConversation,
     endConversation,
     speechError,
+    isListening,
   } = useConversationManager(interview, isMicMuted);
 
   const initializeMedia = async () => {
@@ -160,7 +162,14 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
             isAISpeaking={isAISpeaking}
             isUserSpeaking={isUserSpeaking}
             currentUserResponse={currentUserResponse}
+            interimTranscript={interimTranscript}
           />
+
+          <div className="h-8 mt-2 text-sm text-gray-500 text-center">
+            {isListening && !isUserSpeaking && !isAISpeaking && (
+              <p className="animate-pulse">Listening...</p>
+            )}
+          </div>
 
           {speechError && (
             <div className="mt-4 p-3 bg-red-100 border border-red-300 text-red-800 rounded-md">
