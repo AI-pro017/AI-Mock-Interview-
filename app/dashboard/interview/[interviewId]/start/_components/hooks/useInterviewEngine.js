@@ -164,23 +164,40 @@ export function useInterviewEngine(interview, isMicMuted) {
   }, [processUserResponse]);
 
   const startListening = useCallback(async (audioStream) => {
+    console.log("1. [startListening] Attempting to start speech recognition...");
+
     if (!audioStream || !audioStream.active) {
-      setError(new Error("Audio stream is not active."));
+      const e = new Error("Audio stream is not active.");
+      console.error("1a. [startListening] ERROR:", e);
+      setError(e);
       return;
     }
+
     try {
+      console.log("2. [startListening] Fetching Deepgram token...");
       const response = await fetch('/api/deepgram');
       if (!response.ok) throw new Error('Failed to get Deepgram token');
       const { deepgramToken } = await response.json();
+      console.log("2a. [startListening] Deepgram token received.");
+
       const deepgram = createClient(deepgramToken);
       const connection = deepgram.listen.live({
         model: "nova-2", language: "en-US", smart_format: true,
         interim_results: true, vad_events: true, utterance_end_ms: 1000,
       });
 
-      connection.on("open", () => setIsListening(true));
-      connection.on("close", () => setIsListening(false));
-      connection.on('error', (e) => { console.error("Deepgram Error:", e); setError(e); });
+      connection.on("open", () => {
+        console.log("3. [Deepgram] Connection OPENED successfully.");
+        setIsListening(true);
+      });
+      connection.on("close", () => {
+        console.log("X. [Deepgram] Connection CLOSED.");
+        setIsListening(false);
+      });
+      connection.on('error', (e) => { 
+        console.error("X. [Deepgram] ERROR:", e); 
+        setError(e); 
+      });
       connection.on('transcript', handleTranscript);
       connection.on('VADEvent', (event) => {
         if (event.label === 'speech_start') handleSpeechStart();
@@ -192,36 +209,40 @@ export function useInterviewEngine(interview, isMicMuted) {
       const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
 
       if (!supportedMimeType) {
-        console.error("No supported MIME type for MediaRecorder");
-        setError(new Error("Your browser does not support the required audio formats for recording."));
+        const e = new Error("Your browser does not support the required audio formats for recording.");
+        console.error("4a. [MediaRecorder] ERROR:", e);
+        setError(e);
         return;
       }
       
       try {
+        console.log(`4. [MediaRecorder] Attempting to create with supported MIME type: ${supportedMimeType}`);
         mediaRecorder = new MediaRecorder(audioStream, { mimeType: supportedMimeType });
       } catch (e) {
-        console.error("Failed to create MediaRecorder with preferred MIME type, trying default.", e);
-        // Fallback to the browser's default if the preferred type fails
+        console.error("4a. [MediaRecorder] ERROR with preferred MIME type. Trying default.", e);
         try {
           mediaRecorder = new MediaRecorder(audioStream);
         } catch (fallbackError) {
-          console.error("Failed to create MediaRecorder with default settings.", fallbackError);
-          setError(new Error("Could not initialize audio recorder. Please check browser permissions and support."));
+          const e = new Error("Could not initialize audio recorder.");
+          console.error("4b. [MediaRecorder] FATAL ERROR with default.", fallbackError);
+          setError(e);
           return;
         }
       }
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0 && !isMicMuted && connection.getReadyState() === 1) {
+          console.log(`5. [ondataavailable] Sending audio data chunk of size: ${event.data.size}`);
           connection.send(event.data);
         }
       };
       
+      console.log("6. [MediaRecorder] Starting recording...");
       mediaRecorder.start(250);
       mediaRecorderRef.current = mediaRecorder;
       deepgramConnectionRef.current = connection;
     } catch (e) {
-      console.error("Failed to start listening:", e);
+      console.error("X. [startListening] CRITICAL ERROR in setup:", e);
       setError(e);
     }
   }, [isMicMuted, handleTranscript, handleSpeechStart, handleSpeechEnd]);
