@@ -4,6 +4,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -30,7 +31,7 @@ function VerifyEmailContent() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to verify email.');
+          throw new Error(data.message || 'Failed to verify email.');
         }
         
         setStatus('success');
@@ -43,38 +44,53 @@ function VerifyEmailContent() {
     verifyToken();
   }, [token]);
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#fbefe5] px-4">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-xl text-center">
-        {status === 'verifying' && (
-          <div>
-            <h1 className="text-2xl font-bold text-[#2c5f73]">Verifying your email...</h1>
-            <p className="mt-2 text-gray-600">Please wait a moment.</p>
+  const renderContent = () => {
+    switch (status) {
+      case 'verifying':
+        return (
+          <>
+            <h1 className="text-2xl font-bold">Verifying your email...</h1>
+            <p className="mt-2 text-muted-foreground">Please wait a moment.</p>
             <div className="mt-4 flex justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2c5f73]"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
-          </div>
-        )}
+          </>
+        );
+      case 'success':
+        return (
+          <>
+            <div className="text-6xl mb-4">✅</div>
+            <h1 className="text-2xl font-bold text-green-500">Email Verified!</h1>
+            <p className="mt-2 text-muted-foreground">Your account has been successfully activated.</p>
+            <Link href="/sign-in" passHref>
+                <Button className="w-full mt-6">Go to Sign In</Button>
+            </Link>
+          </>
+        );
+      case 'error':
+        return (
+          <>
+            <div className="text-6xl mb-4">❌</div>
+            <h1 className="text-2xl font-bold text-destructive">Verification Failed</h1>
+            <p className="mt-2 text-muted-foreground">{error}</p>
+            <Link href="/sign-up" passHref>
+                <Button className="w-full mt-6">Go back to Sign Up</Button>
+            </Link>
+          </>
+        );
+      default:
+        return null;
+    }
+  };
 
-        {status === 'success' && (
-          <div>
-            <h1 className="text-2xl font-bold text-green-600">Email Verified!</h1>
-            <p className="mt-2 text-gray-600">Your account has been successfully activated.</p>
-            <Link href="/sign-in" className="inline-block mt-6 px-6 py-2 text-sm font-medium text-white bg-[#2c5f73] rounded-md hover:bg-[#234d5f]">
-              Go to Sign In
-          </Link>
-          </div>
-        )}
-
-        {status === 'error' && (
-          <div>
-            <h1 className="text-2xl font-bold text-red-600">Verification Failed</h1>
-            <p className="mt-2 text-gray-600">{error}</p>
-             <Link href="/sign-up" className="inline-block mt-6 px-6 py-2 text-sm font-medium text-white bg-[#2c5f73] rounded-md hover:bg-[#234d5f]">
-              Go back to Sign Up
-          </Link>
-          </div>
-        )}
+  return (
+    <div
+      className="flex items-center justify-center min-h-screen bg-cover bg-center"
+      style={{ backgroundImage: "url('/background.jpg')" }}
+    >
+      <div className="absolute inset-0 bg-black opacity-50"></div>
+      <div className="w-full max-w-md p-8 space-y-6 bg-card text-card-foreground rounded-xl shadow-lg z-10 text-center">
+        {renderContent()}
       </div>
     </div>
   );
@@ -83,7 +99,11 @@ function VerifyEmailContent() {
 // The page must be wrapped in Suspense because useSearchParams() is a Client Component hook
 export default function VerifyEmailPage() {
     return (
-        <Suspense fallback={<div>Loading...</div>}>
+        <Suspense fallback={
+            <div className="flex justify-center items-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+        }>
             <VerifyEmailContent />
         </Suspense>
     )
