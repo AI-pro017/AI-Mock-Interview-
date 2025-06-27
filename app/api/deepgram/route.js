@@ -14,12 +14,12 @@ export async function GET() {
       }, { status: 500 });
     }
 
-    // Create a temporary API key using direct API call instead of SDK
-    const response = await fetch('https://api.deepgram.com/v1/listen?callback=false', {
+    // Using the auth/token endpoint to get details about the API key
+    // This is a lightweight way to validate the API key is working
+    const response = await fetch('https://api.deepgram.com/v1/auth/token', {
       method: 'GET',
       headers: {
-        'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`
       }
     });
 
@@ -27,19 +27,19 @@ export async function GET() {
       const errorData = await response.text();
       console.error('Deepgram API Error:', errorData);
       return NextResponse.json({ 
-        error: 'Failed to create Deepgram key', 
+        error: 'Failed to validate Deepgram API key', 
         details: errorData 
       }, { status: response.status });
     }
 
-    // Extract the API key from the response
-    const data = await response.json();
-    
+    // Simply return the API key for client use
+    // Note: In production, you might want to use the token granting approach
+    // via POST to /v1/auth/grant for more security
     return NextResponse.json({ deepgramToken: process.env.DEEPGRAM_API_KEY });
   } catch (error) {
-    console.error('Error creating Deepgram key:', error.message);
+    console.error('Error accessing Deepgram API:', error.message);
     return NextResponse.json({ 
-      error: 'Error creating Deepgram key', 
+      error: 'Error accessing Deepgram API', 
       message: error.message 
     }, { status: 500 });
   }
