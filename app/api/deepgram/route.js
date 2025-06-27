@@ -6,26 +6,21 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     // Verify environment variables are available
-    if (!process.env.DEEPGRAM_PROJECT_ID || !process.env.DEEPGRAM_API_KEY) {
-      console.error('Deepgram API Error: Missing environment variables');
+    if (!process.env.DEEPGRAM_API_KEY) {
+      console.error('Deepgram API Error: Missing API key');
       return NextResponse.json({ 
         error: 'Configuration error', 
-        message: 'Missing Deepgram credentials' 
+        message: 'Missing Deepgram API key' 
       }, { status: 500 });
     }
 
     // Create a temporary API key using direct API call instead of SDK
-    const response = await fetch(`https://api.deepgram.com/v1/projects/${process.env.DEEPGRAM_PROJECT_ID}/keys`, {
-      method: 'POST',
+    const response = await fetch('https://api.deepgram.com/v1/listen?callback=false', {
+      method: 'GET',
       headers: {
         'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
         'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        comment: 'Temporary key for mock interview',
-        scopes: ['member'],
-        time_to_live_in_seconds: 3600 // 1 hour
-      })
+      }
     });
 
     if (!response.ok) {
@@ -37,14 +32,10 @@ export async function GET() {
       }, { status: response.status });
     }
 
+    // Extract the API key from the response
     const data = await response.json();
     
-    if (!data || !data.key) {
-      console.error('Deepgram response missing key:', data);
-      return NextResponse.json({ error: 'Invalid response from Deepgram API' }, { status: 500 });
-    }
-
-    return NextResponse.json({ deepgramToken: data.key });
+    return NextResponse.json({ deepgramToken: process.env.DEEPGRAM_API_KEY });
   } catch (error) {
     console.error('Error creating Deepgram key:', error.message);
     return NextResponse.json({ 

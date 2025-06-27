@@ -32,17 +32,6 @@ export default function CameraSelection({ onCameraToggle }) {
     onCameraToggle(newState);
   };
 
-  // Get diagnostic information to help troubleshoot
-  const getDiagnosticInfo = () => {
-    let info = "Diagnostic Information:\n";
-    info += `- Browser: ${navigator.userAgent}\n`;
-    info += `- Protocol: ${window.location.protocol}\n`;
-    info += `- mediaDevices supported: ${navigator.mediaDevices ? 'Yes' : 'No'}\n`;
-    
-    console.log(info);
-    return info;
-  };
-
   return (
     <Card className="p-6">
       <h2 className="text-xl font-bold mb-4">Camera Settings</h2>
@@ -123,16 +112,6 @@ export default function CameraSelection({ onCameraToggle }) {
             )}
           </div>
         </div>
-        
-        {/* For development troubleshooting */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => console.log(getDiagnosticInfo())}
-          className="w-full text-xs"
-        >
-          Print Diagnostic Info (Check Console)
-        </Button>
       </div>
     </Card>
   );
