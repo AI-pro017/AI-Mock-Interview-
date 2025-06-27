@@ -21,6 +21,7 @@ export function useInterviewEngine(interview, isMicMuted) {
   const deepgramConnectionRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const keepAliveIntervalRef = useRef(null);
 
   // --- AI RESPONSE LOGIC ---
   const stopSpeaking = useCallback(() => {
@@ -127,22 +128,12 @@ export function useInterviewEngine(interview, isMicMuted) {
   
   // --- SPEECH RECOGNITION LOGIC ---
   const handleTranscript = useCallback((transcript, isFinal) => {
-    // --- START OF DEBUGGING CODE ---
-    // This will create a popup for every transcript received.
-    alert(`Transcript Received: (Final: ${isFinal})\n\nText: ${transcript}`);
-    // --- END OF DEBUGGING CODE ---
-
     if (isAISpeaking) stopSpeaking();
-
     if (isFinal && transcript.trim()) {
-      // When a segment is final, append it to the main buffer.
       userResponseBufferRef.current += transcript + ' ';
-      // The "stable" part of the user's response is now this buffer.
       setCurrentUserResponse(userResponseBufferRef.current.trim());
-      // The interim transcript can be cleared as this piece is now final.
       setInterimTranscript('');
-    } else if (transcript) {
-      // For any non-final result, just update the live interim display.
+    } else {
       setInterimTranscript(transcript);
     }
   }, [isAISpeaking, stopSpeaking]);
@@ -184,15 +175,23 @@ export function useInterviewEngine(interview, isMicMuted) {
       const connection = deepgram.listen.live({
         model: "nova-2", language: "en-US", smart_format: true,
         interim_results: true, vad_events: true, utterance_end_ms: 1000,
+        keepalive: 'true'
       });
 
       connection.on("open", () => {
         console.log("3. [Deepgram] Connection OPENED successfully.");
         setIsListening(true);
+        if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
+        keepAliveIntervalRef.current = setInterval(() => {
+          if (connection.getReadyState() === 1) {
+            connection.keepAlive();
+          }
+        }, 10000);
       });
       connection.on("close", () => {
         console.log("X. [Deepgram] Connection CLOSED.");
         setIsListening(false);
+        if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
       });
       connection.on('error', (e) => { 
         console.error("X. [Deepgram] ERROR:", e); 
@@ -253,6 +252,7 @@ export function useInterviewEngine(interview, isMicMuted) {
       deepgramConnectionRef.current.finish();
       deepgramConnectionRef.current = null;
     }
+    if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
     setIsListening(false);
   }, []);
 
