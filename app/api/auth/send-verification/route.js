@@ -43,7 +43,7 @@ export async function POST(request) {
       text: `Click the link to verify your account: ${verificationLink}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #2c5f73;">Verify your Mock Mate AI account</h1>
+          <h1 style="color:rgb(54, 117, 146);">Verify your Mock Mate AI account</h1>
           <p>Click the button below to verify your account:</p>
           <a href="${verificationLink}" style="display: inline-block; background-color: #2c5f73; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;">Verify Account</a>
           <p>Or copy and paste this link into your browser:</p>

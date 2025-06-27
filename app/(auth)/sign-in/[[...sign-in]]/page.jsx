@@ -79,7 +79,7 @@ export default function SignIn() {
         router.push(callbackUrl);
       }
     } catch (err) {
-        setError('An unexpected error occurred. Please try again.');
+        setError('An error occurred. Please try again.');
         setLoading(false);
     }
   };
