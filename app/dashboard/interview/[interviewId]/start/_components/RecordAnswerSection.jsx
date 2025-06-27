@@ -1,53 +1,148 @@
 "use client";
 import { db } from '@/utils/db';
 import { UserAnswer } from '@/utils/schema';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Webcam from "react-webcam";
 import { Button } from '@/components/ui/button';
-import { Mic } from 'lucide-react';
-import useSpeechToText from 'react-hook-speech-to-text';
+import { Mic, StopCircle } from 'lucide-react';
 import { chatSession } from '@/utils/GeminiAIModal';
 import { toast } from 'sonner';
+import Image from 'next/image';
+import { createClient } from '@deepgram/sdk';
 
-function RecordAnswerSection({ mockInterviewQuestion, activeQuestionIndex, interviewData }) {
+export default function RecordAnswerSection({ mockInterview }) {
     const [userAnswer, setUserAnswer] = useState('');
     const [loading, setLoading] = useState(false);
+    const [webcamEnabled, setWebcamEnabled] = useState(false);
+    const [isInterviewStarted, setIsInterviewStarted] = useState(false);
+    const [isAwaitingAIResponse, setIsAwaitingAIResponse] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
+    const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
 
-    const {
-        isRecording,
-        results,
-        startSpeechToText,
-        stopSpeechToText,
-        setResults
-    } = useSpeechToText({
-        continuous: true,
-        useLegacyResults: false,
-    });
+    const webcamRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const deepgramConnectionRef = useRef(null);
 
-    // Collect the speech-to-text result and append to userAnswer
     useEffect(() => {
-        results.forEach(result => setUserAnswer(prevAns => prevAns + result?.transcript));
-    }, [results]);
+        // This effect now handles both setup and cleanup
+        const enableWebcam = () => {
+            setWebcamEnabled(true);
+        };
+        enableWebcam();
 
-    // Automatically save the answer when recording stops and userAnswer is long enough
-    useEffect(() => {
-        if (!isRecording && userAnswer.length > 10) {
-            UpdateUserAnswer();
-        }
-    }, [userAnswer]);
+        return () => {
+            // This is the crucial cleanup function that runs when the component unmounts
+            console.log("Cleaning up interview resources...");
+            if (webcamRef.current && webcamRef.current.stream) {
+                webcamRef.current.stream.getTracks().forEach(track => track.stop());
+            }
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                mediaRecorderRef.current.stop();
+            }
+            if (deepgramConnectionRef.current) {
+                deepgramConnectionRef.current.finish();
+            }
+        };
+    }, []);
 
-    const StartStopRecording = () => {
-        if (isRecording) {
-            stopSpeechToText();
-        } else {
-            startSpeechToText();
+    const startInterview = async () => {
+        setIsInterviewStarted(true);
+        setIsAwaitingAIResponse(true);
+        const firstQuestion = mockInterview.jsonMockResp[0]?.question;
+
+        try {
+            const response = await fetch('/api/text-to-speech', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: firstQuestion }),
+            });
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            audio.play();
+
+            audio.onended = () => {
+                setIsAwaitingAIResponse(false);
+                startRecording();
+            };
+        } catch (e) {
+            console.error(e);
+            setIsAwaitingAIResponse(false);
         }
+    };
+
+    const startRecording = async () => {
+        setIsRecording(true);
+        setUserAnswer('');
+        
+        try {
+            const response = await fetch('/api/deepgram');
+            const data = await response.json();
+            const { deepgramToken } = data;
+
+            const deepgram = createClient(deepgramToken);
+            const connection = deepgram.listen.live({
+                model: "nova-2",
+                language: "en-US",
+                smart_format: true,
+                interim_results: true,
+            });
+
+            // Check if webcam is available, but don't block if it's not
+            let stream;
+            if (webcamRef.current && webcamRef.current.stream) {
+                stream = webcamRef.current.stream;
+            } else {
+                // Get audio-only stream if webcam is not available
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+            
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            mediaRecorderRef.current = mediaRecorder;
+            
+            connection.on("open", () => {
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        connection.send(event.data);
+                    }
+                };
+                mediaRecorder.start(250);
+            });
+            
+            connection.on('transcript', (data) => {
+                const transcript = data.channel.alternatives[0].transcript;
+                if (transcript && data.is_final) {
+                    setUserAnswer(prev => prev + ' ' + transcript);
+                }
+            });
+
+            connection.on('close', () => {
+                console.log('Deepgram connection closed.');
+            });
+
+            deepgramConnectionRef.current = connection;
+        } catch (error) {
+            console.error("Error during Deepgram setup:", error);
+            setIsRecording(false);
+        }
+    };
+
+    const stopRecording = () => {
+        setIsRecording(false);
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+        }
+        if (deepgramConnectionRef.current) {
+            deepgramConnectionRef.current.finish();
+        }
+        console.log("Final Answer:", userAnswer);
+        setIsAwaitingAIResponse(true);
     };
 
     const UpdateUserAnswer = async () => {
         try {
           // Ensure mockId is available
-          if (!interviewData?.mockId) {
+          if (!mockInterview?.mockId) {
             console.error("mockId is missing, cannot proceed with saving the answer.");
             toast.error("Error: Mock Interview ID is missing.");
             return;
@@ -56,7 +151,7 @@ function RecordAnswerSection({ mockInterviewQuestion, activeQuestionIndex, inter
           setLoading(true);
       
           // Create the feedback prompt for the Gemini API
-          const feedbackPrompt = `Question: ${mockInterviewQuestion[activeQuestionIndex]?.question}, User Answer: ${userAnswer}. Based on the question and user answer, provide a rating and feedback.`;
+          const feedbackPrompt = `Question: ${mockInterview?.jsonMockResp[0]?.question}, User Answer: ${userAnswer}. Based on the question and user answer, provide a rating and feedback.`;
       
           // Send the prompt to the Gemini API
           const result = await chatSession.sendMessage(feedbackPrompt);
@@ -91,13 +186,13 @@ function RecordAnswerSection({ mockInterviewQuestion, activeQuestionIndex, inter
       
           // Insert the user answer into the database
           const resp = await db.insert(UserAnswer).values({
-            mockIdRef: interviewData?.mockId,  // Ensure mockIdRef is passed
-            question: mockInterviewQuestion[activeQuestionIndex]?.question,
-            correctAns: mockInterviewQuestion[activeQuestionIndex]?.answer,
+            mockIdRef: mockInterview?.mockId,  // Ensure mockIdRef is passed
+            question: mockInterview?.jsonMockResp[0]?.question,
+            correctAns: mockInterview?.jsonMockResp[0]?.answer,
             userAns: userAnswer,
             feedback: JsonFeedbackResp?.feedback || "No feedback available",
             rating: JsonFeedbackResp?.rating || "No rating available",
-            userEmail: interviewData?.createdBy,  // Assuming this is the user email
+            userEmail: mockInterview?.createdBy,  // Assuming this is the user email
             createdAt: new Date(),
             
           });
@@ -105,49 +200,52 @@ function RecordAnswerSection({ mockInterviewQuestion, activeQuestionIndex, inter
           if (resp) {
             toast.success('User answer recorded successfully');
             setUserAnswer('');
-            setResults([]);
           }
         } catch (error) {
           console.error("Error saving user answer:", error);
           toast.error("Failed to save the user answer.");
         } finally {
-          setResults([]);
           setLoading(false);
         }
       };
-      
-      
+
+    const stopUserRecording = () => {
+        setIsRecording(false);
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+        }
+        if (deepgramConnectionRef.current) {
+            deepgramConnectionRef.current.finish();
+        }
+        console.log("Final Answer:", userAnswer);
+        setIsAwaitingAIResponse(true);
+    };
 
     return (
         <div className='flex items-center justify-center flex-col'>
-            {/* Webcam Section */}
-            <div className='flex flex-col mt-20 justify-center items-center bg-black rounded-lg p-5 relative'>
+            <div className='relative flex flex-col justify-center items-center bg-black rounded-lg p-5'>
                 <Webcam
+                    ref={webcamRef}
+                    onUserMedia={() => setWebcamEnabled(true)}
+                    onUserMediaError={() => setWebcamEnabled(false)}
                     mirrored={true}
-                    style={{
-                        height: 300,
-                        width: '100%',
-                        zIndex: 10,
-                    }}
+                    style={{ height: 300, width: '100%', zIndex: 10 }}
                 />
+                {!webcamEnabled && <Image src={'/webcam.png'} width={200} height={200} className='absolute' alt="Webcam Icon"/>}
             </div>
 
-            {/* Record Answer Button */}
             <Button
-                disabled={loading}
-                variant="outline"
+                disabled={isAwaitingAIResponse && isInterviewStarted}
+                onClick={isInterviewStarted ? (isRecording ? stopUserRecording : startRecording) : startInterview}
                 className="my-10"
-                onClick={StartStopRecording}
             >
-                {isRecording ?
-                    <h2 className='text-red-600 flex gap-2'>
-                        <Mic /> Stop Recording
-                    </h2>
-                    : 'Record Answer'
-                }
+                {isInterviewStarted ? 
+                    (isRecording ? 
+                        <span className='flex items-center gap-2'><StopCircle /> Stop Answering</span> : 
+                        (isAwaitingAIResponse ? 'AI is Speaking...' : 'Start Answering')
+                    ) 
+                : 'Start Interview'}
             </Button>
         </div>
     );
 }
-
-export default RecordAnswerSection;

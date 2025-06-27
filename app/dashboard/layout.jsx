@@ -9,9 +9,9 @@ function DashboardLayout({children}) {
       <div className="ml-64">
         <Header />
         <main className="p-8 bg-gray-50 min-h-screen">
-            {children}
+        {children}
         </main>
-      </div>
+        </div>
     </div>
   )
 }

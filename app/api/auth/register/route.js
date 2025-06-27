@@ -28,12 +28,12 @@ export async function POST(req) {
     if (existingUser.length > 0) {
       if (existingUser[0].emailVerified) {
         return NextResponse.json({ error: 'An account with this email already exists and is verified.' }, { status: 409 });
-      }
+    }
     } else {
       const passwordHash = await bcrypt.hash(password, 10);
       await db.insert(users).values({
-        name,
-        email,
+      name,
+      email,
         passwordHash,
         experienceLevel: null,
         targetRoles: null,
@@ -55,7 +55,7 @@ export async function POST(req) {
         target: verificationTokens.identifier,
         set: { token: token, expires: expires }
     });
-
+    
     // Dynamically construct the verification link from the request URL
     const url = new URL(req.url);
     const baseUrl = `${url.protocol}//${url.host}`;
@@ -64,9 +64,9 @@ export async function POST(req) {
     if (!fromEmail) {
       throw new Error("SENDGRID_VERIFIED_SENDER is not set in the environment variables.");
     }
-    
+
     const msg = {
-        to: email,
+      to: email,
         from: fromEmail,
         subject: 'Verify Your Email Address for Mock Mate AI',
         html: `<p>Hello ${name},</p><p>Please click the link below to verify your email address:</p><p><a href="${verificationLink}">${verificationLink}</a></p><p>This link will expire in 24 hours.</p>`,

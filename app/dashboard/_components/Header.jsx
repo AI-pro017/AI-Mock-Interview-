@@ -27,7 +27,7 @@ function Header() {
             {session?.user ? (
                  <DropdownMenu>
                  <DropdownMenuTrigger>
-                    <Image src={session.user.image || '/default-avatar.png'} alt='user' width={40} height={40}
+                    <Image src={session.user.image || '/default-avatar.svg'} alt='user' width={40} height={40}
                         className='rounded-full'
                     />
                  </DropdownMenuTrigger>

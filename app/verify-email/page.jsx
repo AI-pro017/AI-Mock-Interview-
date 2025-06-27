@@ -32,7 +32,7 @@ function VerifyEmailContent() {
         if (!response.ok) {
           throw new Error(data.error || 'Failed to verify email.');
         }
-
+        
         setStatus('success');
       } catch (err) {
         setStatus('error');
@@ -51,18 +51,18 @@ function VerifyEmailContent() {
             <h1 className="text-2xl font-bold text-[#2c5f73]">Verifying your email...</h1>
             <p className="mt-2 text-gray-600">Please wait a moment.</p>
             <div className="mt-4 flex justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2c5f73]"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2c5f73]"></div>
             </div>
           </div>
         )}
-        
+
         {status === 'success' && (
           <div>
             <h1 className="text-2xl font-bold text-green-600">Email Verified!</h1>
             <p className="mt-2 text-gray-600">Your account has been successfully activated.</p>
             <Link href="/sign-in" className="inline-block mt-6 px-6 py-2 text-sm font-medium text-white bg-[#2c5f73] rounded-md hover:bg-[#234d5f]">
               Go to Sign In
-            </Link>
+          </Link>
           </div>
         )}
 
@@ -72,7 +72,7 @@ function VerifyEmailContent() {
             <p className="mt-2 text-gray-600">{error}</p>
              <Link href="/sign-up" className="inline-block mt-6 px-6 py-2 text-sm font-medium text-white bg-[#2c5f73] rounded-md hover:bg-[#234d5f]">
               Go back to Sign Up
-            </Link>
+          </Link>
           </div>
         )}
       </div>

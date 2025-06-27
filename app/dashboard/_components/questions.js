@@ -66,26 +66,49 @@ const questions = [
   
 // This file stores constants for the interview setup form
 
-export const PRECONFIGURED_ROLES = [
-  'Software Engineer (Frontend)',
-  'Software Engineer (Backend)',
-  'Software Engineer (Full-stack)',
-  'Data Scientist',
-  'Data Analyst',
-  'Product Manager',
-  'Project Manager',
-  'Business Analyst',
-  'DevOps Engineer',
-  'UI/UX Designer',
-  'Sales Representative',
-  'Marketing Manager',
-  'HR Manager',
+export const PRE_CONFIGURED_ROLES = [
+    { value: 'Software Engineer', label: 'Software Engineer (Frontend/Backend/Full-stack)' },
+    { value: 'Data Scientist', label: 'Data Scientist/Analyst' },
+    { value: 'Product Manager', label: 'Product Manager' },
+    { value: 'Project Manager', label: 'Project Manager' },
+    { value: 'Business Analyst', label: 'Business Analyst' },
+    { value: 'DevOps Engineer', label: 'DevOps Engineer' },
+    { value: 'UI/UX Designer', label: 'UI/UX Designer' },
+    { value: 'Sales Representative', label: 'Sales Representative' },
+    { value: 'Marketing Manager', label: 'Marketing Manager' },
+    { value: 'HR Manager', label: 'HR Manager' },
 ];
 
-export const DIFFICULTIES = ['Easy', 'Medium', 'Hard', 'Expert'];
-export const INTERVIEW_FOCUS_OPTIONS = ['Balanced', 'Technical', 'Behavioral'];
-export const INTERVIEW_STYLES = ['Conversational', 'Formal'];
-export const INTERVIEW_MODES = ['Practice', 'Assessment'];
+export const INTERVIEW_STYLES = [
+    { value: 'Conversational', label: 'Conversational' },
+    { value: 'Formal', label: 'Formal' },
+    { value: 'Technical Deep Dive', label: 'Technical Deep Dive' },
+];
+
+export const FOCUS_AREAS = [
+    { value: 'Behavioral', label: 'Behavioral Questions' },
+    { value: 'Technical', label: 'Technical Questions' },
+    { value: 'Mixed', label: 'A Mix of Both' },
+];
+
+export const DIFFICULTY_LEVELS = [
+    { value: 'Easy', label: 'Easy' },
+    { value: 'Medium', label: 'Medium' },
+    { value: 'Hard', label: 'Hard' },
+    { value: 'Expert', label: 'Expert' },
+];
+
+export const DURATION_OPTIONS = [
+    { value: 15, label: '15 Minutes' },
+    { value: 30, label: '30 Minutes' },
+    { value: 45, label: '45 Minutes' },
+    { value: 60, label: '60 Minutes' },
+];
+
+export const INTERVIEW_MODES = [
+    { value: 'Practice', label: 'Practice Mode (Get hints and feedback)' },
+    { value: 'Assessment', label: 'Assessment Mode (Strict evaluation)' },
+];
 
 export const INDUSTRIES = [
     'Technology',

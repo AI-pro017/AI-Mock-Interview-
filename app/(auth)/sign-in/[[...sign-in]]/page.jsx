@@ -62,7 +62,7 @@ export default function SignIn() {
         setLoading(false);
         return; // Stop the function here.
       }
-      
+
       // Step 3: If status is 'proceed', attempt the actual sign-in.
       const result = await signIn('credentials', {
         redirect: false,
@@ -80,7 +80,7 @@ export default function SignIn() {
       }
     } catch (err) {
         setError('An unexpected error occurred. Please try again.');
-        setLoading(false);
+      setLoading(false);
     }
   };
 

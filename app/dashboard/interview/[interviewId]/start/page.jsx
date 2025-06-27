@@ -1,80 +1,99 @@
 "use client";
-import { db } from '@/utils/db';
-import { MockInterview } from '@/utils/schema';
-import { eq } from 'drizzle-orm';
-import React, { useEffect, useState } from 'react';
-import QuestionsSection from './_components/QuestionsSection';
-import RecordAnswerSection from './_components/RecordAnswerSection';
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import InterviewSession from './_components/InterviewSession';
+import CameraSelection from './_components/CameraSelection';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+import { Card } from '@/components/ui/card';
 
-function StartInterview({ params }) {
-    // State to hold the interview data and the list of questions
-    const [interviewData, setInterviewData] = useState(null);  // Initialize as null
-    const [mockInterviewQuestion, setMockInterviewQuestion] = useState([]);  // Initialize as an empty array
-    const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);  // To track the current question
+export default function InterviewStartPage() {
+    const params = useParams();
+    const [interview, setInterview] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [useCameraInInterview, setUseCameraInInterview] = useState(false);
+    const [isSetupComplete, setIsSetupComplete] = useState(false);
+    const [cameraStream, setCameraStream] = useState(null);
 
-    //  interview details when the component is mounted
     useEffect(() => {
-        GetInterviewDetails();
-    }, []);
-
-    // Function to fetch interview data from the database
-    const GetInterviewDetails = async () => {
-        try {
-            const result = await db
-                .select()
-                .from(MockInterview)
-                .where(eq(MockInterview.mockId, params.interviewId));
-
-            // Ensure there is a valid result
-            if (result.length > 0) {
-                // Set the interview data
-                setInterviewData(result[0]);
-
-                // Parse and set the mock interview questions
-                const jsonMockResp = JSON.parse(result[0].jsonMockResp);
-                console.log(jsonMockResp);
-
-                // Update the state with the mock interview questions
-                setMockInterviewQuestion(jsonMockResp);
-            } else {
-                console.error("No interview data found for the given ID");
+        async function fetchInterview() {
+            try {
+                const response = await fetch(`/api/interview?id=${params.interviewId}`);
+                if (!response.ok) throw new Error('Failed to fetch interview');
+                const data = await response.json();
+                setInterview(data);
+            } catch (error) {
+                console.error("Error loading interview:", error);
+            } finally {
+                setLoading(false);
             }
-        } catch (error) {
-            console.error("Error fetching interview data:", error);
         }
+        
+        fetchInterview();
+    }, [params.interviewId]);
+
+    const handleCameraToggle = (enabled) => {
+        setUseCameraInInterview(enabled);
     };
 
+    const handleStartInterview = () => {
+        setIsSetupComplete(true);
+    };
+
+    if (loading) {
+        return <div className="container mx-auto p-5">Loading interview data...</div>;
+    }
+
+    if (!isSetupComplete) {
+        return (
+            <div className="container mx-auto p-5">
+                <h1 className="text-2xl font-bold mb-6">Interview Setup</h1>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <Card className="p-6">
+                            <h2 className="text-xl font-bold mb-4">Interview Details</h2>
+                            {interview && (
+                                <div className="space-y-4">
+                                    <div>
+                                        <span className="font-semibold">Position:</span> {interview.jobPosition}
+                                    </div>
+                                    <div>
+                                        <span className="font-semibold">Experience Level:</span> {interview.jobExperience} years
+                                    </div>
+                                    <div>
+                                        <span className="font-semibold">Interview Style:</span> {interview.interviewStyle}
+                                    </div>
+                                    <div>
+                                        <span className="font-semibold">Focus:</span> {interview.focus}
+                                    </div>
+                                    <div>
+                                        <span className="font-semibold">Duration:</span> {interview.duration} minutes
+                                    </div>
+                                </div>
+                            )}
+                        </Card>
+                    </div>
+                    <CameraSelection onCameraToggle={handleCameraToggle} />
+                </div>
+                <div className="mt-6 flex justify-center">
+                    <Button 
+                        size="lg" 
+                        onClick={handleStartInterview}
+                    >
+                        Start Interview
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                {/* Question Section */}
-                {mockInterviewQuestion.length > 0 && (
-                    <QuestionsSection 
-                        mockInterviewQuestion={mockInterviewQuestion}
-                        activeQuestionIndex={activeQuestionIndex}
-                    />
-                )}
-                
-                {/* Video / Audio Recording Section */}
-                {interviewData && (
-                    <RecordAnswerSection
-                        mockInterviewQuestion={mockInterviewQuestion}
-                        activeQuestionIndex={activeQuestionIndex}
-                        interviewData={interviewData}
-                    />
-                )}
-            </div>
-            <div className = 'flex justify-end gap-6'>
-                {activeQuestionIndex>0 && <Button onClick={()=>setActiveQuestionIndex(activeQuestionIndex-1)}>Previous Question</Button>}
-                {activeQuestionIndex!=mockInterviewQuestion?.length-1&& <Button onClick={()=>setActiveQuestionIndex(activeQuestionIndex+1)}>Next Question</Button>}
-                {activeQuestionIndex==mockInterviewQuestion?.length-1&& <Link href={'/dashboard/interview/'+interviewData?.mockId+"/feedback"}><Button>End</Button></Link>}
-                
-                
-            </div>
+        <div className="container mx-auto p-5">
+            {interview && (
+                <InterviewSession 
+                    interview={interview} 
+                    useCameraInInterview={useCameraInInterview}
+                />
+            )}
         </div>
     );
 }
-
-export default StartInterview;

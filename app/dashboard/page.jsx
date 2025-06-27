@@ -27,7 +27,7 @@ async function DashboardPage() {
         .where(eq(MockInterview.createdBy, session.user.email)) // Assumes createdBy uses email
         .orderBy(desc(MockInterview.id));
 
-    return (
+  return (
         <DashboardClient user={user} interviews={interviews} />
     )
 }
