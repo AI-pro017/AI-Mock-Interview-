@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@deepgram/sdk';
 
 export function useSpeechRecognition({
@@ -18,15 +18,19 @@ export function useSpeechRecognition({
   const mediaRecorderRef = useRef(null);
   const silenceTimerRef = useRef(null);
   
-  // Start listening with Deepgram
-  const startListening = async (audioStream) => {
-    if (!audioStream) return;
-    
+  const startListening = useCallback(async (audioStream) => {
+    if (!audioStream || !audioStream.active) {
+      const e = new Error("Cannot start speech recognition: The provided audio stream is not active.");
+      console.error(e);
+      setError(e);
+      return;
+    }
+
+    setError(null);
+
     try {
       const response = await fetch('/api/deepgram');
-      if (!response.ok) {
-        throw new Error('Failed to get Deepgram token');
-      }
+      if (!response.ok) throw new Error('Failed to get Deepgram token');
       
       const data = await response.json();
       const { deepgramToken } = data;
@@ -41,94 +45,72 @@ export function useSpeechRecognition({
         utterance_end_ms: 1000,
         endpointing: 200
       });
-      
-      // Set up MediaRecorder to capture audio
+
+      connection.on("open", () => setIsListening(true));
+      connection.on("close", () => setIsListening(false));
+      connection.on('error', (e) => {
+        console.error("Deepgram Error:", e);
+        setError(e);
+      });
+
+      connection.on('transcript', (data) => {
+        const transcript = data.channel.alternatives[0].transcript;
+        if (transcript) {
+          onTranscript?.(transcript, data.is_final);
+          if (data.is_final && transcript.trim()) {
+            onFinalTranscript?.(transcript);
+          }
+        }
+      });
+
+      connection.on('VADEvent', (event) => {
+        if (event.label === 'speech_start') onSpeechStart?.();
+        if (event.label === 'speech_end') onSpeechEnd?.();
+      });
+
+      // Ensure the recorder is stopped before creating a new one
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+
       const mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0 && !muted && enabled) {
           connection.send(event.data);
         }
       };
-      
-      mediaRecorder.start(250);
+
       mediaRecorderRef.current = mediaRecorder;
-      
-      // Handle connection events
-      connection.on("open", () => {
-        setIsListening(true);
-        setError(null);
-      });
-      
-      // Handle speech transcripts
-      connection.on('transcript', (data) => {
-        const transcript = data.channel.alternatives[0].transcript;
-        
-        if (transcript) {
-          // Pass the transcript to the callback
-          onTranscript?.(transcript, data.is_final);
-          
-          if (data.is_final) {
-            onFinalTranscript?.(transcript);
-          }
-        }
-      });
-      
-      // Handle Voice Activity Detection events
-      connection.on('VADEvent', (event) => {
-        if (event.label === 'speech_start') {
-          onSpeechStart?.();
-          clearTimeout(silenceTimerRef.current);
-        }
-        
-        if (event.label === 'speech_end') {
-          // Start silence timer
-          silenceTimerRef.current = setTimeout(() => {
-            onSpeechEnd?.();
-          }, 1500);
-        }
-      });
-      
-      // Handle errors and connection close
-      connection.on('error', (error) => {
-        console.error("Deepgram connection error:", error);
-        setError(error);
-        setIsListening(false);
-      });
-      
-      connection.on('close', () => {
-        setIsListening(false);
-      });
-      
-      // Store the connection
       deepgramConnectionRef.current = connection;
-      
-    } catch (error) {
-      console.error("Error setting up Deepgram:", error);
-      setError(error);
-      setIsListening(false);
+
+      // This is a critical point. Start recording.
+      mediaRecorder.start(250);
+
+    } catch (e) {
+      console.error("Failed to start listening:", e);
+      setError(e);
     }
-  };
-  
-  // Stop listening
-  const stopListening = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+  }, [muted, onSpeechStart, onSpeechEnd, onTranscript, onFinalTranscript, enabled]);
+
+  const stopListening = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
     }
-    
     if (deepgramConnectionRef.current) {
       deepgramConnectionRef.current.finish();
+      deepgramConnectionRef.current = null;
     }
-    
     clearTimeout(silenceTimerRef.current);
     setIsListening(false);
-  };
-  
-  // Clean up on unmount
+  }, []);
+
   useEffect(() => {
+    // Cleanup on unmount
     return () => {
       stopListening();
     };
-  }, []);
+  }, [stopListening]);
   
   return {
     isListening,

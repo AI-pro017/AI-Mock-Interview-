@@ -162,7 +162,12 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
             currentUserResponse={currentUserResponse}
           />
 
-          {speechError && <div className="text-red-500 text-sm mt-2">Speech recognition error: {speechError.message}</div>}
+          {speechError && (
+            <div className="mt-4 p-3 bg-red-100 border border-red-300 text-red-800 rounded-md">
+              <p className="font-bold">A speech recognition error occurred:</p>
+              <p className="text-sm mt-1">{speechError.message}</p>
+            </div>
+          )}
         </Card>
       </div>
 
