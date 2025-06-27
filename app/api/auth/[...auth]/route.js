@@ -11,13 +11,6 @@ import { CredentialsSignin } from "@auth/core/errors"
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
 
-// Next.js App Router requires this to be explicit
-const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
-
-console.log("AUTH CONFIG - GOOGLE_CLIENT_ID:", googleClientId ? "✓ Loaded" : "✗ Missing");
-console.log("AUTH CONFIG - GOOGLE_CLIENT_SECRET:", googleClientSecret ? "✓ Loaded" : "✗ Missing");
-
 // Create the auth config
 const authOptions = {
   adapter: DrizzleAdapter(db, {
@@ -28,8 +21,6 @@ const authOptions = {
   }),
   providers: [
     Google({
-      clientId: googleClientId,
-      clientSecret: googleClientSecret,
       profile(profile) {
         return {
           id: profile.sub,
