@@ -177,7 +177,30 @@ export function useInterviewEngine(interview, isMicMuted) {
         if (event.label === 'speech_end') handleSpeechEnd();
       });
 
-      const mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
+      let mediaRecorder;
+      const mimeTypes = ['audio/webm', 'audio/mp4', 'audio/ogg'];
+      const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+
+      if (!supportedMimeType) {
+        console.error("No supported MIME type for MediaRecorder");
+        setError(new Error("Your browser does not support the required audio formats for recording."));
+        return;
+      }
+      
+      try {
+        mediaRecorder = new MediaRecorder(audioStream, { mimeType: supportedMimeType });
+      } catch (e) {
+        console.error("Failed to create MediaRecorder with preferred MIME type, trying default.", e);
+        // Fallback to the browser's default if the preferred type fails
+        try {
+          mediaRecorder = new MediaRecorder(audioStream);
+        } catch (fallbackError) {
+          console.error("Failed to create MediaRecorder with default settings.", fallbackError);
+          setError(new Error("Could not initialize audio recorder. Please check browser permissions and support."));
+          return;
+        }
+      }
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0 && !isMicMuted && connection.getReadyState() === 1) {
           connection.send(event.data);
