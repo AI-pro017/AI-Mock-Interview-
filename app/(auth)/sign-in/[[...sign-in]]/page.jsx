@@ -68,8 +68,17 @@ export default function Page() {
   };
 
   const handleGoogleSignIn = () => {
-    console.log("🔄 ATTEMPTING GOOGLE SIGN-IN");
-    signIn('google', { callbackUrl });
+    try {
+      console.log("Starting Google Sign-In");
+      signIn('google', { 
+        callbackUrl,
+        redirect: true
+      }).catch(error => {
+        console.error("Google Sign-In Error:", error);
+      });
+    } catch (error) {
+      console.error("Failed to initiate Google Sign-In:", error);
+    }
   };
 
   return (

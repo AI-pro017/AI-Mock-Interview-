@@ -8,10 +8,18 @@ import { eq } from "drizzle-orm"
 import bcrypt from "bcryptjs"
 import { CredentialsSignin } from "@auth/core/errors"
 
-// --- DEBUGGING LINE ---
-console.log("SERVER-SIDE GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID);
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
 
-export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
+// Next.js App Router requires this to be explicit
+const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
+
+console.log("AUTH CONFIG - GOOGLE_CLIENT_ID:", googleClientId ? "✓ Loaded" : "✗ Missing");
+console.log("AUTH CONFIG - GOOGLE_CLIENT_SECRET:", googleClientSecret ? "✓ Loaded" : "✗ Missing");
+
+// Create the auth config
+const authOptions = {
   adapter: DrizzleAdapter(db, {
     usersTable: users,
     accountsTable: accounts,
@@ -20,8 +28,8 @@ export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
   }),
   providers: [
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
       profile(profile) {
         return {
           id: profile.sub,
@@ -95,4 +103,13 @@ export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: '/sign-in',
   },
-}) 
+};
+
+// Create the handlers
+const handler = NextAuth(authOptions);
+
+// Export the handlers
+export const { GET, POST } = handler;
+
+// For middleware.js
+export { authOptions }; 
