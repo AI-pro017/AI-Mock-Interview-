@@ -127,6 +127,11 @@ export function useInterviewEngine(interview, isMicMuted) {
   
   // --- SPEECH RECOGNITION LOGIC ---
   const handleTranscript = useCallback((transcript, isFinal) => {
+    // --- START OF DEBUGGING CODE ---
+    // This will create a popup for every transcript received.
+    alert(`Transcript Received: (Final: ${isFinal})\n\nText: ${transcript}`);
+    // --- END OF DEBUGGING CODE ---
+
     if (isAISpeaking) stopSpeaking();
 
     if (isFinal && transcript.trim()) {
