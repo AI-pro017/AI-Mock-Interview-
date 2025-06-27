@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Mic, MicOff, VideoOff } from 'lucide-react';
 import { useInterviewEngine } from './hooks/useInterviewEngine';
 import ConversationDisplay from './ConversationDisplay';
+import AudioVisualizer from './AudioVisualizer';
 
 // This function now safely checks for client-side environment first
 function safelyAccessCamera(video = true) {
@@ -153,6 +154,16 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
             currentUserResponse={currentUserResponse}
             interimTranscript={interimTranscript}
           />
+
+          <div className="h-16 mt-2 text-sm text-gray-500 text-center">
+            {isInterviewActive ? (
+                <AudioVisualizer audioStream={cameraStream} />
+            ) : (
+                <div className="h-full w-full bg-gray-100 rounded-md flex items-center justify-center">
+                    <p>Audio visualizer will appear here</p>
+                </div>
+            )}
+          </div>
 
           <div className="h-8 mt-2 text-sm text-gray-500 text-center">
             {isListening && !isUserSpeaking && !isAISpeaking && (
