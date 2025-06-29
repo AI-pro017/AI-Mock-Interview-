@@ -47,7 +47,7 @@ function VerifyEmailContent() {
   const renderContent = () => {
     switch (status) {
       case 'verifying':
-        return (
+  return (
           <>
             <h1 className="text-2xl font-bold">Verifying your email...</h1>
             <p className="mt-2 text-muted-foreground">Please wait a moment.</p>
@@ -64,7 +64,7 @@ function VerifyEmailContent() {
             <p className="mt-2 text-muted-foreground">Your account has been successfully activated.</p>
             <Link href="/sign-in" passHref>
                 <Button className="w-full mt-6">Go to Sign In</Button>
-            </Link>
+          </Link>
           </>
         );
       case 'error':
@@ -75,7 +75,7 @@ function VerifyEmailContent() {
             <p className="mt-2 text-muted-foreground">{error}</p>
             <Link href="/sign-up" passHref>
                 <Button className="w-full mt-6">Go back to Sign Up</Button>
-            </Link>
+          </Link>
           </>
         );
       default:

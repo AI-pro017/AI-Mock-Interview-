@@ -70,6 +70,9 @@ export default function Page() {
   const handleGoogleSignIn = () => {
     try {
       console.log("Starting Google Sign-In");
+      // Log environment variables from the client side
+      console.log("NEXT_PUBLIC_GOOGLE_CLIENT_ID:", process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "Not set in client");
+      
       signIn('google', { 
         callbackUrl,
         redirect: true
