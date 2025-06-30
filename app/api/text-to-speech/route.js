@@ -1,47 +1,50 @@
 import { NextResponse } from 'next/server';
-import fetch from 'node-fetch';
+import ElevenLabs from 'elevenlabs-node';
 
 export async function POST(req) {
   const { text } = await req.json();
+  console.log("Text-to-speech API called with text:", text?.substring(0, 50) + "...");
 
   if (!text) {
     return NextResponse.json({ error: 'Text is required' }, { status: 400 });
   }
 
   try {
-    // Make a direct API call to ElevenLabs instead of using the SDK
-    const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': process.env.ELEVENLABS_API_KEY
-      },
-      body: JSON.stringify({
-        text: text,
-        model_id: 'eleven_monolingual_v1',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75
-        }
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`ElevenLabs API returned ${response.status}: ${await response.text()}`);
+    // Check if API key exists
+    if (!process.env.ELEVENLABS_API_KEY) {
+      console.error("ELEVENLABS_API_KEY is missing");
+      return NextResponse.json({ error: 'ElevenLabs API key is not configured' }, { status: 500 });
     }
 
-    // Get the audio buffer
-    const audioBuffer = await response.arrayBuffer();
+    // Go back to using the SDK - it was working before according to you
+    const voice = new ElevenLabs({
+      apiKey: process.env.ELEVENLABS_API_KEY,
+      voiceId: '21m00Tcm4TlvDq8ikWAM', // Rachel voice
+    });
 
-    // Return the raw audio
+    console.log("Generating audio with ElevenLabs SDK");
+    const audioBuffer = await voice.textToSpeech({
+      textInput: text,
+      modelId: 'eleven_multilingual_v2',
+      stability: 0.5,
+      similarityBoost: 0.75,
+      style: 0,
+    });
+    
+    console.log(`Audio generated successfully, size: ${audioBuffer.byteLength} bytes`);
+
+    // Return the audio
     return new Response(audioBuffer, {
       headers: {
-        'Content-Type': 'audio/mpeg'
-      }
+        'Content-Type': 'audio/mpeg',
+      },
     });
   } catch (error) {
     console.error('ElevenLabs API Error:', error);
-    return NextResponse.json({ error: `Failed to generate audio: ${error.message}` }, { status: 500 });
+    // More descriptive error response
+    return NextResponse.json({ 
+      error: 'Failed to generate audio from ElevenLabs',
+      details: error.message 
+    }, { status: 500 });
   }
 } 
