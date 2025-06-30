@@ -6,11 +6,14 @@ class AudioProcessor extends AudioWorkletProcessor {
     this.outputSampleRate = 16000;
     
     // Log that we're initialized
-    console.log("🎛️ AudioProcessor initialized");
+    console.log("🎛️ AudioProcessor initialized with sample rate:", sampleRate);
     
     // Buffer to accumulate samples for downsampling
     this.buffer = [];
     this.bufferSize = 2048; // Process in larger chunks
+    
+    // Keep track of when we last sent data
+    this.lastSendTime = 0;
   }
 
   static get parameterDescriptors() {
@@ -43,6 +46,13 @@ class AudioProcessor extends AudioWorkletProcessor {
     // Get the actual sample rate from the context
     const inputSampleRate = sampleRate;
     
+    // Add a periodic debug message
+    const currentTime = currentTime;
+    if (currentTime - this.lastSendTime > 5) {
+      console.log("🎤 Audio processor active, processing chunks");
+      this.lastSendTime = currentTime;
+    }
+    
     // Downsample to 16kHz (Deepgram's preferred rate)
     const downsampled = this.downsample(audioChunk, inputSampleRate);
     
@@ -55,7 +65,11 @@ class AudioProcessor extends AudioWorkletProcessor {
     }
 
     // Send the processed audio chunk to the main thread
-    this.port.postMessage(audioData.buffer, [audioData.buffer]);
+    try {
+      this.port.postMessage(audioData.buffer, [audioData.buffer]);
+    } catch (e) {
+      console.error("Error sending audio data:", e);
+    }
 
     // Keep the processor alive
     return true;

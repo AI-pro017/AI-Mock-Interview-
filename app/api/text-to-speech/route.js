@@ -14,17 +14,17 @@ export async function POST(req) {
   });
 
   try {
-    const stream = await voice.textToSpeechStream({
+    // Use the non-streaming version for better browser compatibility
+    const audioBuffer = await voice.textToSpeech({
       textInput: text,
-      modelId: 'eleven_multilingual_v2', // Use the latest model
+      modelId: 'eleven_multilingual_v2',
       stability: 0.5,
       similarityBoost: 0.75,
       style: 1,
-      responseType: 'stream',
     });
 
-    // Return the audio stream directly to the client
-    return new Response(stream, {
+    // Return the audio as a binary response
+    return new Response(audioBuffer, {
       headers: {
         'Content-Type': 'audio/mpeg',
       },

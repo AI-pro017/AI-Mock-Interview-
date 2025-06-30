@@ -50,15 +50,23 @@ export function useInterviewEngine(interview, isMicMuted) {
     setError(null);
     abortControllerRef.current = new AbortController();
 
-    // Get the audio context from the Deepgram connection to ensure it's the same one
-    const audioContext = deepgramConnectionRef.current?.audioContext;
-    if (!audioContext) {
-      setError(new Error("Audio context not available for playback."));
-      setIsAISpeaking(false);
-      return;
-    }
-
     try {
+      // Create a new audio element each time
+      const audio = new Audio();
+      audioRef.current = audio;
+      
+      // Set up event listeners
+      audio.onended = () => {
+        setIsAISpeaking(false);
+      };
+      
+      audio.onerror = (e) => {
+        console.error("Audio playback error:", e);
+        setError(new Error("Failed to play audio response"));
+        setIsAISpeaking(false);
+      };
+
+      // Convert text to speech
       const response = await fetch('/api/text-to-speech', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,22 +78,19 @@ export function useInterviewEngine(interview, isMicMuted) {
         throw new Error(`Text-to-speech request failed with status ${response.status}`);
       }
       
-      const audioData = await response.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(audioData);
-
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
+      // Create a blob from the response and set it as the audio source
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      audio.src = url;
       
-      source.onended = () => {
-        // IMPORTANT: Resume mic input after AI finishes speaking
-        if (audioContext.state === 'suspended') {
-          audioContext.resume();
-        }
+      // Play the audio
+      await audio.play();
+      
+      // Clean up the blob URL when done
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
         setIsAISpeaking(false);
       };
-
-      source.start();
       
     } catch (err) {
       if (err.name !== 'AbortError') {
