@@ -61,14 +61,9 @@ export default function SignUpPage() {
 
   return (
     <div
-      className="flex items-center justify-center min-h-screen bg-cover bg-center"
-      style={{
-        backgroundImage:
-          "url('https://images.unsplash.com/photo-1593349349443-4a7736934c56?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')",
-      }}
+      className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-green-100"
     >
-      <div className="absolute inset-0 bg-black opacity-60"></div>
-      <div className="w-full max-w-md p-8 space-y-6 bg-card text-card-foreground rounded-xl shadow-lg z-10">
+      <div className="w-full max-w-md p-8 space-y-6 bg-white text-card-foreground rounded-xl shadow-lg z-10">
         <div className="text-center">
           <h1 className="text-3xl font-bold">Create an Account</h1>
           <p className="text-muted-foreground">
@@ -126,9 +121,12 @@ export default function SignUpPage() {
         </div>
         <Button
           variant="outline"
-          className="w-full"
+          className="w-full flex items-center justify-center gap-2"
           onClick={handleGoogleSignIn}
         >
+          <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 488 512">
+            <path fill="#4285F4" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"/>
+          </svg>
           Sign Up with Google
         </Button>
         <div className="text-center text-sm text-muted-foreground">

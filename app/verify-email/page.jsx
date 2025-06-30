@@ -47,7 +47,7 @@ function VerifyEmailContent() {
   const renderContent = () => {
     switch (status) {
       case 'verifying':
-  return (
+        return (
           <>
             <h1 className="text-2xl font-bold">Verifying your email...</h1>
             <p className="mt-2 text-muted-foreground">Please wait a moment.</p>
@@ -64,7 +64,7 @@ function VerifyEmailContent() {
             <p className="mt-2 text-muted-foreground">Your account has been successfully activated.</p>
             <Link href="/sign-in" passHref>
                 <Button className="w-full mt-6">Go to Sign In</Button>
-          </Link>
+            </Link>
           </>
         );
       case 'error':
@@ -75,7 +75,7 @@ function VerifyEmailContent() {
             <p className="mt-2 text-muted-foreground">{error}</p>
             <Link href="/sign-up" passHref>
                 <Button className="w-full mt-6">Go back to Sign Up</Button>
-          </Link>
+            </Link>
           </>
         );
       default:
@@ -84,12 +84,8 @@ function VerifyEmailContent() {
   };
 
   return (
-    <div
-      className="flex items-center justify-center min-h-screen bg-cover bg-center"
-      style={{ backgroundImage: "url('/background.jpg')" }}
-    >
-      <div className="absolute inset-0 bg-black opacity-50"></div>
-      <div className="w-full max-w-md p-8 space-y-6 bg-card text-card-foreground rounded-xl shadow-lg z-10 text-center">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-green-100">
+      <div className="w-full max-w-md p-8 space-y-6 bg-white text-card-foreground rounded-xl shadow-lg z-10 text-center">
         {renderContent()}
       </div>
     </div>
@@ -100,7 +96,7 @@ function VerifyEmailContent() {
 export default function VerifyEmailPage() {
     return (
         <Suspense fallback={
-            <div className="flex justify-center items-center min-h-screen">
+            <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-gray-50 to-green-100">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
         }>
