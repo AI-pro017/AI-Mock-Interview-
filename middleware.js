@@ -1,17 +1,14 @@
 // AI-Mock-Interview-/middleware.js
 // Replace Clerk middleware with custom auth middleware
 
-import { withAuth } from "next-auth/middleware";
-import { authOptions } from "./app/api/auth/[...auth]/route";
+import { auth } from "@/auth"
 
-export default withAuth({
-  callbacks: {
-    authorized: ({ token }) => !!token, // Only allow authenticated users
-  },
-  pages: {
-    signIn: '/sign-in',
-  },
-});
+export default auth((req) => {
+  if (!req.auth && req.nextUrl.pathname !== "/sign-in") {
+    const newUrl = new URL("/sign-in", req.nextUrl.origin)
+    return Response.redirect(newUrl)
+  }
+})
 
 export const config = {
   matcher: [

@@ -1,4 +1,4 @@
-import { auth } from "@/app/api/auth/[...auth]/route";
+import { auth } from "@/auth";
 import { db } from "@/utils/db";
 import { MockInterview } from "@/utils/schema";
 import { NextResponse } from "next/server";

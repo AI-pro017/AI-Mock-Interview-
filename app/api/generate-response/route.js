@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from "@/app/api/auth/[...auth]/route";
+import { auth } from "@/auth";
 import OpenAI from 'openai';
 
 const openai = new OpenAI({

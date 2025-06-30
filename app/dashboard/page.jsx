@@ -1,5 +1,5 @@
 // app/dashboard/page.jsx
-import { auth } from "@/app/api/auth/[...auth]/route"
+import { auth } from "@/auth"
 import { db } from "@/utils/db";
 import { users, MockInterview } from "@/utils/schema";
 import { eq, desc } from "drizzle-orm";
