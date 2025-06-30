@@ -76,113 +76,113 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <main className="flex-grow">
-        <section className="container mx-auto px-6 md:px-12 py-20 md:py-32 flex flex-col md:flex-row items-center">
-          <div className="md:w-1/2 lg:w-2/5 text-center md:text-left">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 leading-tight">
+      <section className="bg-white">
+        <div className="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12">
+          <div className="mr-auto place-self-center lg:col-span-7">
+            <h1 className="max-w-2xl mb-4 text-4xl font-extrabold tracking-tight leading-none md:text-5xl xl:text-6xl">
               Land Your Dream Job with AI
             </h1>
-            <p className="mt-4 text-lg text-gray-600">
-              Our AI-powered mock interviews help you practice, get instant feedback, and build the confidence you need to succeed.
+            <p className="max-w-2xl mb-6 font-light text-gray-500 lg:mb-8 md:text-lg lg:text-xl">
+              Our AI-powered mock interviews help you practice, get instant
+              feedback, and build the confidence you need to succeed.
             </p>
-            <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-              <Link href="/sign-up" passHref>
-                <Button size="lg" className="bg-blue-600 text-white hover:bg-blue-700 px-8 py-4 text-base font-semibold w-full sm:w-auto">
-                  Start Your Free Trial
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-            </div>
+            <a
+              href="/dashboard"
+              className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-white rounded-lg bg-gray-900 hover:bg-gray-800 focus:ring-4 focus:ring-gray-300"
+            >
+              Start Your Free Trial
+              <ArrowRight className="w-5 h-5 ml-2 -mr-1" />
+            </a>
           </div>
-          <div className="md:w-1/2 lg:w-3/5 mt-10 md:mt-0 flex justify-center items-center">
-             <Image 
-                src="/webcam.png"
-                alt="AI Mock Interview in action"
-                width={500}
-                height={400}
-                className="rounded-lg shadow-xl"
-             />
+          <div className="hidden lg:mt-0 lg:col-span-5 lg:flex">
+            <Image
+              src="/ai-interview-hero.png"
+              alt="AI mock interview illustration"
+              width={1000}
+              height={720}
+              className="rounded-lg"
+            />
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Features Section */}
-        <section id="features" className="py-20 bg-white">
-          <div className="container mx-auto px-6 md:px-12">
-            <div className="text-center max-w-2xl mx-auto">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Everything You Need to Succeed
-              </h2>
-              <p className="mt-4 text-lg text-gray-600">
-                From realistic simulations to detailed performance analysis, we've got you covered.
-              </p>
-            </div>
-            <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
-              {features.map((feature, index) => (
-                <div key={index} className="flex flex-col p-8 bg-gray-50 rounded-xl shadow-md hover:shadow-lg transition-shadow">
-                  <div className="flex-shrink-0">{feature.icon}</div>
-                  <div className="mt-4">
-                    <h3 className="text-xl font-semibold text-gray-900">{feature.title}</h3>
-                    <p className="mt-2 text-gray-600">{feature.description}</p>
+      {/* Features Section */}
+      <section id="features" className="py-20 bg-white">
+        <div className="container mx-auto px-6 md:px-12">
+          <div className="text-center max-w-2xl mx-auto">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+              Everything You Need to Succeed
+            </h2>
+            <p className="mt-4 text-lg text-gray-600">
+              From realistic simulations to detailed performance analysis, we've got you covered.
+            </p>
+          </div>
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
+            {features.map((feature, index) => (
+              <div key={index} className="flex flex-col p-8 bg-gray-50 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                <div className="flex-shrink-0">{feature.icon}</div>
+                <div className="mt-4">
+                  <h3 className="text-xl font-semibold text-gray-900">{feature.title}</h3>
+                  <p className="mt-2 text-gray-600">{feature.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-20">
+        <div className="container mx-auto px-6 md:px-12">
+          <div className="text-center max-w-2xl mx-auto">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+              Get Started in 3 Simple Steps
+            </h2>
+          </div>
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-12">
+              <div className="text-center">
+                  <div className="flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 text-blue-600 mx-auto text-2xl font-bold">1</div>
+                  <h3 className="mt-6 text-xl font-semibold text-gray-900">Sign Up</h3>
+                  <p className="mt-2 text-gray-600">Create your account in seconds.</p>
+              </div>
+              <div className="text-center">
+                  <div className="flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 text-blue-600 mx-auto text-2xl font-bold">2</div>
+                  <h3 className="mt-6 text-xl font-semibold text-gray-900">Start an Interview</h3>
+                  <p className="mt-2 text-gray-600">Choose your job role and start a mock interview.</p>
+              </div>
+              <div className="text-center">
+                  <div className="flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 text-blue-600 mx-auto text-2xl font-bold">3</div>
+                  <h3 className="mt-6 text-xl font-semibold text-gray-900">Receive Feedback</h3>
+                  <p className="mt-2 text-gray-600">Get instant, AI-powered feedback to improve.</p>
+              </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section id="testimonials" className="py-20 bg-white">
+        <div className="container mx-auto px-6 md:px-12">
+          <div className="text-center max-w-2xl mx-auto">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+              Trusted by Job Seekers Worldwide
+            </h2>
+          </div>
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-8">
+            {testimonials.map((testimonial, index) => (
+              <div key={index} className="p-8 bg-gray-50 rounded-xl shadow-md">
+                <p className="text-gray-600 italic">"{testimonial.quote}"</p>
+                <div className="mt-4 flex items-center">
+                  <Image src={testimonial.avatar} alt={testimonial.name} width={48} height={48} className="rounded-full" />
+                  <div className="ml-4">
+                    <p className="font-semibold text-gray-900">{testimonial.name}</p>
+                    <p className="text-gray-500">{testimonial.role}</p>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-        </section>
-
-        {/* How It Works Section */}
-        <section id="how-it-works" className="py-20">
-          <div className="container mx-auto px-6 md:px-12">
-            <div className="text-center max-w-2xl mx-auto">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Get Started in 3 Simple Steps
-              </h2>
-            </div>
-            <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-12">
-                <div className="text-center">
-                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 text-blue-600 mx-auto text-2xl font-bold">1</div>
-                    <h3 className="mt-6 text-xl font-semibold text-gray-900">Sign Up</h3>
-                    <p className="mt-2 text-gray-600">Create your account in seconds.</p>
-                </div>
-                <div className="text-center">
-                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 text-blue-600 mx-auto text-2xl font-bold">2</div>
-                    <h3 className="mt-6 text-xl font-semibold text-gray-900">Start an Interview</h3>
-                    <p className="mt-2 text-gray-600">Choose your job role and start a mock interview.</p>
-                </div>
-                <div className="text-center">
-                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 text-blue-600 mx-auto text-2xl font-bold">3</div>
-                    <h3 className="mt-6 text-xl font-semibold text-gray-900">Receive Feedback</h3>
-                    <p className="mt-2 text-gray-600">Get instant, AI-powered feedback to improve.</p>
-                </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Testimonials Section */}
-        <section id="testimonials" className="py-20 bg-white">
-          <div className="container mx-auto px-6 md:px-12">
-            <div className="text-center max-w-2xl mx-auto">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Trusted by Job Seekers Worldwide
-              </h2>
-            </div>
-            <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-8">
-              {testimonials.map((testimonial, index) => (
-                <div key={index} className="p-8 bg-gray-50 rounded-xl shadow-md">
-                  <p className="text-gray-600 italic">"{testimonial.quote}"</p>
-                  <div className="mt-4 flex items-center">
-                    <Image src={testimonial.avatar} alt={testimonial.name} width={48} height={48} className="rounded-full" />
-                    <div className="ml-4">
-                      <p className="font-semibold text-gray-900">{testimonial.name}</p>
-                      <p className="text-gray-500">{testimonial.role}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      </main>
+        </div>
+      </section>
 
       {/* Footer */}
       <footer className="w-full py-10 px-6 md:px-12 bg-gray-100 border-t">

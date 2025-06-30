@@ -14,6 +14,7 @@ export default function RecordAnswerSection({ mockInterview }) {
     const [userAnswer, setUserAnswer] = useState('');
     const [loading, setLoading] = useState(false);
     const [webcamEnabled, setWebcamEnabled] = useState(false);
+    const [isClient, setIsClient] = useState(false);
     const [isInterviewStarted, setIsInterviewStarted] = useState(false);
     const [isAwaitingAIResponse, setIsAwaitingAIResponse] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
@@ -24,6 +25,7 @@ export default function RecordAnswerSection({ mockInterview }) {
     const deepgramConnectionRef = useRef(null);
 
     useEffect(() => {
+        setIsClient(true);
         // This effect now handles both setup and cleanup
         const enableWebcam = () => {
             setWebcamEnabled(true);
@@ -231,7 +233,7 @@ export default function RecordAnswerSection({ mockInterview }) {
                     mirrored={true}
                     style={{ height: 300, width: '100%', zIndex: 10 }}
                 />
-                {!webcamEnabled && <Image src={'/webcam.png'} width={200} height={200} className='absolute' alt="Webcam Icon"/>}
+                {isClient && !webcamEnabled && <div className='absolute z-20 text-white'>Webcam not enabled. Please enable it to continue.</div>}
             </div>
 
             <Button
