@@ -22,41 +22,6 @@ export function useInterviewEngine(interview, isMicMuted) {
   const abortControllerRef = useRef(null);
 
   // --- AI RESPONSE & SPEECH ---
-  const speakText = useCallback(async (text) => {
-    if (!text) return;
-    setIsAISpeaking(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/text-to-speech', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      if (!response.ok) throw new Error('Failed to generate speech');
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-
-      await new Promise((resolve, reject) => {
-        audio.onended = () => {
-          // IMPORTANT: Resume mic input after AI finishes speaking
-          if (deepgramConnectionRef.current?.audioContext?.state === 'suspended') {
-            deepgramConnectionRef.current.audioContext.resume();
-          }
-          resolve();
-        };
-        audio.onerror = reject;
-        audio.play();
-      });
-    } catch (err) {
-      console.error("Error in text-to-speech:", err);
-      setError(err);
-    } finally {
-      setIsAISpeaking(false);
-    }
-  }, []);
-
   const generateAIResponse = useCallback(async (prompt) => {
     setIsGenerating(true);
     setError(null);
@@ -78,6 +43,59 @@ export function useInterviewEngine(interview, isMicMuted) {
     }
   }, [interview]);
   
+  const speakText = useCallback(async (text) => {
+    if (!text || text.trim() === "") return;
+
+    setIsAISpeaking(true);
+    setError(null);
+    abortControllerRef.current = new AbortController();
+
+    // Get the audio context from the Deepgram connection to ensure it's the same one
+    const audioContext = deepgramConnectionRef.current?.audioContext;
+    if (!audioContext) {
+      setError(new Error("Audio context not available for playback."));
+      setIsAISpeaking(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/text-to-speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Text-to-speech request failed with status ${response.status}`);
+      }
+      
+      const audioData = await response.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(audioData);
+
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      
+      source.onended = () => {
+        // IMPORTANT: Resume mic input after AI finishes speaking
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+        setIsAISpeaking(false);
+      };
+
+      source.start();
+      
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error("Error in text-to-speech playback:", err);
+        setError(err);
+      }
+      setIsAISpeaking(false);
+    }
+  }, []);
+
   const createPrompt = useCallback((convHistory, type) => {
     if (type === 'greeting') {
       return `You are an expert interviewer starting an interview for a ${interview.jobPosition} role. The candidate has ${interview.jobExperience} years of experience. Greet them warmly and ask your first question.`;
@@ -172,9 +190,12 @@ export function useInterviewEngine(interview, isMicMuted) {
 
   // --- CONVERSATION FLOW & LIFECYCLE ---
   const startConversation = useCallback(async (audioStream) => {
-    startListening(audioStream);
+    // Start listening first to initialize the audio context and Deepgram connection
+    await startListening(audioStream);
+
     const prompt = createPrompt([], 'greeting');
     const aiResponseText = await generateAIResponse(prompt);
+
     if (aiResponseText) {
       setConversation([{ role: 'ai', text: aiResponseText }]);
       await speakText(aiResponseText);
@@ -191,6 +212,7 @@ export function useInterviewEngine(interview, isMicMuted) {
     }
     if (audioRef.current) audioRef.current.pause();
     clearTimeout(silenceTimerRef.current);
+    setIsListening(false);
   }, []);
 
   useEffect(() => {
