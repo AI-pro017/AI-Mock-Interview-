@@ -56,7 +56,7 @@ export const PersonalityFeedback = pgTable('personalityFeedback', {
     index: integer('index').notNull()              
 });
 
-// New tables for next-auth
+// Add resumeContent field to the users table
 export const users = pgTable("users", {
   id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name"),
@@ -71,6 +71,7 @@ export const users = pgTable("users", {
   experienceLevel: varchar('experienceLevel'), // e.g., 'Entry-level', 'Mid-level', 'Senior'
   targetRoles: text('targetRoles'), // Can be a JSON string of roles
   resumeUrl: varchar('resumeUrl'),
+  resumeContent: text('resumeContent'), // Add this line to store resume content
   timezone: varchar('timezone'),
 });
 
