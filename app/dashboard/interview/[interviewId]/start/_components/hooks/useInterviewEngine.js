@@ -108,16 +108,6 @@ export function useInterviewEngine(interview, isMicMuted) {
       }
     } finally {
       setIsGenerating(false);
-      const checkQueue = setInterval(() => {
-        if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
-          setIsAISpeaking(false);
-          // Ensure mic is active after AI finishes
-          if (deepgramConnectionRef.current?.audioContext?.state === 'suspended') {
-            deepgramConnectionRef.current.audioContext.resume();
-          }
-          clearInterval(checkQueue);
-        }
-      }, 100);
     }
   };
 
@@ -139,7 +129,15 @@ export function useInterviewEngine(interview, isMicMuted) {
   };
 
   const playAudioQueue = async () => {
-    if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
+    if (isPlayingRef.current || audioQueueRef.current.length === 0) {
+      if (!isPlayingRef.current) {
+        setIsAISpeaking(false);
+        if (deepgramConnectionRef.current?.audioContext?.state === 'suspended') {
+          deepgramConnectionRef.current.audioContext.resume();
+        }
+      }
+      return;
+    }
     
     isPlayingRef.current = true;
     const audioBlob = audioQueueRef.current.shift();
@@ -149,11 +147,12 @@ export function useInterviewEngine(interview, isMicMuted) {
     
     audio.onended = () => {
       isPlayingRef.current = false;
-      playAudioQueue(); // Play next in queue
+      playAudioQueue();
     };
     audio.onerror = () => {
         console.error("Error playing audio.");
         isPlayingRef.current = false;
+        playAudioQueue();
     };
     audio.play();
   };
