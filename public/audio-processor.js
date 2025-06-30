@@ -53,10 +53,10 @@ class AudioProcessor extends AudioWorkletProcessor {
       const sample = downsampled[i] * 32767;
       audioData[i] = Math.max(-32768, Math.min(32767, Math.round(sample)));
     }
-    
+
     // Send the processed audio chunk to the main thread
     this.port.postMessage(audioData.buffer, [audioData.buffer]);
-    
+
     // Keep the processor alive
     return true;
   }
