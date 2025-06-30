@@ -4,7 +4,4 @@ import { handlers } from "@/auth"
 export const dynamic = 'force-dynamic';
 
 // Export the handlers
-export const { GET, POST } = handlers;
-
-// For middleware.js
-export { authOptions }; 
+export const { GET, POST } = handlers; 

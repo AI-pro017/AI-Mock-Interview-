@@ -1,4 +1,4 @@
-import { auth } from "@/app/api/auth/[...auth]/route"
+import { auth } from "@/auth"
 import { db } from "@/utils/db";
 import { users } from "@/utils/schema";
 import { eq } from "drizzle-orm";
