@@ -92,6 +92,7 @@ export default function SignUpPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
+            
           </div>
           <div>
             <Label htmlFor="password">Password</Label>
