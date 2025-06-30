@@ -1,22 +1,8 @@
-// app/api/profile/update/resume/route.js
 import { NextResponse } from 'next/server';
-import { auth } from "@/app/api/auth/[...auth]/route";
-import { db } from '@/utils/db';
-import { users } from "@/utils/schema";
-import { eq } from "drizzle-orm";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-// Initialize the Google Generative AI with your API key
-const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
+import pdfParse from 'pdf-parse';
 
 export async function POST(request) {
   try {
-    const session = await auth();
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
     const formData = await request.formData();
     const resumeFile = formData.get('resume');
     
@@ -24,91 +10,66 @@ export async function POST(request) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
     
-    // Convert the file to a format Gemini can work with
-    const fileArrayBuffer = await resumeFile.arrayBuffer();
-    const fileBuffer = Buffer.from(fileArrayBuffer);
-    
-    // For PDF parsing, we'll need to extract text first
-    // For this example, we'll simulate parsing with Gemini AI
-    
-    // Get text content from file (this is simplified)
-    let fileContent;
+    // Extract file content
+    let fileContent = '';
     try {
-      // For real implementation, use packages like pdf-parse for PDFs
-      // or mammoth for Word documents
-      
-      // For now, we'll use a simple text extraction approach
-      // Convert file to Base64 for the model
-      const base64Content = fileBuffer.toString('base64');
-      
-      // Use Gemini to analyze the resume
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      
-      // Create a prompt to extract information from the resume
-      const prompt = `
-        You are a resume parser. Extract the following information from this resume:
-        1. Experience level (choose from: Entry-level / New Grad, Junior (1-2 years), Mid-level (3-5 years), Senior (5-10 years), Staff / Principal (10+ years), Manager)
-        2. Target roles or job titles
-        
-        Output the information in JSON format with keys "experienceLevel" and "targetRoles".
-        For targetRoles, provide a comma-separated list of roles.
-      `;
-      
-      const result = await model.generateContent([
-        prompt,
-        {
-          inlineData: {
-            mimeType: resumeFile.type,
-            data: base64Content
-          }
+      // Convert file to array buffer then to text
+      const arrayBuffer = await resumeFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      // For text-based files, convert to string
+      if (resumeFile.type.includes('text/') || 
+          resumeFile.type === 'application/msword' ||
+          resumeFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        fileContent = buffer.toString('utf-8').substring(0, 1000); // Limit to first 1000 chars
+      }else if(resumeFile.type === 'application/pdf') {
+        const pdfData = await pdfParse(buffer);
+        fileContent  = pdfData.text;
+      }else if (resumeFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        // For DOCX files
+        const result = await mammoth.extractRawText({ buffer });
+        fileContent = result.value;
+        console.log("DOCX content extracted successfully");
+      } 
+      else if (resumeFile.type === 'application/msword') {
+        // For DOC files - older format
+        // Note: mammoth may not work perfectly with old .doc files
+        try {
+          const result = await mammoth.extractRawText({ buffer });
+          fileContent = result.value;
+          console.log("DOC content extracted successfully");
+        } catch (docError) {
+          console.error("Error extracting DOC content:", docError);
+          fileContent = "Could not parse DOC file content. Consider converting to DOCX format.";
         }
-      ]);
-      
-      const response = await result.response;
-      const textResponse = response.text();
-      
-      // Parse the JSON from the response
-      // Note: We're assuming the model returns valid JSON; in production add more error handling
-      const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-      const parsedData = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-      
-      if (!parsedData) {
-        throw new Error("Failed to parse resume data");
+      }else {
+        // For binary files like PDFs, show base64 preview
+        fileContent = `Binary file (${buffer.length} bytes), Base64 preview: ${buffer.toString('base64').substring(0, 100)}...`;
       }
-      
-      // Simulate file upload - in production replace with actual upload code
-      const fileName = resumeFile.name.replace(/\s+/g, '-').toLowerCase();
-      const resumeUrl = `https://storage.example.com/${Date.now()}-${fileName}`;
-      
-      // Update the user record with the resume URL
-      await db.update(users)
-        .set({
-          resumeUrl,
-          ...(parsedData.experienceLevel && { experienceLevel: parsedData.experienceLevel }),
-          ...(parsedData.targetRoles && { targetRoles: parsedData.targetRoles })
-        })
-        .where(eq(users.id, session.user.id));
-      
-      return NextResponse.json({ 
-        success: true, 
-        resumeUrl,
-        parsedData
-      });
-    } catch (error) {
-      console.error("Resume parsing error:", error);
-      return NextResponse.json({ 
-        error: "Failed to parse resume. Using mock data instead.",
-        success: true,
-        resumeUrl: `https://storage.example.com/${Date.now()}-${resumeFile.name}`,
-        parsedData: {
-          experienceLevel: 'Mid-level (3-5 years)',
-          targetRoles: 'Software Developer, Frontend Engineer'
-        }
-      });
+    } catch (err) {
+      console.error("Error reading file content:", err);
+      fileContent = "Error reading file content";
     }
+    
+    // Mock parsed data
+    const parsedData = {
+      experienceLevel: 'Mid-level (3-5 years)',
+      targetRoles: 'Frontend Developer, React Developer'
+    };
+    
+    return NextResponse.json({
+      success: true,
+      name: resumeFile.name, 
+      type: resumeFile.type, 
+      size: resumeFile.size,
+      content: fileContent,
+      parsedData,
+      resumeUrl: `https://storage.example.com/${Date.now()}-${resumeFile.name}`
+    });
     
   } catch (error) {
     console.error('Resume upload error:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: error.message || 'Internal server error' 
+    }, { status: 500 });
   }
 }

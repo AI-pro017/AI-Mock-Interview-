@@ -46,6 +46,7 @@ export default function ProfileForm({ user }) {
           file.type === 'application/msword' || 
           file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         setResumeFile(file);
+        console.log("File selected:", file.name, file.type, file.size);
       } else {
         toast.error("Please upload a PDF or Word document");
         fileInputRef.current.value = "";
@@ -58,11 +59,11 @@ export default function ProfileForm({ user }) {
       toast.error("Please select a file first");
       return;
     }
-
+  
     setParsingResume(true);
     
     try {
-      // Create FormData for file upload
+      // We'll let the server handle file parsing for all file types
       const formData = new FormData();
       formData.append('resume', resumeFile);
       
@@ -70,9 +71,10 @@ export default function ProfileForm({ user }) {
         method: 'POST',
         body: formData,
       });
-      
+      console.log(response)
       const data = await response.json();
       
+      console.log(data)
       if (!response.ok) {
         throw new Error(data.error || 'Failed to upload resume');
       }
@@ -87,6 +89,7 @@ export default function ProfileForm({ user }) {
       toast.success("Resume uploaded and parsed successfully!");
       
     } catch (error) {
+      console.error("Resume processing error:", error);
       toast.error(error.message || "Error uploading resume");
     } finally {
       setParsingResume(false);
