@@ -107,13 +107,14 @@ export function useInterviewEngine(interview, isMicMuted) {
   const processUserResponse = useCallback(async () => {
     const userResponse = userResponseBufferRef.current.trim();
     userResponseBufferRef.current = '';
+    setCurrentUserResponse(userResponse);
     setInterimTranscript('');
-    setCurrentUserResponse('');
     setIsUserSpeaking(false);
     if (!userResponse) return;
 
     const newConversation = [...conversation, { role: 'user', text: userResponse }];
     setConversation(newConversation);
+    setCurrentUserResponse('');
 
     const prompt = createPrompt(newConversation, 'response');
     const aiResponseText = await generateAIResponse(prompt);
@@ -125,11 +126,12 @@ export function useInterviewEngine(interview, isMicMuted) {
   }, [conversation, createPrompt, generateAIResponse, speakText]);
   
   // --- SPEECH RECOGNITION LOGIC ---
-  const handleTranscript = useCallback((transcript, isFinal) => {
+  const handleTranscript = useCallback((data) => {
+    const transcript = data.channel.alternatives[0].transcript;
     if (isAISpeaking) stopSpeaking();
-    if (isFinal && transcript.trim()) {
+
+    if (data.is_final && transcript.trim()) {
       userResponseBufferRef.current += transcript + ' ';
-      setCurrentUserResponse(userResponseBufferRef.current.trim());
       setInterimTranscript('');
     } else {
       setInterimTranscript(transcript);
