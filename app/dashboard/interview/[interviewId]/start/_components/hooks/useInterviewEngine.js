@@ -56,86 +56,77 @@ export function useInterviewEngine(interview, isMicMuted) {
     setError(null);
     
     try {
-      // Stop any previous audio
+      console.log("Starting text-to-speech for:", text.substring(0, 30) + "...");
+      
+      // Clear previous audio
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
       }
 
-      console.log("Getting TTS for:", text.substring(0, 30) + "...");
-      
-      // Fetch the audio with a longer timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
+      // Simple, direct approach
       const response = await fetch('/api/text-to-speech', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
-        signal: controller.signal,
       });
-      
-      clearTimeout(timeoutId);
+
+      console.log("TTS API response status:", response.status);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Text-to-speech request failed with status ${response.status}: ${errorText}`);
+        let errorMessage = `Text-to-speech request failed with status ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage += `: ${errorData.error || 'Unknown error'}`;
+          console.error("TTS error details:", errorData);
+        } catch (e) {
+          // If we can't parse the error as JSON
+          console.error("Couldn't parse error response:", e);
+        }
+        throw new Error(errorMessage);
       }
       
-      // Get audio data and create a blob
-      const audioData = await response.arrayBuffer();
-      const blob = new Blob([audioData], { type: 'audio/mpeg' });
-      const url = URL.createObjectURL(blob);
+      // Get the audio data
+      const blob = await response.blob();
+      console.log("Audio blob received, size:", blob.size, "bytes");
       
-      // Create a new audio element and set up handlers
+      const url = URL.createObjectURL(blob);
+      console.log("Created URL for audio:", url);
+      
+      // Create a new audio element
       const audio = new Audio();
       
-      // Important: Set up event handlers BEFORE setting src
+      // Set up event handlers
       audio.onloadedmetadata = () => {
         console.log("Audio loaded, duration:", audio.duration);
       };
       
       audio.onended = () => {
-        console.log("Audio playback completed");
+        console.log("Audio playback ended");
         URL.revokeObjectURL(url);
         setIsAISpeaking(false);
       };
       
       audio.onerror = (e) => {
         console.error("Audio playback error:", e);
+        console.error("Audio element error:", audio.error);
         URL.revokeObjectURL(url);
         setIsAISpeaking(false);
-        setError(new Error("Failed to play audio response"));
+        setError(new Error(`Failed to play audio: ${audio.error?.message || 'Unknown error'}`));
       };
       
-      // Set the audio source and play
+      // Set the source and store the element for cleanup
       audio.src = url;
       audioRef.current = audio;
       
       // Play the audio
-      try {
-        await audio.play();
-        console.log("Audio playback started");
-      } catch (playError) {
-        console.error("Failed to play audio:", playError);
-        
-        // User interaction may be required for playback
-        const handleUserInteraction = async () => {
-          try {
-            await audio.play();
-            document.removeEventListener('click', handleUserInteraction);
-          } catch (secondPlayError) {
-            console.error("Second play attempt failed:", secondPlayError);
-          }
-        };
-        
-        document.addEventListener('click', handleUserInteraction);
-        
-        setError(new Error("Audio playback requires user interaction. Please click anywhere to enable audio."));
-      }
+      console.log("Attempting to play audio...");
+      await audio.play();
+      console.log("Audio playback started successfully");
+      
     } catch (err) {
-      console.error("Error in text-to-speech playback:", err);
-      setError(err);
+      console.error("Error in text-to-speech process:", err);
+      setError(new Error(`Text-to-speech error: ${err.message}`));
       setIsAISpeaking(false);
     }
   }, []);
