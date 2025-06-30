@@ -56,32 +56,47 @@ export function useInterviewEngine(interview, isMicMuted) {
     setError(null);
     
     try {
-      // Clear previous audio
+      // Stop any previous audio
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
       }
 
-      // Get TTS audio - using a direct approach that should work reliably
+      console.log("Getting TTS for:", text.substring(0, 30) + "...");
+      
+      // Fetch the audio with a longer timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const response = await fetch('/api/text-to-speech', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`Text-to-speech request failed with status ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Text-to-speech request failed with status ${response.status}: ${errorText}`);
       }
       
-      // Create an object URL directly from the blob
-      const blob = await response.blob();
+      // Get audio data and create a blob
+      const audioData = await response.arrayBuffer();
+      const blob = new Blob([audioData], { type: 'audio/mpeg' });
       const url = URL.createObjectURL(blob);
       
-      // Create a new audio element each time for clean state
+      // Create a new audio element and set up handlers
       const audio = new Audio();
       
-      // Set up event handlers first
+      // Important: Set up event handlers BEFORE setting src
+      audio.onloadedmetadata = () => {
+        console.log("Audio loaded, duration:", audio.duration);
+      };
+      
       audio.onended = () => {
+        console.log("Audio playback completed");
         URL.revokeObjectURL(url);
         setIsAISpeaking(false);
       };
@@ -93,19 +108,31 @@ export function useInterviewEngine(interview, isMicMuted) {
         setError(new Error("Failed to play audio response"));
       };
       
-      // Then set the source and play
+      // Set the audio source and play
       audio.src = url;
       audioRef.current = audio;
       
-      // Use a timeout to ensure the audio is loaded before playing
-      setTimeout(() => {
-        audio.play().catch(e => {
-          console.error("Failed to play audio:", e);
-          setError(new Error("Unable to play audio. Please check your audio settings."));
-          setIsAISpeaking(false);
-        });
-      }, 100);
-      
+      // Play the audio
+      try {
+        await audio.play();
+        console.log("Audio playback started");
+      } catch (playError) {
+        console.error("Failed to play audio:", playError);
+        
+        // User interaction may be required for playback
+        const handleUserInteraction = async () => {
+          try {
+            await audio.play();
+            document.removeEventListener('click', handleUserInteraction);
+          } catch (secondPlayError) {
+            console.error("Second play attempt failed:", secondPlayError);
+          }
+        };
+        
+        document.addEventListener('click', handleUserInteraction);
+        
+        setError(new Error("Audio playback requires user interaction. Please click anywhere to enable audio."));
+      }
     } catch (err) {
       console.error("Error in text-to-speech playback:", err);
       setError(err);

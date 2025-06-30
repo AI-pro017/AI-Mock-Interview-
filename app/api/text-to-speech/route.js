@@ -1,38 +1,52 @@
 import { NextResponse } from 'next/server';
-import ElevenLabs from 'elevenlabs-node';
+import axios from 'axios';
 
 export async function POST(req) {
-  const { text } = await req.json();
-
-  if (!text) {
-    return NextResponse.json({ error: 'Text is required' }, { status: 400 });
-  }
-
   try {
-    // Simple configuration for the voice
-    const voice = new ElevenLabs({
-      apiKey: process.env.ELEVENLABS_API_KEY, 
-      voiceId: '21m00Tcm4TlvDq8ikWAM', // Rachel voice
-    });
+    const { text } = await req.json();
 
-    // Stream option was the original implementation that worked
-    const stream = await voice.textToSpeechStream({
-      textInput: text,
-      modelId: 'eleven_multilingual_v2',
-      stability: 0.5,
-      similarityBoost: 0.75,
-      style: 0,
-      responseType: 'stream',
-    });
+    if (!text) {
+      return NextResponse.json({ error: 'Text is required' }, { status: 400 });
+    }
 
-    // Return the audio stream directly
-    return new Response(stream, {
+    // Direct API call to ElevenLabs using axios for more control
+    const response = await axios({
+      method: 'POST',
+      url: 'https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream',
       headers: {
-        'Content-Type': 'audio/mpeg',
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': process.env.ELEVENLABS_API_KEY
       },
+      data: {
+        text: text,
+        model_id: 'eleven_monolingual_v1',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75
+        }
+      },
+      responseType: 'arraybuffer'
+    });
+
+    // Return the audio as a Response object
+    return new Response(response.data, {
+      headers: {
+        'Content-Type': 'audio/mpeg'
+      }
     });
   } catch (error) {
-    console.error('ElevenLabs API Error:', error);
-    return NextResponse.json({ error: 'Failed to generate audio from ElevenLabs' }, { status: 500 });
+    console.error('Text-to-speech error:', error);
+    
+    // Detailed error logging
+    if (error.response) {
+      console.error(`ElevenLabs API returned status ${error.response.status}`);
+      console.error('Error data:', error.response.data.toString());
+    }
+    
+    return NextResponse.json({ 
+      error: 'Failed to generate audio', 
+      details: error.message 
+    }, { status: 500 });
   }
 } 
