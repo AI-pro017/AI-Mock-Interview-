@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 
-export default function ConversationDisplay({ conversation, isAISpeaking, isUserSpeaking, currentUserResponse, interimTranscript }) {
+export default function ConversationDisplay({ conversation, isAISpeaking, isUserSpeaking, currentUserResponse, interimTranscript, isListening }) {
   const scrollRef = useRef(null);
 
   // Auto-scroll to the bottom of the conversation
@@ -17,7 +17,7 @@ export default function ConversationDisplay({ conversation, isAISpeaking, isUser
 
   return (
     <div ref={scrollRef} className="h-96 overflow-y-auto border rounded-md p-4 mb-4 bg-gray-50 flex flex-col space-y-4">
-      {conversation.length === 0 && !isAISpeaking && !isUserSpeaking ? (
+      {conversation.length === 0 && !isAISpeaking && !isUserSpeaking && !liveUserResponse ? (
         <div className="text-center text-gray-500 h-full flex items-center justify-center">
           <p>The interview transcript will appear here.</p>
         </div>
@@ -37,12 +37,11 @@ export default function ConversationDisplay({ conversation, isAISpeaking, isUser
             </div>
           )}
           
-          {/* This block will now correctly display the live caption */}
-          {(isUserSpeaking || liveUserResponse) && (
+          {/* Show the user's speech bubble as long as we're listening, even if no text yet */}
+          {(isUserSpeaking || isListening || liveUserResponse) && (
             <div className="p-3 rounded-lg bg-green-100 self-end max-w-[90%] w-fit">
               <div className="font-bold">You</div>
-              {/* We show the combined live response. If it's empty, we show "Listening..." */}
-              <div>{liveUserResponse || "Listening..."}</div>
+              <div>{liveUserResponse || (isUserSpeaking ? "Listening..." : "Waiting for your response...")}</div>
             </div>
           )}
         </>

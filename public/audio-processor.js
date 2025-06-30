@@ -2,18 +2,15 @@
 class AudioProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    // Initialize with the standard 48000 Hz sample rate
-    this.sampleRate = 48000;
-    // Buffer for accumulating audio data
+    // Always use 16kHz for Deepgram
+    this.outputSampleRate = 16000;
+    
+    // Log that we're initialized
+    console.log("🎛️ AudioProcessor initialized");
+    
+    // Buffer to accumulate samples for downsampling
     this.buffer = [];
-    // Target chunks of 1024 samples
-    this.bufferSize = 1024;
-    this.port.onmessage = (event) => {
-      if (event.data && event.data.type === 'init') {
-        this.sampleRate = event.data.sampleRate;
-        console.log(`AudioProcessor initialized with sample rate: ${this.sampleRate}`);
-      }
-    };
+    this.bufferSize = 2048; // Process in larger chunks
   }
 
   static get parameterDescriptors() {
@@ -21,17 +18,14 @@ class AudioProcessor extends AudioWorkletProcessor {
   }
 
   // Simple and efficient downsampling function
-  downsample(audioData, inSampleRate, outSampleRate) {
-    if (inSampleRate === outSampleRate) {
-      return audioData;
-    }
+  downsample(audioData, inputSampleRate) {
+    const ratio = inputSampleRate / this.outputSampleRate;
+    const newLength = Math.ceil(audioData.length / ratio);
+    const result = new Float32Array(newLength);
     
-    const ratio = inSampleRate / outSampleRate;
-    const outLength = Math.ceil(audioData.length / ratio);
-    const result = new Float32Array(outLength);
-    
-    for (let i = 0; i < outLength; i++) {
-      result[i] = audioData[Math.floor(i * ratio)];
+    for (let i = 0; i < newLength; i++) {
+      const sourceIndex = Math.min(Math.floor(i * ratio), audioData.length - 1);
+      result[i] = audioData[sourceIndex];
     }
     
     return result;
@@ -46,13 +40,18 @@ class AudioProcessor extends AudioWorkletProcessor {
     
     const audioChunk = input[0];
     
+    // Get the actual sample rate from the context
+    const inputSampleRate = sampleRate;
+    
     // Downsample to 16kHz (Deepgram's preferred rate)
-    const downsampled = this.downsample(audioChunk, this.sampleRate, 16000);
+    const downsampled = this.downsample(audioChunk, inputSampleRate);
     
     // Convert to Int16 format (-32768 to 32767)
     const audioData = new Int16Array(downsampled.length);
     for (let i = 0; i < downsampled.length; i++) {
-      audioData[i] = Math.max(-32768, Math.min(32767, Math.floor(downsampled[i] * 32767)));
+      // Ensure proper conversion to Int16
+      const sample = downsampled[i] * 32767;
+      audioData[i] = Math.max(-32768, Math.min(32767, Math.round(sample)));
     }
     
     // Send the processed audio chunk to the main thread
