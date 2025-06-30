@@ -3,8 +3,12 @@ class AudioProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.sampleRate = 48000; // Default browser sample rate
-    // Note: The processor is created before we can send it the real sample rate.
-    // We can receive it via a message if needed, but for now, we'll assume it's provided or default.
+    this.port.onmessage = (event) => {
+      if (event.data && event.data.type === 'init') {
+        this.sampleRate = event.data.sampleRate;
+        console.log(`AudioProcessor initialized with sample rate: ${this.sampleRate}`);
+      }
+    };
   }
 
   static get parameterDescriptors() {
@@ -53,7 +57,8 @@ class AudioProcessor extends AudioWorkletProcessor {
     const downsampled = this.processAudio(channelData);
     const int16 = new Int16Array(downsampled.length);
     for (let i = 0; i < downsampled.length; i++) {
-      int16[i] = Math.max(-32768, Math.min(32767, downsampled[i] * 32767));
+      // Ensure we're within valid Int16 range (-32768 to 32767)
+      int16[i] = Math.max(-32768, Math.min(32767, Math.round(downsampled[i] * 32767)));
     }
 
     // Post the processed data back to the main thread

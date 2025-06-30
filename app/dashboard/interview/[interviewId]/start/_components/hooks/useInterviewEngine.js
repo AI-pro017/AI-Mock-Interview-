@@ -255,48 +255,110 @@ export function useInterviewEngine(interview, isMicMuted) {
     try {
       console.log("🎤 Fetching Deepgram token...");
       const response = await fetch('/api/deepgram');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to get Deepgram token: ${errorData.error || response.statusText}`);
+      }
       const { deepgramToken } = await response.json();
       console.log("🎤 Got Deepgram token, creating client...");
+      
+      // Create Deepgram client with proper configuration
       const deepgram = createClient(deepgramToken);
       const connection = deepgram.listen.live({
-        model: "nova-2", language: "en-US", smart_format: true,
-        interim_results: true, vad_events: true,
+        model: "nova-2", 
+        language: "en-US", 
+        smart_format: true,
+        interim_results: true, 
+        vad_events: true,
+        encoding: 'linear16',  // Explicitly set encoding to match our audio format
+        sample_rate: 16000,    // Explicitly set sample rate to match our downsampled audio
+        channels: 1            // Explicitly set to mono (single channel)
       });
 
+      // Set up connection event handlers
       connection.on("open", () => {
         console.log("🎤 Deepgram connection OPENED");
         setIsListening(true);
       });
+      
       connection.on("close", () => {
         console.log("🎤 Deepgram connection CLOSED");
         setIsListening(false);
+        
+        // Attempt to reconnect if connection closed unexpectedly
+        if (deepgramConnectionRef.current) {
+          console.log("🎤 Attempting to reconnect to Deepgram...");
+          setTimeout(() => {
+            if (audioStream.active) {
+              startListening(audioStream);
+            }
+          }, 1000);
+        }
       });
+      
       connection.on('error', (e) => {
         console.error("🎤 Deepgram ERROR:", e);
         setError(e);
       });
+      
       connection.on('transcript', (data) => {
-        console.log("🎤 Received transcript:", data.channel.alternatives[0].transcript);
+        console.log("📝 Received transcript:", data.channel.alternatives[0].transcript);
         handleTranscript(data);
       });
       
+      // Properly initialize audio context with correct sample rate
       console.log("🎤 Setting up AudioContext...");
-      const audioContext = new AudioContext();
+      const audioContext = new AudioContext({ sampleRate: 48000 }); // Match native sample rate
+      
+      // Ensure audio context is in running state
+      if (audioContext.state !== "running") {
+        await audioContext.resume();
+      }
+      
       await audioContext.audioWorklet.addModule('/audio-processor.js'); 
       console.log("🎤 AudioWorklet module loaded");
+      
       const source = audioContext.createMediaStreamSource(audioStream);
       const workletNode = new AudioWorkletNode(audioContext, 'audio-processor');
+      
+      // Pass the sample rate to the processor
+      workletNode.port.postMessage({ 
+        type: 'init', 
+        sampleRate: audioContext.sampleRate 
+      });
 
+      // Send audio data to Deepgram
       workletNode.port.onmessage = (event) => {
-        if (!isMicMuted && connection.getReadyState() === 1 /* OPEN */) {
-          console.log("🎤 Sending audio data to Deepgram");
+        if (!isMicMuted && connection.getReadyState() === 1) {
           connection.send(event.data);
         }
       };
 
-      source.connect(workletNode).connect(audioContext.destination);
+      // Connect the audio nodes but DON'T connect to destination
+      // This prevents audio feedback loops
+      source.connect(workletNode);
       console.log("🎤 Audio pipeline connected");
-      deepgramConnectionRef.current = { connection, audioContext, workletNode, source };
+      
+      deepgramConnectionRef.current = { 
+        connection, 
+        audioContext, 
+        workletNode, 
+        source,
+        stream: audioStream 
+      };
+      
+      // Add a keep-alive ping to prevent connection timeouts
+      const keepAlivePing = setInterval(() => {
+        if (connection.getReadyState() === 1) {
+          connection.keepAlive();
+          console.log("🎤 Sent keep-alive ping to Deepgram");
+        } else {
+          clearInterval(keepAlivePing);
+        }
+      }, 30000); // Send a ping every 30 seconds
+      
+      deepgramConnectionRef.current.keepAlivePing = keepAlivePing;
+      
     } catch (e) {
       console.error("🎤 CRITICAL ERROR in setup:", e);
       setError(e);
@@ -305,13 +367,42 @@ export function useInterviewEngine(interview, isMicMuted) {
   
   const stopListening = useCallback(() => {
     if (deepgramConnectionRef.current) {
-        deepgramConnectionRef.current.workletNode?.port.close();
-        deepgramConnectionRef.current.source?.disconnect();
-        deepgramConnectionRef.current.audioContext?.close();
-        deepgramConnectionRef.current.connection?.finish();
-        deepgramConnectionRef.current = null;
+      console.log("🎤 Stopping Deepgram connection and cleaning up resources");
+      
+      // Clear the keep-alive interval
+      if (deepgramConnectionRef.current.keepAlivePing) {
+        clearInterval(deepgramConnectionRef.current.keepAlivePing);
+      }
+      
+      // Close worklet and disconnect audio nodes
+      if (deepgramConnectionRef.current.workletNode) {
+        deepgramConnectionRef.current.workletNode.port.close();
+        deepgramConnectionRef.current.workletNode.disconnect();
+      }
+      
+      if (deepgramConnectionRef.current.source) {
+        deepgramConnectionRef.current.source.disconnect();
+      }
+      
+      // Close audio context
+      if (deepgramConnectionRef.current.audioContext) {
+        deepgramConnectionRef.current.audioContext.close().catch(e => {
+          console.error("Error closing AudioContext:", e);
+        });
+      }
+      
+      // Properly finish the Deepgram connection
+      if (deepgramConnectionRef.current.connection) {
+        try {
+          deepgramConnectionRef.current.connection.finish();
+        } catch (e) {
+          console.error("Error finishing Deepgram connection:", e);
+        }
+      }
+      
+      deepgramConnectionRef.current = null;
+      setIsListening(false);
     }
-    setIsListening(false);
   }, []);
 
   const startConversation = useCallback(async (audioStream) => {
