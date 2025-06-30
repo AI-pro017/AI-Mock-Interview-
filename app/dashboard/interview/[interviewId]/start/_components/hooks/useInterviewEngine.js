@@ -211,13 +211,22 @@ export function useInterviewEngine(interview, isMicMuted) {
   }, []);
   
   const handleTranscript = useCallback((data) => {
+    console.log("📝 handleTranscript called with data:", data);
     const transcript = data.channel.alternatives[0].transcript;
-    if (isAISpeaking) stopSpeaking();
+    console.log("📝 Extracted transcript:", transcript);
+    
+    if (isAISpeaking) {
+      console.log("📝 AI is speaking, stopping...");
+      stopSpeaking();
+    }
+    
     if (data.is_final && transcript.trim()) {
+      console.log("📝 FINAL transcript, adding to buffer:", transcript);
       userResponseBufferRef.current += transcript + ' ';
       setCurrentUserResponse(userResponseBufferRef.current.trim());
       setInterimTranscript('');
     } else {
+      console.log("📝 INTERIM transcript, updating:", transcript);
       setInterimTranscript(transcript);
     }
   }, [isAISpeaking, stopSpeaking]);
@@ -238,42 +247,61 @@ export function useInterviewEngine(interview, isMicMuted) {
   }, [processUserResponse]);
 
   const startListening = useCallback(async (audioStream) => {
+    console.log("🎤 startListening called with audioStream:", audioStream?.active);
     if (!audioStream?.active) {
       setError(new Error("Audio stream is not active."));
       return;
     }
     try {
+      console.log("🎤 Fetching Deepgram token...");
       const response = await fetch('/api/deepgram');
       const { deepgramToken } = await response.json();
+      console.log("🎤 Got Deepgram token, creating client...");
       const deepgram = createClient(deepgramToken);
       const connection = deepgram.listen.live({
         model: "nova-2", language: "en-US", smart_format: true,
         interim_results: true, vad_events: true,
       });
 
-      connection.on("open", () => setIsListening(true));
-      connection.on("close", () => setIsListening(false));
-      connection.on('error', (e) => setError(e));
-      connection.on('transcript', (data) => handleTranscript(data));
+      connection.on("open", () => {
+        console.log("🎤 Deepgram connection OPENED");
+        setIsListening(true);
+      });
+      connection.on("close", () => {
+        console.log("🎤 Deepgram connection CLOSED");
+        setIsListening(false);
+      });
+      connection.on('error', (e) => {
+        console.error("🎤 Deepgram ERROR:", e);
+        setError(e);
+      });
+      connection.on('transcript', (data) => {
+        console.log("🎤 Received transcript:", data.channel.alternatives[0].transcript);
+        handleTranscript(data);
+      });
       
+      console.log("🎤 Setting up AudioContext...");
       const audioContext = new AudioContext();
       await audioContext.audioWorklet.addModule('/audio-processor.js'); 
+      console.log("🎤 AudioWorklet module loaded");
       const source = audioContext.createMediaStreamSource(audioStream);
       const workletNode = new AudioWorkletNode(audioContext, 'audio-processor');
 
       workletNode.port.onmessage = (event) => {
-        const audioData = event.data;
         if (!isMicMuted && connection.getReadyState() === 1 /* OPEN */) {
-          connection.send(audioData);
+          console.log("🎤 Sending audio data to Deepgram");
+          connection.send(event.data);
         }
       };
 
       source.connect(workletNode).connect(audioContext.destination);
+      console.log("🎤 Audio pipeline connected");
       deepgramConnectionRef.current = { connection, audioContext, workletNode, source };
     } catch (e) {
+      console.error("🎤 CRITICAL ERROR in setup:", e);
       setError(e);
     }
-  }, [isMicMuted, handleTranscript, handleSpeechStart, handleSpeechEnd]);
+  }, [isMicMuted, handleTranscript]);
   
   const stopListening = useCallback(() => {
     if (deepgramConnectionRef.current) {
