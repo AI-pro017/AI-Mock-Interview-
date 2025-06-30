@@ -1,4 +1,3 @@
-"use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@deepgram/sdk';
@@ -17,6 +16,8 @@ export function useInterviewEngine(interview, isMicMuted) {
   // --- REFS ---
   const userResponseBufferRef = useRef('');
   const silenceTimerRef = useRef(null);
+  const audioQueueRef = useRef([]); // To queue audio chunks
+  const isPlayingRef = useRef(false); // To track if audio is playing
   const audioRef = useRef(null);
   const deepgramConnectionRef = useRef(null);
   const abortControllerRef = useRef(null);
@@ -32,17 +33,23 @@ export function useInterviewEngine(interview, isMicMuted) {
     }
     setIsAISpeaking(false);
     setIsGenerating(false);
+    audioQueueRef.current = []; // Clear the audio queue
+    isPlayingRef.current = false;
   }, []);
 
-  const generateAIResponse = async (prompt) => {
+  const generateAndSpeak = async (prompt) => {
+    setIsGenerating(true);
+    setIsAISpeaking(true);
+    setError(null);
+    abortControllerRef.current = new AbortController();
+
+    let accumulatedText = "";
+    
     try {
-      setIsGenerating(true);
-      setError(null);
-      abortControllerRef.current = new AbortController();
       const response = await fetch('/api/generate-response', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           prompt,
           role: interview.jobPosition,
           interviewStyle: interview.interviewStyle,
@@ -50,50 +57,78 @@ export function useInterviewEngine(interview, isMicMuted) {
         }),
         signal: abortControllerRef.current.signal,
       });
-      if (!response.ok) throw new Error('Failed to generate AI response');
-      const data = await response.json();
-      return data.response;
+
+      if (!response.ok || !response.body) throw new Error('Failed to generate AI response stream');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      const processText = async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const textChunk = decoder.decode(value, { stream: true });
+          accumulatedText += textChunk;
+          setConversation(prev => {
+              const lastItem = prev[prev.length - 1];
+              if (lastItem && lastItem.role === 'ai') {
+                  lastItem.text = accumulatedText;
+                  return [...prev];
+              }
+              return [...prev, { role: 'ai', text: accumulatedText }];
+          });
+
+          // Fetch and queue audio for the chunk
+          const audioResponse = await fetch('/api/text-to-speech', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: textChunk })
+          });
+          if (audioResponse.ok) {
+            const audioBlob = await audioResponse.blob();
+            audioQueueRef.current.push(audioBlob);
+            if (!isPlayingRef.current) playAudioQueue();
+          }
+        }
+      };
+
+      await processText();
+
     } catch (err) {
       if (err.name !== 'AbortError') {
-        console.error("Error generating AI response:", err);
+        console.error("Error in streaming generation/speech:", err);
         setError(err);
       }
-      return null;
     } finally {
       setIsGenerating(false);
+      // Ensure the audio queue is empty before setting isAISpeaking to false
+      const checkQueue = setInterval(() => {
+        if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
+          setIsAISpeaking(false);
+          clearInterval(checkQueue);
+        }
+      }, 100);
     }
   };
 
-  const speakText = async (text) => {
-    try {
-      setIsAISpeaking(true);
-      setError(null);
-      abortControllerRef.current = new AbortController();
-      const response = await fetch('/api/text-to-speech', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-        signal: abortControllerRef.current.signal,
-      });
-      if (!response.ok) throw new Error('Failed to generate speech');
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-      await new Promise((resolve, reject) => {
-        audio.onended = resolve;
-        audio.onerror = reject;
-        audio.play();
-      });
-    } catch (err) {
-      if (err.name !== 'AbortError') {
-        console.error("Error converting text to speech:", err);
-        setError(err);
-      }
-    } finally {
-      setIsAISpeaking(false);
-      audioRef.current = null;
-    }
+  const playAudioQueue = async () => {
+    if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
+    
+    isPlayingRef.current = true;
+    const audioBlob = audioQueueRef.current.shift();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+    
+    audio.onended = () => {
+      isPlayingRef.current = false;
+      playAudioQueue(); // Play next in queue
+    };
+    audio.onerror = () => {
+        console.error("Error playing audio.");
+        isPlayingRef.current = false;
+    };
+    audio.play();
   };
 
   const createPrompt = useCallback((convHistory, type) => {
@@ -117,13 +152,8 @@ export function useInterviewEngine(interview, isMicMuted) {
     setCurrentUserResponse('');
 
     const prompt = createPrompt(newConversation, 'response');
-    const aiResponseText = await generateAIResponse(prompt);
-    
-    if (aiResponseText) {
-      setConversation(prev => [...prev, { role: 'ai', text: aiResponseText }]);
-      await speakText(aiResponseText);
-    }
-  }, [conversation, createPrompt, generateAIResponse, speakText]);
+    generateAndSpeak(prompt);
+  }, [conversation, createPrompt, generateAndSpeak]);
   
   // --- SPEECH RECOGNITION LOGIC ---
   const handleTranscript = useCallback((data) => {
@@ -234,12 +264,9 @@ export function useInterviewEngine(interview, isMicMuted) {
   const startConversation = useCallback(async (audioStream) => {
     startListening(audioStream);
     const prompt = createPrompt([], 'greeting');
-    const aiResponseText = await generateAIResponse(prompt);
-    if (aiResponseText) {
-      setConversation([{ role: 'ai', text: aiResponseText }]);
-      await speakText(aiResponseText);
-    }
-  }, [startListening, createPrompt, generateAIResponse, speakText]);
+    setConversation([{role: 'ai', text: ''}]); // Initial empty AI message for streaming
+    generateAndSpeak(prompt);
+  }, [startListening, createPrompt, generateAndSpeak]);
 
   const endConversation = useCallback(() => {
     stopListening();
