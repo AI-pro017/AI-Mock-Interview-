@@ -17,15 +17,15 @@ export function useInterviewEngine(interview, isMicMuted) {
   // --- REFS ---
   const userResponseBufferRef = useRef('');
   const silenceTimerRef = useRef(null);
+  const audioRef = useRef(null);
   const deepgramConnectionRef = useRef(null);
   const abortControllerRef = useRef(null);
-  const audioElementRef = useRef(null);
 
   // --- AI RESPONSE LOGIC ---
   const stopSpeaking = useCallback(() => {
-    if (audioElementRef.current) {
-      audioElementRef.current.pause();
-      audioElementRef.current.src = '';
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
     }
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -34,20 +34,16 @@ export function useInterviewEngine(interview, isMicMuted) {
     setIsGenerating(false);
   }, []);
 
-  const generateAndSpeak = useCallback(async (prompt) => {
-    setIsGenerating(true);
-    setIsAISpeaking(true);
-    setError(null);
-    abortControllerRef.current = new AbortController();
-
-    let accumulatedText = "";
-    
+  const generateAIResponse = async (prompt) => {
     try {
-      // Generate AI response
+      setIsGenerating(true);
+      setError(null);
+      abortControllerRef.current = new AbortController();
+      
       const response = await fetch('/api/generate-response', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify({ 
           prompt,
           role: interview.jobPosition,
           interviewStyle: interview.interviewStyle,
@@ -55,66 +51,71 @@ export function useInterviewEngine(interview, isMicMuted) {
         }),
         signal: abortControllerRef.current.signal,
       });
-
+      
       if (!response.ok) throw new Error('Failed to generate AI response');
       
-      const responseData = await response.json();
-      const aiResponseText = responseData.response;
+      // Process the text stream instead of trying to parse as JSON
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let completeResponse = '';
       
-      // Update UI with the complete response
-      accumulatedText = aiResponseText;
-      setConversation(prev => {
-          const lastItem = prev[prev.length - 1];
-          if (lastItem && lastItem.role === 'ai') {
-              lastItem.text = accumulatedText;
-              return [...prev];
-          }
-          return [...prev, { role: 'ai', text: accumulatedText }];
-      });
-
-      // Now that we have the text, get the audio
-      const ttsResponse = await fetch('/api/text-to-speech', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: aiResponseText })
-      });
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        completeResponse += chunk;
+      }
       
-      if (!ttsResponse.ok) throw new Error('Failed to generate speech');
-      
-      const audioBlob = await ttsResponse.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      
-      // Use a standard HTML Audio element
-      const audio = new Audio(audioUrl);
-      audioElementRef.current = audio;
-      
-      // Set up audio event handlers
-      audio.onended = () => {
-        setIsAISpeaking(false);
-        // Resume the deepgram audio context if it's suspended
-        if (deepgramConnectionRef.current?.audioContext?.state === 'suspended') {
-          deepgramConnectionRef.current.audioContext.resume()
-            .then(() => console.log("🎤 AudioContext resumed after AI speech"))
-            .catch(e => console.error("🎤 Error resuming AudioContext:", e));
-        }
-      };
-      
-      audio.onerror = (e) => {
-        console.error("❌ Audio playback error:", e);
-        setIsAISpeaking(false);
-      };
-      
-      // Play the audio
-      await audio.play();
+      return completeResponse;
     } catch (err) {
       if (err.name !== 'AbortError') {
-        console.error("Error in generating/speaking:", err);
+        console.error("Error generating AI response:", err);
         setError(err);
       }
+      return null;
     } finally {
       setIsGenerating(false);
     }
-  }, [interview]);
+  };
+
+  const speakText = async (text) => {
+    try {
+      setIsAISpeaking(true);
+      setError(null);
+      abortControllerRef.current = new AbortController();
+      const response = await fetch('/api/text-to-speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+        signal: abortControllerRef.current.signal,
+      });
+      if (!response.ok) throw new Error('Failed to generate speech');
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      
+      // Make sure to resume the Deepgram audio context when the AI stops speaking
+      audio.onended = () => {
+        setIsAISpeaking(false);
+        if (deepgramConnectionRef.current?.audioContext?.state === 'suspended') {
+          deepgramConnectionRef.current.audioContext.resume()
+            .catch(e => console.error("Failed to resume audio context:", e));
+        }
+      };
+      
+      await audio.play();
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error("Error converting text to speech:", err);
+        setError(err);
+      }
+    } finally {
+      setIsAISpeaking(false);
+      audioRef.current = null;
+    }
+  };
 
   const createPrompt = useCallback((convHistory, type) => {
     if (type === 'greeting') {
@@ -136,26 +137,31 @@ export function useInterviewEngine(interview, isMicMuted) {
     setConversation(newConversation);
 
     const prompt = createPrompt(newConversation, 'response');
-    await generateAndSpeak(prompt);
-  }, [conversation, createPrompt, generateAndSpeak]);
+    const aiResponseText = await generateAIResponse(prompt);
+    
+    if (aiResponseText) {
+      setConversation(prev => [...prev, { role: 'ai', text: aiResponseText }]);
+      await speakText(aiResponseText);
+    }
+  }, [conversation, createPrompt, generateAIResponse, speakText]);
   
   // --- SPEECH RECOGNITION LOGIC ---
   const handleTranscript = useCallback((data) => {
-    const transcript = data.channel.alternatives[0].transcript;
-    console.log("📝 Processing transcript:", transcript);
+    console.log("Transcript data received:", data);
+    if (!data.channel?.alternatives?.[0]) return;
     
-    if (isAISpeaking) {
-      console.log("📝 AI is speaking, stopping...");
-      stopSpeaking();
-    }
+    const transcript = data.channel.alternatives[0].transcript;
+    console.log("Transcript text:", transcript);
+    
+    if (isAISpeaking) stopSpeaking();
     
     if (data.is_final && transcript.trim()) {
-      console.log("📝 FINAL transcript, adding to buffer:", transcript);
+      console.log("Final transcript:", transcript);
       userResponseBufferRef.current += transcript + ' ';
       setCurrentUserResponse(userResponseBufferRef.current.trim());
       setInterimTranscript('');
     } else if (transcript.trim()) {
-      console.log("📝 INTERIM transcript, updating:", transcript);
+      console.log("Interim transcript:", transcript);
       setInterimTranscript(transcript);
     }
   }, [isAISpeaking, stopSpeaking]);
@@ -179,111 +185,88 @@ export function useInterviewEngine(interview, isMicMuted) {
   }, [processUserResponse]);
 
   const startListening = useCallback(async (audioStream) => {
-    console.log("🎤 startListening called with audioStream:", audioStream?.active);
-    if (!audioStream?.active) {
-      setError(new Error("Audio stream is not active."));
+    console.log("Starting to listen with stream:", audioStream?.active);
+    if (!audioStream || !audioStream.active) {
+      const e = new Error("Audio stream is not active.");
+      console.error("Audio stream error:", e);
+      setError(e);
       return;
     }
+
     try {
-      console.log("🎤 Fetching Deepgram token...");
+      console.log("Fetching Deepgram token...");
       const response = await fetch('/api/deepgram');
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Failed to get Deepgram token: ${errorData.error || response.statusText}`);
-      }
+      if (!response.ok) throw new Error('Failed to get Deepgram token');
       const { deepgramToken } = await response.json();
-      console.log("🎤 Got Deepgram token, creating client...");
-      
-      // Create Deepgram client with proper configuration
+      console.log("Got Deepgram token:", deepgramToken ? "✓" : "✗");
+
       const deepgram = createClient(deepgramToken);
       const connection = deepgram.listen.live({
         model: "nova-2", 
         language: "en-US", 
         smart_format: true,
         interim_results: true, 
-        encoding: 'linear16',
+        vad_events: true, 
+        encoding: 'linear16', 
         sample_rate: 16000,
         channels: 1
       });
 
-      // Set up connection event handlers
       connection.on("open", () => {
-        console.log("🎤 Deepgram connection OPENED");
+        console.log("Deepgram connection OPENED");
         setIsListening(true);
       });
       
       connection.on("close", () => {
-        console.log("🎤 Deepgram connection CLOSED");
+        console.log("Deepgram connection CLOSED");
         setIsListening(false);
       });
       
-      connection.on('error', (e) => {
-        console.error("🎤 Deepgram ERROR:", e);
-        setError(e);
+      connection.on('error', (e) => { 
+        console.error("Deepgram ERROR:", e); 
+        setError(e); 
       });
       
       connection.on('transcript', (data) => {
-        if (data && data.channel && data.channel.alternatives && data.channel.alternatives.length > 0) {
-          const transcript = data.channel.alternatives[0].transcript;
-          console.log("📝 Received transcript:", transcript);
-          
-          if (transcript && transcript.trim()) {
-            handleTranscript(data);
-          }
-        }
+        console.log("Got transcript event:", data.channel?.alternatives?.[0]?.transcript);
+        handleTranscript(data);
       });
       
-      // Set up audio processing
-      console.log("🎤 Setting up AudioContext...");
+      connection.on('VADEvent', (event) => {
+        console.log("VAD Event:", event.label);
+        if (event.label === 'speech_start') handleSpeechStart();
+        if (event.label === 'speech_end') handleSpeechEnd();
+      });
+
+      console.log("Setting up AudioContext...");
       const audioContext = new AudioContext();
-      
-      // Ensure audio context is in running state
-      if (audioContext.state !== "running") {
-        await audioContext.resume();
-      }
-      
       await audioContext.audioWorklet.addModule('/audio-processor.js'); 
-      console.log("🎤 AudioWorklet module loaded");
       
+      console.log("Creating audio processing pipeline...");
       const source = audioContext.createMediaStreamSource(audioStream);
       const workletNode = new AudioWorkletNode(audioContext, 'audio-processor');
-      
-      // Setup a buffer to collect and send audio in larger chunks
-      let audioBuffer = [];
-      const BUFFER_SIZE = 4096;
-      
+
       workletNode.port.onmessage = (event) => {
+        const audioData = event.data;
         if (!isMicMuted && connection.getReadyState() === 1) {
-          // Add the audio data to our buffer
-          const newData = new Int16Array(event.data);
-          audioBuffer = [...audioBuffer, ...Array.from(newData)];
-          
-          // If we have enough data, send it
-          if (audioBuffer.length >= BUFFER_SIZE) {
-            const dataToSend = new Int16Array(audioBuffer.slice(0, BUFFER_SIZE));
-            connection.send(dataToSend.buffer);
-            audioBuffer = audioBuffer.slice(BUFFER_SIZE);
-          }
+          connection.send(audioData);
         }
       };
 
-      // Connect the audio processing pipeline
       source.connect(workletNode);
-      console.log("🎤 Audio pipeline connected");
+      console.log("Audio pipeline connected");
       
       deepgramConnectionRef.current = { 
         connection, 
         audioContext, 
         workletNode, 
-        source,
-        stream: audioStream 
+        source 
       };
-      
     } catch (e) {
-      console.error("🎤 CRITICAL ERROR in setup:", e);
+      console.error("CRITICAL ERROR in speech recognition setup:", e);
       setError(e);
     }
-  }, [isMicMuted, handleTranscript]);
+  }, [isMicMuted, handleTranscript, handleSpeechStart, handleSpeechEnd]);
 
   const stopListening = useCallback(() => {
     console.log("Stopping speech recognition...");
@@ -312,8 +295,12 @@ export function useInterviewEngine(interview, isMicMuted) {
     console.log("Starting conversation with stream:", audioStream?.active);
     startListening(audioStream);
     const prompt = createPrompt([], 'greeting');
-    await generateAndSpeak(prompt);
-  }, [startListening, createPrompt, generateAndSpeak]);
+    const aiResponseText = await generateAIResponse(prompt);
+    if (aiResponseText) {
+      setConversation([{ role: 'ai', text: aiResponseText }]);
+      await speakText(aiResponseText);
+    }
+  }, [startListening, createPrompt, generateAIResponse, speakText]);
 
   const endConversation = useCallback(() => {
     console.log("Ending conversation...");
