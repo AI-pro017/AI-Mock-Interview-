@@ -14,11 +14,12 @@ export function useInterviewEngine(interview, isMicMuted) {
   const [error, setError] = useState(null);
 
   // --- REFS ---
-  const audioRef = useRef(null);
+  const audioRef = useRef(new Audio());
   const recognitionRef = useRef(null);
   const userResponseBufferRef = useRef('');
   const timeoutRef = useRef(null);
   const retryTimeoutRef = useRef(null);
+  const noSpeechErrorShownRef = useRef(false);
 
   // --- AI RESPONSE & SPEECH ---
   const generateAIResponse = useCallback(async (prompt) => {
@@ -55,25 +56,13 @@ export function useInterviewEngine(interview, isMicMuted) {
     setError(null);
     
     try {
-      // Create a new audio element
-      const audio = new Audio();
-      
-      // Set up event handlers before setting src
-      audio.onended = () => {
-        console.log("Audio playback ended");
-        setIsAISpeaking(false);
-      };
-      
-      audio.onerror = (e) => {
-        console.error("Audio playback error:", e);
-        setIsAISpeaking(false);
-        setError(new Error("Failed to play audio response"));
-      };
-      
-      // Store the element for cleanup
-      audioRef.current = audio;
+      // Clear previous audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
 
-      console.log("Fetching TTS audio for text:", text.substring(0, 50) + "...");
+      // Get TTS audio - using a direct approach that should work reliably
       const response = await fetch('/api/text-to-speech', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,33 +70,41 @@ export function useInterviewEngine(interview, isMicMuted) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error("TTS error response:", errorData);
-        throw new Error(`Text-to-speech request failed with status ${response.status}: ${errorData?.error || 'Unknown error'}`);
+        throw new Error(`Text-to-speech request failed with status ${response.status}`);
       }
       
-      console.log("TTS response received, creating blob");
+      // Create an object URL directly from the blob
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       
-      // Set source and play
+      // Create a new audio element each time for clean state
+      const audio = new Audio();
+      
+      // Set up event handlers first
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        setIsAISpeaking(false);
+      };
+      
+      audio.onerror = (e) => {
+        console.error("Audio playback error:", e);
+        URL.revokeObjectURL(url);
+        setIsAISpeaking(false);
+        setError(new Error("Failed to play audio response"));
+      };
+      
+      // Then set the source and play
       audio.src = url;
+      audioRef.current = audio;
       
-      console.log("Playing audio");
-      const playPromise = audio.play();
-      
-      // Handle play() promise rejection (common in some browsers)
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.error("Play promise rejected:", error);
-          // Try to play again after user interaction
-          const handleUserInteraction = () => {
-            audio.play().catch(e => console.error("Second play attempt failed:", e));
-            document.removeEventListener('click', handleUserInteraction);
-          };
-          document.addEventListener('click', handleUserInteraction);
+      // Use a timeout to ensure the audio is loaded before playing
+      setTimeout(() => {
+        audio.play().catch(e => {
+          console.error("Failed to play audio:", e);
+          setError(new Error("Unable to play audio. Please check your audio settings."));
+          setIsAISpeaking(false);
         });
-      }
+      }, 100);
       
     } catch (err) {
       console.error("Error in text-to-speech playback:", err);
@@ -158,9 +155,6 @@ export function useInterviewEngine(interview, isMicMuted) {
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
-    
-    // Increase the maxAlternatives to improve recognition
-    recognition.maxAlternatives = 3;
 
     recognition.onstart = () => {
       console.log("Speech recognition started");
@@ -169,29 +163,36 @@ export function useInterviewEngine(interview, isMicMuted) {
 
     recognition.onend = () => {
       console.log("Speech recognition ended");
-      setIsListening(false);
       
       // Auto-restart if not manually stopped
       if (!isMicMuted) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = setTimeout(() => {
-          try {
-            console.log("Auto-restarting speech recognition");
-            recognition.start();
-          } catch (e) {
-            console.error("Failed to restart speech recognition:", e);
-          }
-        }, 300); // Short delay before restarting
+        try {
+          recognition.start();
+          console.log("Speech recognition restarted");
+        } catch (e) {
+          console.error("Failed to restart speech recognition:", e);
+          // If we can't restart immediately, try again after a short delay
+          setTimeout(() => {
+            try {
+              recognition.start();
+            } catch (innerError) {
+              // If it still fails, then we set listening to false
+              setIsListening(false);
+            }
+          }, 300);
+        }
+      } else {
+        setIsListening(false);
       }
     };
 
     recognition.onerror = (event) => {
-      console.error("Speech recognition error:", event.error);
-      
-      // Don't show "no-speech" errors to the user, just retry
+      // CRITICAL CHANGE: Only log no-speech errors, don't show them to the user
       if (event.error === 'no-speech') {
-        console.log("No speech detected, will auto-restart");
+        console.log("No speech detected, continuing to listen");
+        // Don't set any error state for no-speech
       } else {
+        console.error("Speech recognition error:", event.error);
         setError(new Error(`Speech recognition error: ${event.error}`));
       }
     };
@@ -242,19 +243,6 @@ export function useInterviewEngine(interview, isMicMuted) {
 
   // --- CONVERSATION FLOW & LIFECYCLE ---
   const startConversation = useCallback(async () => {
-    // Check and request microphone permission
-    try {
-      console.log("Requesting microphone access");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Stop the stream immediately, we just needed permission
-      stream.getTracks().forEach(track => track.stop());
-      console.log("Microphone access granted");
-    } catch (err) {
-      console.error("Failed to get microphone permission:", err);
-      setError(new Error("Microphone access is required for the interview. Please allow microphone access and try again."));
-      return;
-    }
-    
     // Set up speech recognition
     const recognition = setupSpeechRecognition();
     if (recognition) {
