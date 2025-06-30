@@ -29,32 +29,20 @@ export async function POST(req) {
             - Respond naturally to the candidate's previous answers
             - Speak as if this is a voice conversation, not a text chat`;
         
-        const stream = await openai.chat.completions.create({
+        const response = await openai.chat.completions.create({
             model: 'gpt-4o',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: prompt }
             ],
-            stream: true,
             temperature: 0.7,
             max_tokens: 250
         });
-
-        const readableStream = new ReadableStream({
-            async start(controller) {
-                for await (const chunk of stream) {
-                    const content = chunk.choices[0]?.delta?.content || "";
-                    if (content) {
-                        controller.enqueue(content);
-                    }
-                }
-                controller.close();
-            }
-        });
-
-        return new Response(readableStream, {
-            headers: { 'Content-Type': 'text/plain' },
-        });
+        
+        const aiResponse = response.choices[0].message.content.trim();
+        
+        // Return a standard JSON response
+        return NextResponse.json({ response: aiResponse });
         
     } catch (error) {
         console.error("Error generating AI response:", error);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import io from 'socket.io-client';
+import { createClient } from '@deepgram/sdk';
 
 export function useInterviewEngine(interview, isMicMuted) {
   // --- STATE MANAGEMENT ---
@@ -18,12 +18,12 @@ export function useInterviewEngine(interview, isMicMuted) {
   const userResponseBufferRef = useRef('');
   const silenceTimerRef = useRef(null);
   const audioRef = useRef(null);
-  const socketRef = useRef(null);
-  const workletNodeRef = useRef(null);
+  const deepgramConnectionRef = useRef(null);
   const abortControllerRef = useRef(null);
 
   // --- AI RESPONSE & SPEECH ---
   const speakText = useCallback(async (text) => {
+    if (!text) return;
     setIsAISpeaking(true);
     setError(null);
     try {
@@ -39,12 +39,18 @@ export function useInterviewEngine(interview, isMicMuted) {
       audioRef.current = audio;
 
       await new Promise((resolve, reject) => {
-        audio.onended = resolve;
+        audio.onended = () => {
+          // IMPORTANT: Resume mic input after AI finishes speaking
+          if (deepgramConnectionRef.current?.audioContext?.state === 'suspended') {
+            deepgramConnectionRef.current.audioContext.resume();
+          }
+          resolve();
+        };
         audio.onerror = reject;
         audio.play();
       });
     } catch (err) {
-      console.error("Error converting text to speech:", err);
+      console.error("Error in text-to-speech:", err);
       setError(err);
     } finally {
       setIsAISpeaking(false);
@@ -61,7 +67,7 @@ export function useInterviewEngine(interview, isMicMuted) {
         body: JSON.stringify({ prompt, role: interview.jobPosition, interviewStyle: interview.interviewStyle, focus: interview.focus }),
       });
       if (!response.ok) throw new Error('Failed to generate AI response');
-      const data = await response.json();
+      const data = await response.json(); // Now this will work correctly
       return data.response;
     } catch (err) {
       console.error("Error generating AI response:", err);
@@ -74,10 +80,10 @@ export function useInterviewEngine(interview, isMicMuted) {
   
   const createPrompt = useCallback((convHistory, type) => {
     if (type === 'greeting') {
-      return `You are an expert interviewer starting an interview for a ${interview.jobPosition} role. The candidate has ${interview.jobExperience} years of experience. Greet them warmly and ask your first question. Keep your opening brief and natural.`;
+      return `You are an expert interviewer starting an interview for a ${interview.jobPosition} role. The candidate has ${interview.jobExperience} years of experience. Greet them warmly and ask your first question.`;
     }
     const history = convHistory.map(item => `${item.role === 'ai' ? 'Interviewer' : 'Candidate'}: ${item.text}`).join('\n');
-    return `This is a real-time interview for a ${interview.jobPosition} role. Here is the conversation so far:\n${history}\n\nRespond naturally to the candidate's last message. Keep your response concise and conversational.`;
+    return `This is a real-time interview. Here is the history:\n${history}\n\nRespond naturally to the candidate's last message.`;
   }, [interview]);
 
   const processUserResponse = useCallback(async () => {
@@ -112,90 +118,84 @@ export function useInterviewEngine(interview, isMicMuted) {
   }, []);
 
   const handleSpeechEnd = useCallback(() => {
-    if (userResponseBufferRef.current.trim()) {
-        processUserResponse();
-    }
     setIsUserSpeaking(false);
+    clearTimeout(silenceTimerRef.current);
+    silenceTimerRef.current = setTimeout(() => {
+        if (userResponseBufferRef.current.trim()) {
+            processUserResponse();
+        }
+    }, 500); // Shorter delay for responsiveness
   }, [processUserResponse]);
 
   const startListening = useCallback(async (audioStream) => {
-    if (!socketRef.current || !audioStream.active) return;
-    
-    const socket = socketRef.current;
-    setIsListening(true);
-    socket.emit('start-transcription'); // Tell server to connect to Deepgram
+    if (!audioStream.active) return;
+    try {
+      const response = await fetch('/api/deepgram');
+      const { deepgramToken } = await response.json();
+      const deepgram = createClient(deepgramToken);
+      const connection = deepgram.listen.live({
+        model: 'nova-2', language: 'en-US', smart_format: true,
+        interim_results: true, vad_events: true
+      });
+      
+      connection.on('open', () => setIsListening(true));
+      connection.on('close', () => setIsListening(false));
+      connection.on('error', (e) => { console.error("Deepgram Error:", e); setError(e); });
+      connection.on('transcript', handleTranscript);
+      connection.on('VADEvent', (event) => {
+          if (event.label === 'speech_start') {
+            setIsUserSpeaking(true);
+            clearTimeout(silenceTimerRef.current);
+          }
+          if (event.label === 'speech_end') {
+            handleSpeechEnd();
+          }
+      });
+      
+      const audioContext = new AudioContext();
+      await audioContext.audioWorklet.addModule('/audio-processor.js');
+      const source = audioContext.createMediaStreamSource(audioStream);
+      const workletNode = new AudioWorkletNode(audioContext, 'audio-processor');
 
-    const audioContext = new AudioContext();
-    await audioContext.audioWorklet.addModule('/audio-processor.js');
-    const source = audioContext.createMediaStreamSource(audioStream);
-    const workletNode = new AudioWorkletNode(audioContext, 'audio-processor');
-    workletNodeRef.current = { audioContext, workletNode, source };
-
-    workletNode.port.onmessage = (event) => {
-      if (socket.connected && !isMicMuted) {
-        socket.emit('microphone-stream', event.data);
-      }
-    };
-    source.connect(workletNode);
-  }, [isMicMuted]);
-
-  const stopListening = useCallback(() => {
-    setIsListening(false);
-    if (workletNodeRef.current) {
-        workletNodeRef.current.workletNode.port.close();
-        workletNodeRef.current.workletNode.disconnect();
-        workletNodeRef.current.source.disconnect();
-        workletNodeRef.current.audioContext.close();
-        workletNodeRef.current = null;
+      workletNode.port.onmessage = (event) => {
+        if (!isMicMuted && connection.getReadyState() === 1) {
+          connection.send(event.data);
+        }
+      };
+      source.connect(workletNode);
+      deepgramConnectionRef.current = { connection, audioContext, workletNode, source };
+    } catch (e) {
+      console.error("Error setting up transcription:", e);
+      setError(e);
     }
-  }, []);
-  
+  }, [isMicMuted, handleTranscript, handleSpeechEnd]);
+
   // --- CONVERSATION FLOW & LIFECYCLE ---
   const startConversation = useCallback(async (audioStream) => {
+    startListening(audioStream);
     const prompt = createPrompt([], 'greeting');
     const aiResponseText = await generateAIResponse(prompt);
     if (aiResponseText) {
       setConversation([{ role: 'ai', text: aiResponseText }]);
       await speakText(aiResponseText);
     }
-    startListening(audioStream);
   }, [startListening, createPrompt, generateAIResponse, speakText]);
 
   const endConversation = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
+    if (deepgramConnectionRef.current) {
+        deepgramConnectionRef.current.workletNode?.port.close();
+        deepgramConnectionRef.current.source?.disconnect();
+        deepgramConnectionRef.current.audioContext?.close();
+        deepgramConnectionRef.current.connection?.finish();
+        deepgramConnectionRef.current = null;
     }
-    stopListening();
     if (audioRef.current) audioRef.current.pause();
     clearTimeout(silenceTimerRef.current);
-  }, [stopListening]);
+  }, []);
 
   useEffect(() => {
-    // Connect to the WebSocket server using an environment variable for the URL
-    const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001');
-    socketRef.current = socket;
-    
-    socket.on('transcript-result', handleTranscript);
-    socket.on('connect', () => console.log('🟢 Frontend connected to WebSocket server.'));
-    socket.on('disconnect', () => console.log('👋 Frontend disconnected from WebSocket server.'));
-    
-    return () => {
-      endConversation();
-    };
-  }, [handleTranscript, endConversation]);
-  
-  useEffect(() => {
-    if (isListening) {
-      const lastMessage = conversation[conversation.length - 1];
-      const isFinal = lastMessage?.role === 'user';
-      const userIsDone = isFinal && !interimTranscript;
-
-      if (userIsDone) {
-        handleSpeechEnd();
-      }
-    }
-  }, [conversation, interimTranscript, isListening, handleSpeechEnd]);
+    return () => endConversation();
+  }, [endConversation]);
 
   return { conversation, currentUserResponse, interimTranscript, isUserSpeaking, isAISpeaking, isListening, error, startConversation, endConversation };
 } 
