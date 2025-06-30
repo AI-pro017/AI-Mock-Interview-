@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@deepgram/sdk';
 
@@ -24,8 +23,12 @@ export function useInterviewEngine(interview, isMicMuted) {
 
   // --- AI RESPONSE LOGIC ---
   const stopSpeaking = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
+    if (audioQueueRef.current.length > 0) {
+      audioQueueRef.current = [];
+    }
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
       audioRef.current = null;
     }
     if (abortControllerRef.current) {
@@ -33,7 +36,6 @@ export function useInterviewEngine(interview, isMicMuted) {
     }
     setIsAISpeaking(false);
     setIsGenerating(false);
-    audioQueueRef.current = []; // Clear the audio queue
     isPlayingRef.current = false;
   }, []);
 
@@ -42,9 +44,9 @@ export function useInterviewEngine(interview, isMicMuted) {
     setIsAISpeaking(true);
     setError(null);
     abortControllerRef.current = new AbortController();
-
     let accumulatedText = "";
-    
+    let sentenceBuffer = "";
+
     try {
       const response = await fetch('/api/generate-response', {
         method: 'POST',
@@ -63,13 +65,20 @@ export function useInterviewEngine(interview, isMicMuted) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
-      const processText = async () => {
+      const processStream = async () => {
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            if (sentenceBuffer.trim()) {
+              fetchAndQueueAudio(sentenceBuffer.trim());
+            }
+            break;
+          }
           
           const textChunk = decoder.decode(value, { stream: true });
+          sentenceBuffer += textChunk;
           accumulatedText += textChunk;
+
           setConversation(prev => {
               const lastItem = prev[prev.length - 1];
               if (lastItem && lastItem.role === 'ai') {
@@ -78,22 +87,19 @@ export function useInterviewEngine(interview, isMicMuted) {
               }
               return [...prev, { role: 'ai', text: accumulatedText }];
           });
-
-          // Fetch and queue audio for the chunk
-          const audioResponse = await fetch('/api/text-to-speech', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: textChunk })
-          });
-          if (audioResponse.ok) {
-            const audioBlob = await audioResponse.blob();
-            audioQueueRef.current.push(audioBlob);
-            if (!isPlayingRef.current) playAudioQueue();
+          
+          const sentenceEndIndex = sentenceBuffer.search(/[.?!]/);
+          if (sentenceEndIndex !== -1) {
+            const sentence = sentenceBuffer.substring(0, sentenceEndIndex + 1).trim();
+            if(sentence) {
+              fetchAndQueueAudio(sentence);
+            }
+            sentenceBuffer = sentenceBuffer.substring(sentenceEndIndex + 1);
           }
         }
       };
 
-      await processText();
+      await processStream();
 
     } catch (err) {
       if (err.name !== 'AbortError') {
@@ -102,13 +108,33 @@ export function useInterviewEngine(interview, isMicMuted) {
       }
     } finally {
       setIsGenerating(false);
-      // Ensure the audio queue is empty before setting isAISpeaking to false
       const checkQueue = setInterval(() => {
         if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
           setIsAISpeaking(false);
+          // Ensure mic is active after AI finishes
+          if (deepgramConnectionRef.current?.audioContext?.state === 'suspended') {
+            deepgramConnectionRef.current.audioContext.resume();
+          }
           clearInterval(checkQueue);
         }
       }, 100);
+    }
+  };
+
+  const fetchAndQueueAudio = async (text) => {
+    try {
+      const audioResponse = await fetch('/api/text-to-speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      if (audioResponse.ok) {
+        const audioBlob = await audioResponse.blob();
+        audioQueueRef.current.push(audioBlob);
+        if (!isPlayingRef.current) playAudioQueue();
+      }
+    } catch (e) {
+      console.error("Error fetching audio for sentence:", e);
     }
   };
 
@@ -119,6 +145,7 @@ export function useInterviewEngine(interview, isMicMuted) {
     const audioBlob = audioQueueRef.current.shift();
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
+    audioRef.current = audio;
     
     audio.onended = () => {
       isPlayingRef.current = false;
