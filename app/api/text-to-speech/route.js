@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import ElevenLabs from 'elevenlabs-node';
+import fetch from 'node-fetch';
 
 export async function POST(req) {
   const { text } = await req.json();
@@ -8,30 +8,40 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Text is required' }, { status: 400 });
   }
 
-  const voice = new ElevenLabs({
-    apiKey: process.env.ELEVENLABS_API_KEY, 
-    voiceId: '21m00Tcm4TlvDq8ikWAM', // A popular standard voice, 'Rachel'
-  });
-
   try {
-    // Use the non-streaming version for better browser compatibility
-    const audioBuffer = await voice.textToSpeech({
-      textInput: text,
-      modelId: 'eleven_multilingual_v2',
-      stability: 0.5,
-      similarityBoost: 0.75,
-      style: 1,
+    // Make a direct API call to ElevenLabs instead of using the SDK
+    const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
+      method: 'POST',
+      headers: {
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': process.env.ELEVENLABS_API_KEY
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: 'eleven_monolingual_v1',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75
+        }
+      })
     });
 
-    // Return the audio as a binary response
+    if (!response.ok) {
+      throw new Error(`ElevenLabs API returned ${response.status}: ${await response.text()}`);
+    }
+
+    // Get the audio buffer
+    const audioBuffer = await response.arrayBuffer();
+
+    // Return the raw audio
     return new Response(audioBuffer, {
       headers: {
-        'Content-Type': 'audio/mpeg',
-      },
+        'Content-Type': 'audio/mpeg'
+      }
     });
-
   } catch (error) {
     console.error('ElevenLabs API Error:', error);
-    return NextResponse.json({ error: 'Failed to generate audio from ElevenLabs' }, { status: 500 });
+    return NextResponse.json({ error: `Failed to generate audio: ${error.message}` }, { status: 500 });
   }
 } 

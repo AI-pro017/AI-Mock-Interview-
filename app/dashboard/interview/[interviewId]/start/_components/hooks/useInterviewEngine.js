@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createClient } from '@deepgram/sdk';
 
 export function useInterviewEngine(interview, isMicMuted) {
   // --- STATE MANAGEMENT ---
@@ -15,11 +14,10 @@ export function useInterviewEngine(interview, isMicMuted) {
   const [error, setError] = useState(null);
 
   // --- REFS ---
+  const audioRef = useRef(new Audio());
+  const recognitionRef = useRef(null);
   const userResponseBufferRef = useRef('');
-  const silenceTimerRef = useRef(null);
-  const audioRef = useRef(null);
-  const deepgramConnectionRef = useRef(null);
-  const abortControllerRef = useRef(null);
+  const timeoutRef = useRef(null);
 
   // --- AI RESPONSE & SPEECH ---
   const generateAIResponse = useCallback(async (prompt) => {
@@ -29,10 +27,16 @@ export function useInterviewEngine(interview, isMicMuted) {
       const response = await fetch('/api/generate-response', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, role: interview.jobPosition, interviewStyle: interview.interviewStyle, focus: interview.focus }),
+        body: JSON.stringify({ 
+          prompt, 
+          role: interview.jobPosition, 
+          interviewStyle: interview.interviewStyle, 
+          focus: interview.focus 
+        }),
       });
+      
       if (!response.ok) throw new Error('Failed to generate AI response');
-      const data = await response.json(); // Now this will work correctly
+      const data = await response.json();
       return data.response;
     } catch (err) {
       console.error("Error generating AI response:", err);
@@ -48,55 +52,53 @@ export function useInterviewEngine(interview, isMicMuted) {
 
     setIsAISpeaking(true);
     setError(null);
-    abortControllerRef.current = new AbortController();
-
+    
     try {
-      // Create a new audio element each time
-      const audio = new Audio();
-      audioRef.current = audio;
-      
-      // Set up event listeners
-      audio.onended = () => {
-        setIsAISpeaking(false);
-      };
-      
-      audio.onerror = (e) => {
-        console.error("Audio playback error:", e);
-        setError(new Error("Failed to play audio response"));
-        setIsAISpeaking(false);
-      };
+      // Clear previous audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
 
-      // Convert text to speech
+      // Get TTS audio
       const response = await fetch('/api/text-to-speech', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
-        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
         throw new Error(`Text-to-speech request failed with status ${response.status}`);
       }
       
-      // Create a blob from the response and set it as the audio source
+      // Create a blob URL for the audio
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      audio.src = url;
       
-      // Play the audio
-      await audio.play();
+      // Create a new audio element each time
+      const audio = new Audio();
+      audioRef.current = audio;
       
-      // Clean up the blob URL when done
+      // Set up event handlers
       audio.onended = () => {
         URL.revokeObjectURL(url);
         setIsAISpeaking(false);
       };
       
+      audio.onerror = (e) => {
+        console.error("Audio playback error:", e);
+        URL.revokeObjectURL(url);
+        setIsAISpeaking(false);
+        setError(new Error("Failed to play audio response"));
+      };
+      
+      // Load and play the audio
+      audio.src = url;
+      await audio.play();
+      
     } catch (err) {
-      if (err.name !== 'AbortError') {
-        console.error("Error in text-to-speech playback:", err);
-        setError(err);
-      }
+      console.error("Error in text-to-speech playback:", err);
+      setError(err);
       setIsAISpeaking(false);
     }
   }, []);
@@ -128,76 +130,105 @@ export function useInterviewEngine(interview, isMicMuted) {
     }
   }, [conversation, createPrompt, generateAIResponse, speakText]);
 
-  // --- REAL-TIME TRANSCRIPTION LOGIC ---
-  const handleTranscript = useCallback((data) => {
-    const transcript = data.channel.alternatives[0].transcript;
-    if (data.is_final && transcript.trim()) {
-      userResponseBufferRef.current += transcript + ' ';
-      setCurrentUserResponse(userResponseBufferRef.current.trim());
-      setInterimTranscript('');
-    } else {
-      setInterimTranscript(transcript);
+  // --- BROWSER SPEECH RECOGNITION ---
+  const setupSpeechRecognition = useCallback(() => {
+    if (typeof window === 'undefined') return null;
+    
+    // Browser Speech Recognition API
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError(new Error("Speech recognition is not supported in this browser."));
+      return null;
     }
-  }, []);
 
-  const handleSpeechEnd = useCallback(() => {
-    setIsUserSpeaking(false);
-    clearTimeout(silenceTimerRef.current);
-    silenceTimerRef.current = setTimeout(() => {
-        if (userResponseBufferRef.current.trim()) {
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      console.log("Speech recognition started");
+      setIsListening(true);
+    };
+
+    recognition.onend = () => {
+      console.log("Speech recognition ended");
+      setIsListening(false);
+      
+      // Auto-restart if not manually stopped
+      if (!isMicMuted) {
+        try {
+          recognition.start();
+        } catch (e) {
+          // Ignore errors on restart attempt
+        }
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error", event.error);
+      setError(new Error(`Speech recognition error: ${event.error}`));
+    };
+
+    recognition.onresult = (event) => {
+      let interim = '';
+      let final = '';
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript + ' ';
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+
+      if (interim) {
+        setInterimTranscript(interim);
+        setIsUserSpeaking(true);
+        // Clear any pending end-of-speech timeout
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+      }
+
+      if (final) {
+        userResponseBufferRef.current += final;
+        setCurrentUserResponse(userResponseBufferRef.current.trim());
+        setIsUserSpeaking(true);
+        
+        // Set a timeout to detect end of speech
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+        
+        timeoutRef.current = setTimeout(() => {
+          setIsUserSpeaking(false);
+          if (userResponseBufferRef.current.trim()) {
             processUserResponse();
-        }
-    }, 500); // Shorter delay for responsiveness
-  }, [processUserResponse]);
-
-  const startListening = useCallback(async (audioStream) => {
-    if (!audioStream.active) return;
-    try {
-      const response = await fetch('/api/deepgram');
-      const { deepgramToken } = await response.json();
-      const deepgram = createClient(deepgramToken);
-      const connection = deepgram.listen.live({
-        model: 'nova-2', language: 'en-US', smart_format: true,
-        interim_results: true, vad_events: true
-      });
-      
-      connection.on('open', () => setIsListening(true));
-      connection.on('close', () => setIsListening(false));
-      connection.on('error', (e) => { console.error("Deepgram Error:", e); setError(e); });
-      connection.on('transcript', handleTranscript);
-      connection.on('VADEvent', (event) => {
-          if (event.label === 'speech_start') {
-            setIsUserSpeaking(true);
-            clearTimeout(silenceTimerRef.current);
           }
-          if (event.label === 'speech_end') {
-            handleSpeechEnd();
-          }
-      });
-      
-      const audioContext = new AudioContext();
-      await audioContext.audioWorklet.addModule('/audio-processor.js');
-      const source = audioContext.createMediaStreamSource(audioStream);
-      const workletNode = new AudioWorkletNode(audioContext, 'audio-processor');
+        }, 1500);
+      }
+    };
 
-      workletNode.port.onmessage = (event) => {
-        if (!isMicMuted && connection.getReadyState() === 1) {
-          connection.send(event.data);
-        }
-      };
-      source.connect(workletNode);
-      deepgramConnectionRef.current = { connection, audioContext, workletNode, source };
-    } catch (e) {
-      console.error("Error setting up transcription:", e);
-      setError(e);
-    }
-  }, [isMicMuted, handleTranscript, handleSpeechEnd]);
+    return recognition;
+  }, [isMicMuted, processUserResponse]);
 
   // --- CONVERSATION FLOW & LIFECYCLE ---
-  const startConversation = useCallback(async (audioStream) => {
-    // Start listening first to initialize the audio context and Deepgram connection
-    await startListening(audioStream);
+  const startConversation = useCallback(async () => {
+    // Set up speech recognition
+    const recognition = setupSpeechRecognition();
+    if (recognition) {
+      recognitionRef.current = recognition;
+      try {
+        recognition.start();
+      } catch (e) {
+        console.error("Failed to start speech recognition:", e);
+        setError(new Error("Failed to start speech recognition"));
+      }
+    }
 
+    // Generate AI greeting
     const prompt = createPrompt([], 'greeting');
     const aiResponseText = await generateAIResponse(prompt);
 
@@ -205,24 +236,52 @@ export function useInterviewEngine(interview, isMicMuted) {
       setConversation([{ role: 'ai', text: aiResponseText }]);
       await speakText(aiResponseText);
     }
-  }, [startListening, createPrompt, generateAIResponse, speakText]);
+  }, [setupSpeechRecognition, createPrompt, generateAIResponse, speakText]);
 
   const endConversation = useCallback(() => {
-    if (deepgramConnectionRef.current) {
-        deepgramConnectionRef.current.workletNode?.port.close();
-        deepgramConnectionRef.current.source?.disconnect();
-        deepgramConnectionRef.current.audioContext?.close();
-        deepgramConnectionRef.current.connection?.finish();
-        deepgramConnectionRef.current = null;
+    // Stop speech recognition
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // Ignore errors when stopping
+      }
+      recognitionRef.current = null;
     }
-    if (audioRef.current) audioRef.current.pause();
-    clearTimeout(silenceTimerRef.current);
+    
+    // Stop any playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+    
+    // Clear any pending timeouts
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    
     setIsListening(false);
+    setIsAISpeaking(false);
+    setIsUserSpeaking(false);
   }, []);
 
+  // Cleanup on unmount
   useEffect(() => {
-    return () => endConversation();
+    return () => {
+      endConversation();
+    };
   }, [endConversation]);
 
-  return { conversation, currentUserResponse, interimTranscript, isUserSpeaking, isAISpeaking, isListening, error, startConversation, endConversation };
+  return { 
+    conversation, 
+    currentUserResponse, 
+    interimTranscript, 
+    isUserSpeaking, 
+    isAISpeaking, 
+    isListening, 
+    error, 
+    startConversation, 
+    endConversation 
+  };
 } 
