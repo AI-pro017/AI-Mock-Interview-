@@ -31,14 +31,15 @@ export async function POST(req) {
 
         console.log("Generating new report for mockId:", mockId);
         
-        // 1. Fetch all user answers for the interview
+        // FIX: Query UserAnswer using the correct column name 'mockId'
         const userAnswers = await db.select()
             .from(UserAnswer)
-            .where(eq(UserAnswer.mockIdRef, mockId));
+            .where(eq(UserAnswer.mockId, mockId));  // <-- FIXED: Using mockId instead of mockIdRef
 
         console.log(`Found ${userAnswers.length} answers for mockId:`, mockId);
         
         if (userAnswers.length === 0) {
+            console.error(`No answers found for mockId: ${mockId}`);
             return NextResponse.json({ error: 'No answers found for this interview' }, { status: 404 });
         }
 
