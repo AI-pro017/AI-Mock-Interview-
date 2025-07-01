@@ -1,3 +1,5 @@
+console.log("API ROUTE LOADED SUCCESSFULLY: /api/interview/analysis");
+
 import { NextResponse } from 'next/server';
 import { auth } from "@/auth";
 import { db } from '@/utils/db';
