@@ -90,7 +90,14 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       
       // Create constraints for getUserMedia
       const constraints = {
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+          sampleRate: 48000,
+          sampleSize: 16
+        },
         video: useCameraInInterview ? {
           width: { ideal: 1280 },
           height: { ideal: 720 },
@@ -421,6 +428,20 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
                 disabled={!isInterviewActive}
               />
             </div>
+
+            {/* Noise Reduction Toggle */}
+            <div className="flex items-center justify-between mt-2">
+              <div className="space-y-0.5">
+                <Label htmlFor="noise-reduction">Background Noise Filtering</Label>
+                <p className="text-xs text-gray-500">Reduces background noise in voice recognition</p>
+              </div>
+              {/* This is just a visual indicator as the feature is always on */}
+              <Switch
+                id="noise-reduction"
+                checked={true}
+                disabled={true}
+              />
+            </div>
           </div>
 
           <ConversationDisplay
@@ -482,7 +503,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
                 {!isMediaLoading && (
                   <Button 
                     variant="outline" 
-                    className="mt-4 text-white border-white hover:bg-gray-800"
+                    className="mt-4 text-black bg-white border-white hover:bg-gray-200"
                     onClick={() => {
                       console.log("Retry camera access clicked");
                       initializeMedia();

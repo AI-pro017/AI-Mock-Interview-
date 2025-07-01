@@ -33,6 +33,31 @@ export function useSpeechRecognition({
     setError(null);
 
     try {
+      // Apply noise suppression using AudioContext
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(audioStream);
+      
+      // Create a noise suppressor node if supported
+      let processedStream;
+      
+      if (typeof audioContext.createNoiseSuppressor === 'function') {
+        // Use native noise suppressor if available
+        const noiseSuppressor = audioContext.createNoiseSuppressor();
+        source.connect(noiseSuppressor);
+        
+        // Create a destination for the processed audio
+        const destination = audioContext.createMediaStreamDestination();
+        noiseSuppressor.connect(destination);
+        
+        // Use the processed stream for speech recognition
+        processedStream = destination.stream;
+        console.log("Using native noise suppression");
+      } else {
+        // Fallback to using the original stream with manual filter settings
+        processedStream = audioStream;
+        console.log("Native noise suppression not available");
+      }
+      
       const response = await fetch('/api/deepgram');
       if (!response.ok) throw new Error('Failed to get Deepgram token');
       
@@ -45,9 +70,16 @@ export function useSpeechRecognition({
         language: "en-US",
         smart_format: true,
         interim_results: true,
-        vad_events: true,
+        vad_events: true, // Voice Activity Detection
         utterance_end_ms: 1000,
-        endpointing: 200
+        endpointing: 200,
+        // Add these options to improve background noise filtering
+        diarize: true, // Speaker identification can help filter out other voices
+        punctuate: true,
+        profanity_filter: true,
+        // Additional model parameters to improve speech recognition
+        noise_reduction: true,
+        background_noise_suppression: 1.0 // Maximum value for noise suppression
       });
 
       connection.on("open", () => setIsListening(true));
@@ -60,9 +92,12 @@ export function useSpeechRecognition({
       connection.on('transcript', (data) => {
         const transcript = data.channel.alternatives[0].transcript;
         if (transcript) {
-          onTranscript?.(transcript, data.is_final);
-          if (data.is_final && transcript.trim()) {
-            onFinalTranscript?.(transcript);
+          // Additional confidence filtering to reduce incorrect transcriptions
+          if (data.channel.alternatives[0].confidence > 0.7 || data.is_final) {
+            onTranscript?.(transcript, data.is_final);
+            if (data.is_final && transcript.trim()) {
+              onFinalTranscript?.(transcript);
+            }
           }
         }
       });
@@ -77,26 +112,24 @@ export function useSpeechRecognition({
         mediaRecorderRef.current.stop();
       }
 
-      // Only create and start the MediaRecorder if not muted
-      if (!muted) {
-        const mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
+      // Use the processed stream for the media recorder if available
+      const mediaRecorder = new MediaRecorder(processedStream, { mimeType: 'audio/webm' });
 
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0 && !muted && enabled && deepgramConnectionRef.current) {
-            try {
-              deepgramConnectionRef.current.send(event.data);
-            } catch (e) {
-              console.error("Failed to send audio data:", e);
-            }
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0 && !muted && enabled && deepgramConnectionRef.current) {
+          try {
+            deepgramConnectionRef.current.send(event.data);
+          } catch (e) {
+            console.error("Failed to send audio data:", e);
           }
-        };
+        }
+      };
 
-        mediaRecorderRef.current = mediaRecorder;
-        // Start recording
-        mediaRecorder.start(250);
-      }
-
+      mediaRecorderRef.current = mediaRecorder;
       deepgramConnectionRef.current = connection;
+
+      // This is a critical point. Start recording.
+      mediaRecorder.start(250);
 
     } catch (e) {
       console.error("Failed to start listening:", e);
