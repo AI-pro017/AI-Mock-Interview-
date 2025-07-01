@@ -76,6 +76,10 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       try {
         cameraStream.getTracks().forEach(track => track.stop());
         setCameraStream(null);
+        // Clear any existing srcObject
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+        }
       } catch (e) {
         console.error("Error stopping existing stream:", e);
       }
@@ -106,16 +110,31 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
         console.warn("No video tracks found despite requesting camera");
       }
       
-      // Store the stream and update UI
+      // Store the stream
       setCameraStream(stream);
-      setIsMediaLoading(false);
       
-      // Connect stream to video element if we have video
+      // Connect stream to video element if we have video tracks
       if (videoRef.current && videoTracks.length > 0) {
+        // Important: Set srcObject directly, not after state update
         videoRef.current.srcObject = stream;
+        
+        // Add event listeners to ensure video is properly loaded
+        videoRef.current.onloadedmetadata = () => {
+          console.log("Video metadata loaded, playing video");
+          videoRef.current.play().catch(e => {
+            console.error("Error playing video:", e);
+          });
+        };
+        
+        videoRef.current.onerror = (e) => {
+          console.error("Video element error:", e);
+          setMediaError("Error displaying video feed");
+        };
+        
         console.log("Connected video stream to video element");
       }
       
+      setIsMediaLoading(false);
       return stream;
     } catch (error) {
       console.error("Failed to get media stream:", error.name, error.message);
@@ -155,33 +174,52 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const startInterview = async () => {
     const mediaStream = await initializeMedia();
     if (mediaStream) {
+      // Reset the timer to the full duration before starting
+      setRemainingTime(interview.duration * 60);
+      
+      // Mark the interview as active - this will trigger the timer useEffect
       setIsInterviewActive(true);
+      
+      // Start the conversation
       startConversation(mediaStream);
-      timerRef.current = setInterval(() => {
-        setRemainingTime(prev => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current);
-            endInterview();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
     }
   };
 
   const endInterview = () => {
+    console.log("Ending interview");
+    
+    // Mark interview as inactive first
     setIsInterviewActive(false);
-    if (timerRef.current) clearInterval(timerRef.current);
     
-    endConversation();
-    
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-      setCameraStream(null);
+    // Clear the timer interval
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
     
-    router.push(`/dashboard/interview/${interview.mockId}/feedback`);
+    // End the conversation (stop speech recognition, etc.)
+    endConversation();
+    
+    // Clean up media resources
+    if (cameraStream) {
+      try {
+        cameraStream.getTracks().forEach(track => {
+          try {
+            track.stop();
+          } catch (e) {
+            console.error("Error stopping track:", e);
+          }
+        });
+        setCameraStream(null);
+      } catch (e) {
+        console.error("Error cleaning up camera stream:", e);
+      }
+    }
+    
+    // Navigate to feedback page after a short delay to ensure state updates
+    setTimeout(() => {
+      router.push(`/dashboard/interview/${interview.mockId}/feedback`);
+    }, 100);
   };
 
   useEffect(() => {
@@ -207,6 +245,72 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       }
     };
   }, [cameraStream]);
+
+  // Add this useEffect to ensure video element is updated when cameraStream changes
+  useEffect(() => {
+    if (cameraStream && videoRef.current) {
+      const videoTracks = cameraStream.getVideoTracks();
+      if (videoTracks.length > 0) {
+        console.log("Camera stream changed, updating video element");
+        
+        // Ensure video tracks are enabled
+        videoTracks.forEach(track => {
+          track.enabled = true;
+          console.log(`Video track ${track.label} enabled`);
+        });
+        
+        // Set the stream to the video element
+        videoRef.current.srcObject = cameraStream;
+        
+        // Attempt to play the video
+        videoRef.current.play().catch(e => {
+          console.error("Error playing video after stream change:", e);
+        });
+      }
+    }
+  }, [cameraStream]);
+
+  // Add this separate useEffect to handle the timer countdown
+  useEffect(() => {
+    // Only run the timer when the interview is active
+    if (isInterviewActive) {
+      console.log("Starting interview timer");
+      
+      // Clear any existing interval first
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      
+      // Set up a new interval for countdown
+      timerRef.current = setInterval(() => {
+        setRemainingTime(prev => {
+          console.log("Timer tick, remaining time:", prev - 1);
+          
+          // When time is up, end the interview
+          if (prev <= 1) {
+            console.log("Timer finished, ending interview");
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+            
+            // Use setTimeout to ensure state updates before navigation
+            setTimeout(() => endInterview(), 100);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      // Cleanup function to clear interval when component unmounts or interview becomes inactive
+      return () => {
+        if (timerRef.current) {
+          console.log("Cleaning up timer interval");
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      };
+    }
+  }, [isInterviewActive]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -360,9 +464,12 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
               <video
                 ref={videoRef}
                 autoPlay
-                muted
                 playsInline
+                muted
                 className="w-full h-full object-cover"
+                onLoadedMetadata={() => console.log("Video metadata loaded in render")}
+                onPlay={() => console.log("Video playback started")}
+                onError={(e) => console.error("Video error in render:", e)}
               />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-white p-4 text-center">
@@ -376,7 +483,10 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
                   <Button 
                     variant="outline" 
                     className="mt-4 text-white border-white hover:bg-gray-800"
-                    onClick={() => initializeMedia()}
+                    onClick={() => {
+                      console.log("Retry camera access clicked");
+                      initializeMedia();
+                    }}
                   >
                     Retry Camera Access
                   </Button>
