@@ -214,7 +214,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     setIsAnalyzing(true);
     try {
       console.log("Starting interview analysis...");
-      const response = await fetch('/api/interview/analysis', {
+      const response = await fetch('/api/interview-analysis', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

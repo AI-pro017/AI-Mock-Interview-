@@ -1,4 +1,5 @@
-console.log("API ROUTE LOADED SUCCESSFULLY: /api/interview/analysis");
+// app/api/interview-analysis/route.js
+console.log("API ROUTE LOADED: /api/interview-analysis");
 
 import { NextResponse } from 'next/server';
 import { auth } from "@/auth";

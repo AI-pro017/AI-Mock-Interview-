@@ -30,7 +30,7 @@ function Feedback({ params }) {
       // NOTE: This check now correctly runs on the server-side via the API.
       // We will trigger our API to do the check and generation.
       try {
-        const response = await fetch(`/api/interview/analysis`, {
+        const response = await fetch(`/api/interview-analysis`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
