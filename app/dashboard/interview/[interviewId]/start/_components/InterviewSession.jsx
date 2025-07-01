@@ -71,53 +71,84 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     setIsMediaLoading(true);
     setMediaError(null);
     
+    // Close any existing streams first
+    if (cameraStream) {
+      try {
+        cameraStream.getTracks().forEach(track => track.stop());
+        setCameraStream(null);
+      } catch (e) {
+        console.error("Error stopping existing stream:", e);
+      }
+    }
+    
     try {
-      // Attempt to get the stream based on camera preference
-      const stream = useCameraInInterview 
-        ? await safelyAccessCamera(true)
-        : await safelyAccessCamera(false);
+      console.log("Requesting media access:", useCameraInInterview ? "video+audio" : "audio-only");
       
-      // Success - we have a stream
-      setIsMediaLoading(false);
+      // Create constraints for getUserMedia
+      const constraints = {
+        audio: true,
+        video: useCameraInInterview ? {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "user"
+        } : false
+      };
+      
+      // Request media access
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      // Log what we got
+      const videoTracks = stream.getVideoTracks();
+      const audioTracks = stream.getAudioTracks();
+      console.log(`Acquired stream with ${videoTracks.length} video tracks and ${audioTracks.length} audio tracks`);
+      
+      if (useCameraInInterview && videoTracks.length === 0) {
+        console.warn("No video tracks found despite requesting camera");
+      }
+      
+      // Store the stream and update UI
       setCameraStream(stream);
+      setIsMediaLoading(false);
       
-      // Set up video element if we have a stream with video tracks
-      if (stream && videoRef.current) {
-        const hasVideoTracks = stream.getVideoTracks().length > 0;
-        
-        if (hasVideoTracks) {
-          videoRef.current.srcObject = stream;
-          console.log("Video stream attached to video element");
-        } else {
-          console.log("No video tracks available in the stream");
-        }
+      // Connect stream to video element if we have video
+      if (videoRef.current && videoTracks.length > 0) {
+        videoRef.current.srcObject = stream;
+        console.log("Connected video stream to video element");
       }
       
       return stream;
     } catch (error) {
-      console.warn("Media access failed:", error.message);
+      console.error("Failed to get media stream:", error.name, error.message);
       
-      // If camera access failed but was requested, try audio-only as fallback
+      // Handle specific error types
+      if (error.name === "NotAllowedError") {
+        setMediaError("Camera/microphone access denied. Please check your browser permissions and try again.");
+      } else if (error.name === "NotFoundError") {
+        setMediaError("No camera/microphone found. Please check your device connections.");
+      } else if (error.name === "NotReadableError" || error.name === "AbortError") {
+        setMediaError("Cannot access camera/microphone. It may be in use by another application.");
+      } else {
+        setMediaError(`Media error: ${error.message}`);
+      }
+      
+      setIsMediaLoading(false);
+      
+      // If camera was requested but failed, try audio-only as fallback
       if (useCameraInInterview) {
         try {
-          console.log("Falling back to audio-only");
-          const audioOnlyStream = await safelyAccessCamera(false);
-          setMediaError("Camera access failed: " + error.message + ". Using audio only.");
-          setIsMediaLoading(false);
+          console.log("Attempting audio-only fallback");
+          const audioOnlyStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
           setCameraStream(audioOnlyStream);
+          setMediaError(prev => prev + " Using audio only.");
           return audioOnlyStream;
         } catch (audioError) {
-          console.error("Fatal: Could not access microphone either.", audioError);
-          setMediaError("Interview cannot start: " + audioError.message);
-          setIsMediaLoading(false);
+          console.error("Audio fallback also failed:", audioError);
+          setMediaError(prev => prev + " Audio-only fallback also failed.");
           return null;
         }
-      } else {
-        // This is a direct audio-only failure
-        setMediaError("Microphone access failed: " + error.message);
-        setIsMediaLoading(false);
-        return null;
       }
+      
+      return null;
     }
   };
 
@@ -189,25 +220,32 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
 
   const currentError = engineError || mediaError;
 
-  // Fix the toggleMicrophone function - there's a logical error in it
+  // Fix the toggleMicrophone function to directly control the audio tracks
   const toggleMicrophone = () => {
-    // Toggle the mute state
-    const newMuteState = !isMicMuted;
-    
-    // Update the UI state first
-    setIsMicMuted(newMuteState);
-    
-    // If we have an active camera stream, directly mute/unmute the audio tracks
-    if (cameraStream) {
-      const audioTracks = cameraStream.getAudioTracks();
-      audioTracks.forEach(track => {
-        // The 'enabled' property controls whether the track outputs audio
-        // When muted, enabled should be false
-        track.enabled = !newMuteState;
-        console.log(`Audio track ${track.label} ${newMuteState ? 'muted' : 'unmuted'}`);
-      });
-    } else {
-      console.warn("Cannot mute microphone: No camera stream available");
+    try {
+      // Calculate the new mute state (opposite of current)
+      const newMuteState = !isMicMuted;
+      console.log(`Toggling microphone: ${isMicMuted ? 'unmuting' : 'muting'}`);
+      
+      // Update state first
+      setIsMicMuted(newMuteState);
+      
+      // Directly control audio tracks if available
+      if (cameraStream) {
+        const audioTracks = cameraStream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          audioTracks.forEach(track => {
+            track.enabled = !newMuteState; // When muted, enabled should be false
+            console.log(`Audio track ${track.label} ${newMuteState ? 'muted' : 'unmuted'}`);
+          });
+        } else {
+          console.warn("No audio tracks found in camera stream");
+        }
+      } else {
+        console.warn("No media stream available for muting");
+      }
+    } catch (error) {
+      console.error("Error toggling microphone:", error);
     }
   };
 
@@ -329,15 +367,19 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-white p-4 text-center">
                 <VideoOff className="h-12 w-12 mb-2" />
-                <p>{isMediaLoading ? "Requesting media..." : 
-                    useCameraInInterview && mediaError ? mediaError : "Camera is disabled"}</p>
-                {useCameraInInterview && !isMediaLoading && (
-                  <div className="mt-4 max-w-md">
-                    <p className="text-sm text-gray-400">
-                      To enable your camera, check the camera permissions in your browser settings 
-                      and ensure no other application is using your camera.
-                    </p>
-                  </div>
+                <p>
+                  {isMediaLoading ? "Requesting camera access..." : 
+                   mediaError ? mediaError : 
+                   "Camera is disabled or unavailable"}
+                </p>
+                {!isMediaLoading && (
+                  <Button 
+                    variant="outline" 
+                    className="mt-4 text-white border-white hover:bg-gray-800"
+                    onClick={() => initializeMedia()}
+                  >
+                    Retry Camera Access
+                  </Button>
                 )}
               </div>
             )}

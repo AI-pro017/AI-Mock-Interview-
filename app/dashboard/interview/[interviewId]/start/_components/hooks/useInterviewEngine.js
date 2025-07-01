@@ -409,23 +409,57 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     setIsGenerating(false);
   }, []);
 
-  // This useEffect helps manage the speech recognition based on mic mute state
+  // This useEffect properly handles mic muting with browser's SpeechRecognition
   useEffect(() => {
+    // Only try to interact with recognition if it exists
     if (!recognitionRef.current) return;
-
-    if (isMicMuted) {
-      // If the mic is muted, stop recognition
-      recognitionRef.current.stop();
-      console.log("Speech recognition stopped due to mute.");
-    } else if (isListening) {
-      // Only try to start if we're supposed to be listening
-      try {
-        recognitionRef.current.start();
-        console.log("Speech recognition started due to unmute.");
-      } catch (e) {
-        // This can happen if start() is called too rapidly
-        console.error("Could not restart speech recognition on unmute:", e);
+    
+    try {
+      // If mic is muted, stop recognition if it's running
+      if (isMicMuted) {
+        // Check if recognition is active before stopping it
+        if (isListening) {
+          // Remove the onend handler to prevent auto-restarting
+          const originalOnEnd = recognitionRef.current.onend;
+          recognitionRef.current.onend = () => {
+            setIsListening(false);
+            // Restore original handler after stopping
+            recognitionRef.current.onend = originalOnEnd;
+          };
+          
+          recognitionRef.current.stop();
+          console.log("Speech recognition stopped due to mute");
+        }
+      } else {
+        // If mic is unmuted and we're not already listening, start recognition
+        if (!isListening) {
+          try {
+            recognitionRef.current.start();
+            console.log("Speech recognition started due to unmute");
+          } catch (e) {
+            console.error("Could not start speech recognition:", e);
+            
+            // If recognition is already running, don't try to restart
+            if (e.name === 'InvalidStateError') {
+              console.log("Recognition was already running");
+              setIsListening(true);
+            } else {
+              // For other errors, attempt a delayed restart
+              setTimeout(() => {
+                try {
+                  if (recognitionRef.current && !isMicMuted) {
+                    recognitionRef.current.start();
+                  }
+                } catch (retryError) {
+                  console.error("Failed to restart recognition after delay:", retryError);
+                }
+              }, 500);
+            }
+          }
+        }
       }
+    } catch (error) {
+      console.error("Error managing speech recognition:", error);
     }
   }, [isMicMuted, isListening]);
 

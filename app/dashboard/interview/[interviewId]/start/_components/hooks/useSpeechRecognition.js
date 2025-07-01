@@ -119,34 +119,50 @@ export function useSpeechRecognition({
 
   // Handle muting changes
   useEffect(() => {
-    // If we have a stream and a connection but mute state changed
-    if (audioStreamRef.current && deepgramConnectionRef.current) {
-      if (muted) {
-        // Stop recording if muted
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-          mediaRecorderRef.current.stop();
-          mediaRecorderRef.current = null;
-          console.log("Mic recording stopped due to mute");
-        }
-      } else {
-        // Start recording if unmuted and not already recording
-        if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "recording") {
-          try {
-            const mediaRecorder = new MediaRecorder(audioStreamRef.current, { mimeType: 'audio/webm' });
-            
-            mediaRecorder.ondataavailable = (event) => {
-              if (event.data.size > 0 && !muted && enabled) {
-                deepgramConnectionRef.current?.send(event.data);
-              }
-            };
-            
-            mediaRecorderRef.current = mediaRecorder;
-            mediaRecorder.start(250);
-            console.log("Mic recording started due to unmute");
-          } catch (e) {
-            console.error("Failed to restart recording after unmute:", e);
+    // If we have a stream but mute state changed
+    if (audioStreamRef.current) {
+      try {
+        // Get all audio tracks and update their enabled state
+        const audioTracks = audioStreamRef.current.getAudioTracks();
+        audioTracks.forEach(track => {
+          track.enabled = !muted;
+          console.log(`Audio track ${track.label} ${muted ? 'muted' : 'unmuted'}`);
+        });
+        
+        // Also handle the recorder based on mute state
+        if (muted) {
+          // Stop recording if muted
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current = null;
+            console.log("Media recorder stopped due to mute");
+          }
+        } else if (deepgramConnectionRef.current) {
+          // Start recording if unmuted and connection exists
+          if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "recording") {
+            try {
+              const mediaRecorder = new MediaRecorder(audioStreamRef.current, { mimeType: 'audio/webm' });
+              
+              mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0 && !muted && enabled && deepgramConnectionRef.current) {
+                  try {
+                    deepgramConnectionRef.current.send(event.data);
+                  } catch (sendError) {
+                    console.error("Failed to send audio data:", sendError);
+                  }
+                }
+              };
+              
+              mediaRecorderRef.current = mediaRecorder;
+              mediaRecorder.start(250);
+              console.log("Media recorder started after unmute");
+            } catch (e) {
+              console.error("Failed to restart recording after unmute:", e);
+            }
           }
         }
+      } catch (error) {
+        console.error("Error handling mute state change:", error);
       }
     }
   }, [muted, enabled]);
