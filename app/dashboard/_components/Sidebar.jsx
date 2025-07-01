@@ -31,7 +31,7 @@ const Sidebar = () => {
       id: 3,
       name: 'Interview History',
       icon: History,
-      path: '/dashboard/history',
+      path: '/dashboard/interview-history',
     },
     {
       id: 4,
