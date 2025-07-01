@@ -1,5 +1,4 @@
 "use client"
-
 import { db } from '@/utils/db';
 import { UserAnswer, InterviewReport } from '@/utils/schema';
 import { eq } from 'drizzle-orm';
@@ -19,44 +18,72 @@ function Feedback({ params }) {
   const [interviewReport, setInterviewReport] = useState(null);
   const [detailedFeedback, setDetailedFeedback] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
-    const getFeedback = async () => {
+    const getAndGenerateFeedback = async () => {
       setIsLoading(true);
+      setError(null);
       
-      // Fetch the overall report
-      const reportResult = await db.select()
-        .from(InterviewReport)
-        .where(eq(InterviewReport.mockIdRef, params.interviewId));
-      
-      if (reportResult.length > 0) {
-        setInterviewReport(reportResult[0]);
-      }
+      // First, check if a report already exists.
+      // NOTE: This check now correctly runs on the server-side via the API.
+      // We will trigger our API to do the check and generation.
+      try {
+        const response = await fetch(`/api/interview/analysis`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ mockId: params.interviewId }),
+        });
 
-      // Fetch the detailed answers
-      const answersResult = await db.select()
-        .from(UserAnswer)
-        .where(eq(UserAnswer.mockIdRef, params.interviewId))
-        .orderBy(UserAnswer.id);
+        if (!response.ok) {
+          throw new Error('Failed to fetch or generate feedback.');
+        }
+
+        // After the analysis is done (or was already done), we can fetch the results.
+        const reportResult = await db.select().from(InterviewReport).where(eq(InterviewReport.mockIdRef, params.interviewId));
+        const answersResult = await db.select().from(UserAnswer).where(eq(UserAnswer.mockIdRef, params.interviewId)).orderBy(UserAnswer.id);
+
+        if (reportResult.length > 0) {
+          setInterviewReport(reportResult[0]);
+          setDetailedFeedback(answersResult);
+        } else {
+          throw new Error("Report could not be found after generation.");
+        }
+
+      } catch (e) {
+        console.error("Error during feedback retrieval:", e);
+        setError("Sorry, we couldn't generate your feedback report at this time.");
+      }
       
-      setDetailedFeedback(answersResult);
       setIsLoading(false);
     };
 
-    getFeedback();
+    getAndGenerateFeedback();
   }, [params.interviewId]);
 
   if (isLoading) {
     return (
       <div className="p-10 flex flex-col items-center justify-center h-screen">
         <h2 className="text-2xl font-bold text-gray-700">Generating your feedback report...</h2>
-        <p className="text-gray-500 mt-2">This might take a moment.</p>
-        <Progress value={50} className="w-1/3 mt-4" />
+        <p className="text-gray-500 mt-2">This might take a moment. Please don't refresh the page.</p>
+        <Progress value={50} className="w-1/3 mt-4 animate-pulse" />
       </div>
     );
   }
 
+  if (error) {
+    return (
+        <div className="p-10 text-center">
+            <h2 className='font-bold text-xl text-red-500'>{error}</h2>
+            <Button onClick={() => router.replace('/dashboard')} className="mt-4">Go to Dashboard</Button>
+        </div>
+    )
+  }
+  
+  // ... rest of the component is unchanged
   if (!interviewReport) {
     return (
         <div className="p-10 text-center">

@@ -22,6 +22,15 @@ export async function POST(req) {
             return NextResponse.json({ error: 'Mock ID is required' }, { status: 400 });
         }
 
+        // New: Check if a report already exists
+        const existingReport = await db.select().from(InterviewReport).where(eq(InterviewReport.mockIdRef, mockId));
+        if (existingReport.length > 0) {
+            console.log("Report already exists for mockId:", mockId);
+            return NextResponse.json({ message: 'Report already exists.' });
+        }
+
+        console.log("Generating new report for mockId:", mockId);
+        
         // 1. Fetch all user answers for the interview
         const userAnswers = await db.select()
             .from(UserAnswer)
