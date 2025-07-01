@@ -4,10 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Mic, MicOff, VideoOff } from 'lucide-react';
+import { Mic, MicOff, VideoOff, Volume2 } from 'lucide-react';
 import { useInterviewEngine } from './hooks/useInterviewEngine';
 import ConversationDisplay from './ConversationDisplay';
 import AudioVisualizer from './AudioVisualizer';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 // This function now safely checks for client-side environment first
 function safelyAccessCamera(video = true) {
@@ -25,6 +28,8 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const [cameraStream, setCameraStream] = useState(null);
   const [mediaError, setMediaError] = useState(null);
   const [isMediaLoading, setIsMediaLoading] = useState(false);
+  const [voiceSpeed, setVoiceSpeed] = useState(1.0);
+  const [useNaturalSpeech, setUseNaturalSpeech] = useState(true);
 
   const timerRef = useRef(null);
   const videoRef = useRef(null);
@@ -39,7 +44,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     error: engineError,
     startConversation,
     endConversation,
-  } = useInterviewEngine(interview, isMicMuted);
+  } = useInterviewEngine(interview, isMicMuted, voiceSpeed, useNaturalSpeech);
 
   const initializeMedia = async () => {
     setIsMediaLoading(true);
@@ -115,6 +120,10 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleVoiceSpeedChange = (value) => {
+    setVoiceSpeed(value[0]);
+  };
+
   const currentError = engineError || mediaError;
 
   return (
@@ -149,6 +158,41 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
               >
                 {isMediaLoading ? "Starting..." : isInterviewActive ? "End Interview" : "Start Interview"}
               </Button>
+            </div>
+          </div>
+
+          {/* Voice Settings */}
+          <div className="flex flex-col gap-3 mb-4 p-3 border rounded-lg">
+            <h3 className="text-sm font-semibold text-gray-700">Voice Settings</h3>
+            
+            {/* Voice Speed Control */}
+            <div className="flex items-center gap-3">
+              <Volume2 className="h-5 w-5 text-gray-600" />
+              <div className="flex-1">
+                <p className="text-sm font-medium mb-1">Voice Speed: {voiceSpeed.toFixed(1)}x</p>
+                <Slider
+                  defaultValue={[1.0]}
+                  min={0.5}
+                  max={2.0}
+                  step={0.1}
+                  onValueChange={handleVoiceSpeedChange}
+                  disabled={!isInterviewActive}
+                />
+              </div>
+            </div>
+            
+            {/* Natural Speech Toggle */}
+            <div className="flex items-center justify-between mt-2">
+              <div className="space-y-0.5">
+                <Label htmlFor="natural-speech">Natural Speech Patterns</Label>
+                <p className="text-xs text-gray-500">Enable more human-like pauses and intonation</p>
+              </div>
+              <Switch
+                id="natural-speech"
+                checked={useNaturalSpeech}
+                onCheckedChange={setUseNaturalSpeech}
+                disabled={!isInterviewActive}
+              />
             </div>
           </div>
 

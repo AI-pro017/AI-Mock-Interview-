@@ -6,6 +6,8 @@ export function useAIResponse() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [error, setError] = useState(null);
+  const [voiceSpeed, setVoiceSpeed] = useState(1.0); // Default speed is 1.0
+  const [useNaturalSpeech, setUseNaturalSpeech] = useState(true); // Enable natural speech by default
   
   const audioRef = useRef(null);
   const abortControllerRef = useRef(null);
@@ -27,7 +29,14 @@ export function useAIResponse() {
           prompt,
           role: interviewDetails.jobPosition,
           interviewStyle: interviewDetails.interviewStyle,
-          focus: interviewDetails.focus
+          focus: interviewDetails.focus,
+          // Additional context for the AI to make better decisions
+          conversationContext: {
+            jobExperience: interviewDetails.jobExperience,
+            industry: interviewDetails.industry || '',
+            skills: interviewDetails.skills || '',
+            difficulty: interviewDetails.difficulty || 'Medium'
+          }
         }),
         signal
       });
@@ -64,7 +73,11 @@ export function useAIResponse() {
       const response = await fetch('/api/text-to-speech', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ 
+          text,
+          speed: voiceSpeed,
+          naturalSpeech: useNaturalSpeech
+        }),
         signal
       });
       
@@ -85,7 +98,8 @@ export function useAIResponse() {
         audioRef.current = null;
       };
       
-      // Play the audio
+      // Play the audio with the selected playback rate
+      audio.playbackRate = voiceSpeed;
       await audio.play();
       
       return true;
@@ -133,6 +147,10 @@ export function useAIResponse() {
     generateResponse,
     speakText,
     stopSpeaking,
-    generateAndSpeak
+    generateAndSpeak,
+    voiceSpeed,
+    setVoiceSpeed,
+    useNaturalSpeech,
+    setUseNaturalSpeech
   };
 } 

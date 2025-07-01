@@ -6,9 +6,10 @@ export async function POST(req) {
   try {
     // Parse the request body
     const body = await req.json();
-    const { text } = body;
+    const { text, speed } = body;
     
     console.log("Text to convert:", text?.substring(0, 50) + "...");
+    console.log("Voice speed:", speed || "default (1.0)");
 
     if (!text) {
       console.log("No text provided");
@@ -25,6 +26,10 @@ export async function POST(req) {
       }, { status: 500 });
     }
 
+    // Process text to add natural speech patterns
+    const processedText = addNaturalSpeechPatterns(text);
+    console.log("Processed text with natural pauses");
+
     console.log("Making direct request to ElevenLabs API");
     
     // Make direct fetch request to ElevenLabs API
@@ -36,7 +41,7 @@ export async function POST(req) {
         'xi-api-key': apiKey
       },
       body: JSON.stringify({
-        text: text,
+        text: processedText,
         model_id: 'eleven_monolingual_v1',
         voice_settings: {
           stability: 0.5,
@@ -75,4 +80,28 @@ export async function POST(req) {
       stack: error.stack
     }, { status: 500 });
   }
+}
+
+// Helper function to add natural speech patterns with pauses
+function addNaturalSpeechPatterns(text) {
+  // Replace periods with a slightly longer pause (using SSML)
+  let processedText = text.replace(/\./g, '.<break time="500ms"/>');
+  
+  // Replace commas with a shorter pause
+  processedText = processedText.replace(/,/g, ',<break time="300ms"/>');
+  
+  // Add pauses after question marks
+  processedText = processedText.replace(/\?/g, '?<break time="600ms"/>');
+  
+  // Add slight pauses between sentences when there are no punctuation marks
+  processedText = processedText.replace(/(\w+)(\s+)(\w+)/g, (match, word1, space, word2) => {
+    // Only add a pause occasionally to make it sound more natural
+    if (Math.random() < 0.1 && word1.length > 3 && word2.length > 3) {
+      return `${word1}<break time="150ms"/>${space}${word2}`;
+    }
+    return match;
+  });
+  
+  // Wrap the text in SSML to enable breaks
+  return `<speak>${processedText}</speak>`;
 } 

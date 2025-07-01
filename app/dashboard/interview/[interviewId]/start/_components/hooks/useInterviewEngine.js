@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export function useInterviewEngine(interview, isMicMuted) {
+export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useNaturalSpeech = true) {
   // --- STATE MANAGEMENT ---
   const [conversation, setConversation] = useState([]);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
@@ -12,6 +12,9 @@ export function useInterviewEngine(interview, isMicMuted) {
   const [currentUserResponse, setCurrentUserResponse] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState(null);
+  const [questionPhase, setQuestionPhase] = useState('initial'); // 'initial', 'behavioral', 'technical', 'closing'
+  const [questionCount, setQuestionCount] = useState(0);
+  const [coveredTopics, setCoveredTopics] = useState([]);
 
   // --- REFS ---
   const audioRef = useRef(new Audio());
@@ -61,7 +64,11 @@ export function useInterviewEngine(interview, isMicMuted) {
       const response = await fetch('/api/text-to-speech', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ 
+          text,
+          speed: voiceSpeed,
+          naturalSpeech: useNaturalSpeech
+        }),
       });
 
       console.log("TTS API response status:", response.status);
@@ -82,22 +89,23 @@ export function useInterviewEngine(interview, isMicMuted) {
       console.log("Audio blob received, size:", blob.size, "bytes");
       
       const url = URL.createObjectURL(blob);
-      const audio = new Audio(url); // Create a new Audio object with the URL
+      const audio = new Audio(url);
 
+      audio.playbackRate = voiceSpeed;
+      
       audio.onloadedmetadata = () => console.log("Audio loaded, duration:", audio.duration);
       
       audio.onended = () => {
         console.log("Audio playback ended");
-        URL.revokeObjectURL(url); // Clean up the object URL
+        URL.revokeObjectURL(url);
         setIsAISpeaking(false);
       };
       
-      audio.onerror = () => {
-        console.error("Audio playback error:", audio.error);
-        URL.revokeObjectURL(url); // Clean up
+      audio.onerror = (e) => {
+        console.error("Audio playback error:", e);
+        URL.revokeObjectURL(url);
         setIsAISpeaking(false);
-        // Provide a more specific error message
-        setError(new Error(`Failed to play audio: ${audio.error?.message || 'MEDIA_ELEMENT_ERROR'}. Please check browser permissions.`));
+        setError(new Error(`Failed to play audio: ${e?.message || 'MEDIA_ELEMENT_ERROR'}. Please check browser permissions.`));
       };
       
       await audio.play();
@@ -108,15 +116,113 @@ export function useInterviewEngine(interview, isMicMuted) {
       setError(new Error(`Text-to-speech error: ${err.message}`));
       setIsAISpeaking(false);
     }
-  }, []);
+  }, [voiceSpeed, useNaturalSpeech]);
 
   const createPrompt = useCallback((convHistory, type) => {
     if (type === 'greeting') {
-      return `You are an expert interviewer starting an interview for a ${interview.jobPosition} role. The candidate has ${interview.jobExperience} years of experience. Greet them warmly and ask your first question.`;
+      return `You are an expert interviewer starting an interview for a ${interview.jobPosition} role. 
+      The candidate has ${interview.jobExperience} years of experience. 
+      
+      Start by introducing yourself as the interviewer for this role.
+      Greet them warmly and then ask your first question about their background or experience.
+      
+      Keep your response conversational and relatively brief (2-3 sentences).`;
     }
+    
+    // Analyze the conversation to extract topics and guide the AI
+    const candidateResponses = convHistory.filter(item => item.role === 'user').map(item => item.text);
+    const lastResponse = candidateResponses[candidateResponses.length - 1] || '';
+    
+    // Simple topic extraction (in a production app, this would use NLP)
+    const potentialTopics = lastResponse
+      .split(/[.,!?;]/)
+      .map(sentence => sentence.trim())
+      .filter(sentence => sentence.length > 15)
+      .slice(0, 2);
+    
+    // Update interview phase based on question count
+    let currentPhase = questionPhase;
+    if (questionCount === 0) {
+      currentPhase = 'initial';
+    } else if (questionCount < 3) {
+      currentPhase = 'behavioral';
+    } else if (questionCount < 6) {
+      currentPhase = 'technical';
+    } else {
+      currentPhase = 'closing';
+    }
+    
+    // If phase changed, update state
+    if (currentPhase !== questionPhase) {
+      setQuestionPhase(currentPhase);
+    }
+    
+    // Create phase-specific instructions
+    let phaseInstructions = '';
+    switch (currentPhase) {
+      case 'initial':
+        phaseInstructions = `
+          You're in the initial phase of the interview. Focus on:
+          - Understanding the candidate's background and experience
+          - Assessing their interest in the role
+          - Ask open-ended questions about their career journey
+        `;
+        break;
+      case 'behavioral':
+        phaseInstructions = `
+          You're in the behavioral assessment phase. Use the STAR method approach:
+          - Ask questions that prompt the candidate to describe specific Situations
+          - Have them explain the Task they were responsible for
+          - Get them to describe the Actions they took
+          - Find out about the Results they achieved
+          
+          Example format: "Tell me about a time when you [faced a relevant challenge for ${interview.jobPosition}]"
+        `;
+        break;
+      case 'technical':
+        phaseInstructions = `
+          You're in the technical/scenario assessment phase:
+          - Present realistic work scenarios relevant to a ${interview.jobPosition}
+          - Ask how they would approach specific problems
+          - If their previous answer was vague, ask for more specifics
+          - Connect your question to something they mentioned earlier
+        `;
+        break;
+      case 'closing':
+        phaseInstructions = `
+          You're in the final phase of the interview:
+          - Ask deeper questions about their career goals
+          - Follow up on any points that need clarification
+          - If they've mentioned interesting projects or experiences, ask for more details
+          - Ask one final challenging question relevant to the ${interview.jobPosition} role
+        `;
+        break;
+    }
+    
     const history = convHistory.map(item => `${item.role === 'ai' ? 'Interviewer' : 'Candidate'}: ${item.text}`).join('\n');
-    return `This is a real-time interview. Here is the history:\n${history}\n\nRespond naturally to the candidate's last message.`;
-  }, [interview]);
+    
+    return `This is a real-time interview for a ${interview.jobPosition} position. 
+    The candidate has ${interview.jobExperience} years of experience.
+    Interview style: ${interview.interviewStyle}
+    Primary focus: ${interview.focus}
+    
+    Here is the conversation history:
+    ${history}
+    
+    Current interview phase: ${currentPhase} (Question #${questionCount + 1})
+    Topics already discussed: ${coveredTopics.join(', ')}
+    
+    Key points from their last response to follow up on:
+    ${potentialTopics.map(topic => `- "${topic}"`).join('\n')}
+    
+    ${phaseInstructions}
+    
+    Respond naturally to the candidate's last message with:
+    1. A brief acknowledgment of their answer (1 sentence)
+    2. A follow-up question OR a new question if they've fully answered
+    3. Keep your entire response under 3 sentences to maintain conversational flow
+    `;
+  }, [interview, questionPhase, questionCount, coveredTopics]);
 
   const processUserResponse = useCallback(async () => {
     const userResponse = userResponseBufferRef.current.trim();
@@ -125,17 +231,33 @@ export function useInterviewEngine(interview, isMicMuted) {
     setCurrentUserResponse('');
     if (!userResponse) return;
 
+    // Update conversation with user response
     const newConversation = [...conversation, { role: 'user', text: userResponse }];
     setConversation(newConversation);
 
+    // Extract potential topics from response for tracking
+    const newTopics = userResponse
+      .split(' ')
+      .filter(word => word.length > 5)
+      .slice(0, 3);
+    
+    setCoveredTopics(prev => [...new Set([...prev, ...newTopics])]);
+
+    // Generate AI response
     const prompt = createPrompt(newConversation, 'response');
     const aiResponseText = await generateAIResponse(prompt);
     
     if (aiResponseText) {
       setConversation(prev => [...prev, { role: 'ai', text: aiResponseText }]);
+      
+      // If the AI is asking a question, increment the counter
+      if (aiResponseText.includes('?')) {
+        setQuestionCount(prev => prev + 1);
+      }
+      
       await speakText(aiResponseText);
     }
-  }, [conversation, createPrompt, generateAIResponse, speakText]);
+  }, [conversation, createPrompt, generateAIResponse, speakText, setCoveredTopics]);
 
   // --- BROWSER SPEECH RECOGNITION ---
   const setupSpeechRecognition = useCallback(() => {
