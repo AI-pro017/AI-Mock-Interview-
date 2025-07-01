@@ -17,6 +17,8 @@ function Header() {
 
     const { data: session } = useSession();
 
+    // Ensure we always have a valid image source
+    const userImage = session?.user?.image || '/default-avatar.svg';
 
   return (
     <div className='p-5 shadow-sm border-b flex justify-between bg-white'>
@@ -26,9 +28,13 @@ function Header() {
         <div>
             {session?.user ? (
                  <DropdownMenu>
-                 <DropdownMenuTrigger>
-                    <Image src={session.user.image || '/default-avatar.svg'} alt='user' width={40} height={40}
-                        className='rounded-full'
+                 <DropdownMenuTrigger asChild>
+                    <Image 
+                        src={userImage} 
+                        alt='user' 
+                        width={40} 
+                        height={40}
+                        className='rounded-full cursor-pointer'
                     />
                  </DropdownMenuTrigger>
                  <DropdownMenuContent>

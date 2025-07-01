@@ -199,17 +199,20 @@ export function useInterviewEngine(interview, isMicMuted) {
       let final = '';
       
       for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          final += event.results[i][0].transcript + ' ';
+          final += transcript + ' ';
         } else {
-          interim += event.results[i][0].transcript;
+          interim += transcript;
         }
       }
+      
+      // Always update the live, interim transcript
+      setInterimTranscript(interim);
 
       if (interim) {
-        setInterimTranscript(interim);
         setIsUserSpeaking(true);
-        // Clear any pending end-of-speech timeout
+        // Clear any pending end-of-speech timeout as long as the user is talking
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
@@ -217,100 +220,115 @@ export function useInterviewEngine(interview, isMicMuted) {
       }
 
       if (final) {
+        // A final result has arrived.
+        // 1. Add it to our permanent buffer for this turn.
         userResponseBufferRef.current += final;
-        setCurrentUserResponse(userResponseBufferRef.current.trim());
-        setIsUserSpeaking(true);
         
-        // Set a timeout to detect end of speech
+        // 2. Update the UI to show the full, finalized text for this turn.
+        setCurrentUserResponse(userResponseBufferRef.current.trim());
+
+        // 3. IMPORTANT: Clear the live/interim transcript display.
+        setInterimTranscript('');
+        
+        // 4. Set a timeout to detect the end of speech.
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
         
         timeoutRef.current = setTimeout(() => {
           setIsUserSpeaking(false);
+          // Only process the response if we have something to say
           if (userResponseBufferRef.current.trim()) {
             processUserResponse();
           }
-        }, 1500);
+        }, 1200); // Slightly shorter delay
       }
     };
 
     return recognition;
   }, [isMicMuted, processUserResponse]);
 
-  // --- CONVERSATION FLOW & LIFECYCLE ---
-  const startConversation = useCallback(async () => {
-    // Set up speech recognition
+  // --- LIFECYCLE & CONTROL ---
+  
+  // A new, dedicated shutdown function
+  const shutdownEngine = useCallback(() => {
+    console.log("Shutting down interview engine...");
+
+    // 1. Stop Speech Recognition
+    if (recognitionRef.current) {
+      // Remove the onend handler to prevent auto-restarting
+      recognitionRef.current.onend = null; 
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+      console.log("Speech recognition stopped.");
+    }
+    
+    // 2. Stop any playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = ''; // Clear source
+      console.log("Audio playback stopped.");
+    }
+
+    // 3. Clear all timers
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+    
+    // 4. Reset all state flags
+    setIsAISpeaking(false);
+    setIsUserSpeaking(false);
+    setIsListening(false);
+    setIsGenerating(false);
+  }, []);
+
+  const startConversation = useCallback(async (mediaStream) => {
     const recognition = setupSpeechRecognition();
     if (recognition) {
       recognitionRef.current = recognition;
       try {
         recognition.start();
       } catch (e) {
-        console.error("Failed to start speech recognition:", e);
-        setError(new Error("Failed to start speech recognition"));
+        setError(new Error("Could not start speech recognition. Please check microphone permissions."));
+        return;
       }
     }
-
-    // Generate AI greeting
-    const prompt = createPrompt([], 'greeting');
-    const aiResponseText = await generateAIResponse(prompt);
-
+    
+    const initialPrompt = createPrompt([], 'greeting');
+    const aiResponseText = await generateAIResponse(initialPrompt);
     if (aiResponseText) {
       setConversation([{ role: 'ai', text: aiResponseText }]);
       await speakText(aiResponseText);
     }
   }, [setupSpeechRecognition, createPrompt, generateAIResponse, speakText]);
 
+  // This function is now just a public-facing wrapper for shutdown
   const endConversation = useCallback(() => {
-    // Stop speech recognition
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {
-        // Ignore errors when stopping
-      }
-      recognitionRef.current = null;
-    }
-    
-    // Stop any playing audio
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-    }
-    
-    // Clear any pending timeouts
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
-    
-    setIsListening(false);
-    setIsAISpeaking(false);
-    setIsUserSpeaking(false);
-  }, []);
+    shutdownEngine();
+  }, [shutdownEngine]);
 
-  // Cleanup on unmount
+  // CRITICAL: This useEffect hook handles component unmount
   useEffect(() => {
+    // Return a cleanup function that will be called when the component unmounts
     return () => {
-      endConversation();
+      shutdownEngine();
     };
-  }, [endConversation]);
+  }, [shutdownEngine]); // Dependency array ensures this is stable
 
-  return { 
-    conversation, 
-    currentUserResponse, 
-    interimTranscript, 
-    isUserSpeaking, 
-    isAISpeaking, 
-    isListening, 
-    error, 
-    startConversation, 
-    endConversation 
+  return {
+    conversation,
+    isAISpeaking,
+    isUserSpeaking,
+    isListening,
+    currentUserResponse,
+    interimTranscript,
+    error,
+    startConversation,
+    endConversation,
   };
 } 
