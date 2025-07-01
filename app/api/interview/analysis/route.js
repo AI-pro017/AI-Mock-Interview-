@@ -36,6 +36,8 @@ export async function POST(req) {
             .from(UserAnswer)
             .where(eq(UserAnswer.mockIdRef, mockId));
 
+        console.log(`Found ${userAnswers.length} answers for mockId:`, mockId);
+        
         if (userAnswers.length === 0) {
             return NextResponse.json({ error: 'No answers found for this interview' }, { status: 404 });
         }
@@ -43,55 +45,88 @@ export async function POST(req) {
         // 2. Construct a prompt for the AI to analyze the entire interview
         const analysisPrompt = createAnalysisPrompt(userAnswers);
 
+        console.log("Sending request to OpenAI...");
         // 3. Get the analysis from OpenAI
-        const response = await openai.chat.completions.create({
-            model: "gpt-4-turbo",
-            messages: [
-                {
-                    role: "system",
-                    content: "You are an expert interview coach. Analyze the following interview performance based on the user's answers. Provide a detailed analysis for each question and an overall summary. The output should be a JSON object."
-                },
-                {
-                    role: "user",
-                    content: analysisPrompt
+        try {
+            const response = await openai.chat.completions.create({
+                model: "gpt-4-turbo",
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are an expert interview coach. Analyze the following interview performance based on the user's answers. Provide a detailed analysis for each question and an overall summary. The output should be a JSON object."
+                    },
+                    {
+                        role: "user",
+                        content: analysisPrompt
+                    }
+                ],
+                response_format: { type: "json_object" },
+            });
+
+            console.log("Received response from OpenAI");
+            
+            // Safely parse the response
+            let analysisResult;
+            try {
+                analysisResult = JSON.parse(response.choices[0].message.content);
+                console.log("Successfully parsed OpenAI response");
+            } catch (parseError) {
+                console.error("Error parsing OpenAI response:", parseError);
+                console.error("Response content:", response.choices[0].message.content);
+                return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 500 });
+            }
+
+            // Validate response structure
+            if (!analysisResult.detailedAnalysis || !Array.isArray(analysisResult.detailedAnalysis) || 
+                !analysisResult.overallSummary) {
+                console.error("Invalid response structure from OpenAI:", analysisResult);
+                return NextResponse.json({ error: 'Invalid analysis structure' }, { status: 500 });
+            }
+
+            // 4. Update the UserAnswer table with detailed feedback for each question
+            console.log("Updating user answers with feedback...");
+            for (const item of analysisResult.detailedAnalysis) {
+                if (!item.userAnswerId) {
+                    console.warn("Missing userAnswerId in item:", item);
+                    continue;
                 }
-            ],
-            response_format: { type: "json_object" },
-        });
+                
+                await db.update(UserAnswer)
+                    .set({
+                        feedback: item.feedback || "No specific feedback provided.",
+                        rating: (item.rating || "5").toString(),
+                        clarityScore: item.clarityScore || 5,
+                        paceScore: item.paceScore || 5,
+                        fillerWords: item.fillerWords || 0,
+                        confidenceScore: item.confidenceScore || 5,
+                        technicalScore: item.technicalScore || 5,
+                        grammarScore: item.grammarScore || 5,
+                    })
+                    .where(eq(UserAnswer.id, item.userAnswerId));
+            }
 
-        const analysisResult = JSON.parse(response.choices[0].message.content);
+            // 5. Create a new record in the InterviewReport table
+            console.log("Creating interview report...");
+            await db.insert(InterviewReport).values({
+                mockIdRef: mockId,
+                userId: session.user.id,
+                overallScore: analysisResult.overallSummary.overallScore || 70,
+                strengths: analysisResult.overallSummary.strengths || "Analysis did not provide strengths.",
+                weaknesses: analysisResult.overallSummary.weaknesses || "Analysis did not provide weaknesses.",
+                improvementPlan: analysisResult.overallSummary.improvementPlan || "Focus on improving your interview skills.",
+            });
 
-        // 4. Update the UserAnswer table with detailed feedback for each question
-        for (const item of analysisResult.detailedAnalysis) {
-            await db.update(UserAnswer)
-                .set({
-                    feedback: item.feedback,
-                    rating: item.rating.toString(),
-                    clarityScore: item.clarityScore,
-                    paceScore: item.paceScore,
-                    fillerWords: item.fillerWords,
-                    confidenceScore: item.confidenceScore,
-                    technicalScore: item.technicalScore,
-                    grammarScore: item.grammarScore,
-                })
-                .where(eq(UserAnswer.id, item.userAnswerId));
+            console.log("Analysis and report generation completed successfully");
+            return NextResponse.json({ message: 'Analysis complete and feedback stored.' });
+            
+        } catch (openaiError) {
+            console.error("OpenAI API error:", openaiError);
+            return NextResponse.json({ error: 'Error communicating with AI service' }, { status: 503 });
         }
-
-        // 5. Create a new record in the InterviewReport table
-        await db.insert(InterviewReport).values({
-            mockIdRef: mockId,
-            userId: session.user.id,
-            overallScore: analysisResult.overallSummary.overallScore,
-            strengths: analysisResult.overallSummary.strengths,
-            weaknesses: analysisResult.overallSummary.weaknesses,
-            improvementPlan: analysisResult.overallSummary.improvementPlan,
-        });
-
-        return NextResponse.json({ message: 'Analysis complete and feedback stored.' });
 
     } catch (error) {
         console.error('Error analyzing interview:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({ error: 'Internal Server Error: ' + error.message }, { status: 500 });
     }
 }
 
