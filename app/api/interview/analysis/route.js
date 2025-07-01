@@ -10,133 +10,195 @@ const openai = new OpenAI({
 });
 
 export async function POST(req) {
+    console.log("### FEEDBACK ANALYSIS: API endpoint called ###");
+    
+    // Authentication check
     const session = await auth();
     if (!session?.user?.id) {
+        console.log("### FEEDBACK ANALYSIS: Authentication failed - No user session ###");
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    console.log("### FEEDBACK ANALYSIS: Authentication successful ###");
 
     try {
-        const { mockId } = await req.json();
+        // Parse request body
+        const body = await req.json();
+        const { mockId } = body;
+        console.log(`### FEEDBACK ANALYSIS: Processing mockId: ${mockId} ###`);
 
         if (!mockId) {
+            console.log("### FEEDBACK ANALYSIS: Missing mockId in request ###");
             return NextResponse.json({ error: 'Mock ID is required' }, { status: 400 });
         }
 
-        // New: Check if a report already exists
+        // Check for existing report
+        console.log("### FEEDBACK ANALYSIS: Checking for existing report ###");
         const existingReport = await db.select().from(InterviewReport).where(eq(InterviewReport.mockIdRef, mockId));
+        
         if (existingReport.length > 0) {
-            console.log("Report already exists for mockId:", mockId);
+            console.log("### FEEDBACK ANALYSIS: Report already exists, returning success ###");
             return NextResponse.json({ message: 'Report already exists.' });
         }
 
-        console.log("Generating new report for mockId:", mockId);
+        // Fetch answers
+        console.log("### FEEDBACK ANALYSIS: Fetching user answers ###");
+        console.log(`### FEEDBACK ANALYSIS: UserAnswer schema check: mockIdRef field exists = ${!!UserAnswer.mockIdRef} ###`);
         
-        // FIX: Query UserAnswer using the correct column name 'mockId'
-        const userAnswers = await db.select()
-            .from(UserAnswer)
-            .where(eq(UserAnswer.mockId, mockId));  // <-- FIXED: Using mockId instead of mockIdRef
-
-        console.log(`Found ${userAnswers.length} answers for mockId:`, mockId);
-        
-        if (userAnswers.length === 0) {
-            console.error(`No answers found for mockId: ${mockId}`);
-            return NextResponse.json({ error: 'No answers found for this interview' }, { status: 404 });
-        }
-
-        // 2. Construct a prompt for the AI to analyze the entire interview
-        const analysisPrompt = createAnalysisPrompt(userAnswers);
-
-        console.log("Sending request to OpenAI...");
-        // 3. Get the analysis from OpenAI
+        // Debugging the database query
         try {
-            const response = await openai.chat.completions.create({
-                model: "gpt-4-turbo",
-                messages: [
-                    {
-                        role: "system",
-                        content: "You are an expert interview coach. Analyze the following interview performance based on the user's answers. Provide a detailed analysis for each question and an overall summary. The output should be a JSON object."
-                    },
-                    {
-                        role: "user",
-                        content: analysisPrompt
-                    }
-                ],
-                response_format: { type: "json_object" },
-            });
-
-            console.log("Received response from OpenAI");
+            const userAnswers = await db.select()
+                .from(UserAnswer)
+                .where(eq(UserAnswer.mockIdRef, mockId));
             
-            // Safely parse the response
-            let analysisResult;
+            console.log(`### FEEDBACK ANALYSIS: Found ${userAnswers.length} answers ###`);
+            
+            // Debug first few answers if they exist
+            if (userAnswers.length > 0) {
+                console.log("### FEEDBACK ANALYSIS: First answer sample ###", {
+                    id: userAnswers[0].id,
+                    question: userAnswers[0].question,
+                    hasUserAns: !!userAnswers[0].userAns,
+                    mockIdRef: userAnswers[0].mockIdRef
+                });
+            } else {
+                console.log("### FEEDBACK ANALYSIS: No answers found, returning 404 ###");
+                return NextResponse.json({ error: 'No answers found for this interview' }, { status: 404 });
+            }
+
+            // Construct analysis prompt
+            console.log("### FEEDBACK ANALYSIS: Constructing analysis prompt ###");
+            const analysisPrompt = createAnalysisPrompt(userAnswers);
+            console.log(`### FEEDBACK ANALYSIS: Prompt created with length ${analysisPrompt.length} ###`);
+
+            // Call OpenAI
+            console.log("### FEEDBACK ANALYSIS: Calling OpenAI API ###");
+            console.log(`### FEEDBACK ANALYSIS: OpenAI API key check: ${!!process.env.OPENAI_API_KEY ? "API key exists" : "No API key"} ###`);
+            
             try {
-                analysisResult = JSON.parse(response.choices[0].message.content);
-                console.log("Successfully parsed OpenAI response");
-            } catch (parseError) {
-                console.error("Error parsing OpenAI response:", parseError);
-                console.error("Response content:", response.choices[0].message.content);
-                return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 500 });
-            }
+                const response = await openai.chat.completions.create({
+                    model: "gpt-4-turbo",
+                    messages: [
+                        {
+                            role: "system",
+                            content: "You are an expert interview coach. Analyze the following interview performance based on the user's answers. Provide a detailed analysis for each question and an overall summary. The output should be a JSON object."
+                        },
+                        {
+                            role: "user",
+                            content: analysisPrompt
+                        }
+                    ],
+                    response_format: { type: "json_object" },
+                });
 
-            // Validate response structure
-            if (!analysisResult.detailedAnalysis || !Array.isArray(analysisResult.detailedAnalysis) || 
-                !analysisResult.overallSummary) {
-                console.error("Invalid response structure from OpenAI:", analysisResult);
-                return NextResponse.json({ error: 'Invalid analysis structure' }, { status: 500 });
-            }
-
-            // 4. Update the UserAnswer table with detailed feedback for each question
-            console.log("Updating user answers with feedback...");
-            for (const item of analysisResult.detailedAnalysis) {
-                if (!item.userAnswerId) {
-                    console.warn("Missing userAnswerId in item:", item);
-                    continue;
-                }
+                console.log("### FEEDBACK ANALYSIS: OpenAI response received ###");
                 
-                await db.update(UserAnswer)
-                    .set({
-                        feedback: item.feedback || "No specific feedback provided.",
-                        rating: (item.rating || "5").toString(),
-                        clarityScore: item.clarityScore || 5,
-                        paceScore: item.paceScore || 5,
-                        fillerWords: item.fillerWords || 0,
-                        confidenceScore: item.confidenceScore || 5,
-                        technicalScore: item.technicalScore || 5,
-                        grammarScore: item.grammarScore || 5,
-                    })
-                    .where(eq(UserAnswer.id, item.userAnswerId));
+                // Parse response
+                console.log("### FEEDBACK ANALYSIS: Parsing OpenAI response ###");
+                let analysisResult;
+                try {
+                    analysisResult = JSON.parse(response.choices[0].message.content);
+                    console.log("### FEEDBACK ANALYSIS: Response successfully parsed ###");
+                    console.log("### FEEDBACK ANALYSIS: Response structure check ###", {
+                        hasDetailedAnalysis: !!analysisResult.detailedAnalysis,
+                        detailedAnalysisIsArray: Array.isArray(analysisResult.detailedAnalysis),
+                        hasOverallSummary: !!analysisResult.overallSummary
+                    });
+                } catch (parseError) {
+                    console.log(`### FEEDBACK ANALYSIS: Error parsing response: ${parseError.message} ###`);
+                    console.log("### FEEDBACK ANALYSIS: Raw response preview ###", 
+                        response.choices[0].message.content.substring(0, 200) + "...");
+                    return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 500 });
+                }
+
+                // Validate response
+                if (!analysisResult.detailedAnalysis || !Array.isArray(analysisResult.detailedAnalysis) || 
+                    !analysisResult.overallSummary) {
+                    console.log("### FEEDBACK ANALYSIS: Invalid response structure ###");
+                    return NextResponse.json({ error: 'Invalid analysis structure' }, { status: 500 });
+                }
+
+                // Update answers with feedback
+                console.log(`### FEEDBACK ANALYSIS: Updating ${analysisResult.detailedAnalysis.length} answers with feedback ###`);
+                
+                let updateSuccessCount = 0;
+                for (const item of analysisResult.detailedAnalysis) {
+                    if (!item.userAnswerId) {
+                        console.log("### FEEDBACK ANALYSIS: Missing userAnswerId in item ###");
+                        continue;
+                    }
+                    
+                    console.log(`### FEEDBACK ANALYSIS: Updating answer ID: ${item.userAnswerId} ###`);
+                    try {
+                        await db.update(UserAnswer)
+                            .set({
+                                feedback: item.feedback || "No specific feedback provided.",
+                                rating: (item.rating || "5").toString(),
+                                clarityScore: item.clarityScore || 5,
+                                paceScore: item.paceScore || 5,
+                                fillerWords: item.fillerWords || 0,
+                                confidenceScore: item.confidenceScore || 5,
+                                technicalScore: item.technicalScore || 5,
+                                grammarScore: item.grammarScore || 5,
+                            })
+                            .where(eq(UserAnswer.id, item.userAnswerId));
+                        updateSuccessCount++;
+                    } catch (updateError) {
+                        console.log(`### FEEDBACK ANALYSIS: Error updating answer: ${updateError.message} ###`);
+                    }
+                }
+                console.log(`### FEEDBACK ANALYSIS: Successfully updated ${updateSuccessCount} answers ###`);
+
+                // Create report
+                console.log("### FEEDBACK ANALYSIS: Creating interview report ###");
+                try {
+                    await db.insert(InterviewReport).values({
+                        mockIdRef: mockId,
+                        userId: session.user.id,
+                        overallScore: analysisResult.overallSummary.overallScore || 70,
+                        strengths: analysisResult.overallSummary.strengths || "Analysis did not provide strengths.",
+                        weaknesses: analysisResult.overallSummary.weaknesses || "Analysis did not provide weaknesses.",
+                        improvementPlan: analysisResult.overallSummary.improvementPlan || "Focus on improving your interview skills.",
+                    });
+                    console.log("### FEEDBACK ANALYSIS: Report successfully created ###");
+                } catch (reportError) {
+                    console.log(`### FEEDBACK ANALYSIS: Error creating report: ${reportError.message} ###`);
+                    return NextResponse.json({ error: 'Error creating interview report' }, { status: 500 });
+                }
+
+                console.log("### FEEDBACK ANALYSIS: Analysis complete and successful ###");
+                return NextResponse.json({ message: 'Analysis complete and feedback stored.' });
+                
+            } catch (openaiError) {
+                console.log(`### FEEDBACK ANALYSIS: OpenAI API error: ${openaiError.message} ###`);
+                return NextResponse.json({ error: 'Error communicating with AI service' }, { status: 503 });
             }
-
-            // 5. Create a new record in the InterviewReport table
-            console.log("Creating interview report...");
-            await db.insert(InterviewReport).values({
-                mockIdRef: mockId,
-                userId: session.user.id,
-                overallScore: analysisResult.overallSummary.overallScore || 70,
-                strengths: analysisResult.overallSummary.strengths || "Analysis did not provide strengths.",
-                weaknesses: analysisResult.overallSummary.weaknesses || "Analysis did not provide weaknesses.",
-                improvementPlan: analysisResult.overallSummary.improvementPlan || "Focus on improving your interview skills.",
-            });
-
-            console.log("Analysis and report generation completed successfully");
-            return NextResponse.json({ message: 'Analysis complete and feedback stored.' });
-            
-        } catch (openaiError) {
-            console.error("OpenAI API error:", openaiError);
-            return NextResponse.json({ error: 'Error communicating with AI service' }, { status: 503 });
+        } catch (dbError) {
+            console.log(`### FEEDBACK ANALYSIS: Database query error: ${dbError.message} ###`);
+            return NextResponse.json({ error: 'Database error: ' + dbError.message }, { status: 500 });
         }
-
     } catch (error) {
-        console.error('Error analyzing interview:', error);
+        console.log(`### FEEDBACK ANALYSIS: Unhandled error: ${error.message} ###`);
         return NextResponse.json({ error: 'Internal Server Error: ' + error.message }, { status: 500 });
     }
 }
 
 function createAnalysisPrompt(userAnswers) {
+    console.log("### FEEDBACK ANALYSIS: Creating analysis prompt ###");
+    
     const questionsAndAnswers = userAnswers.map(ua => ({
         userAnswerId: ua.id,
         question: ua.question,
         userAnswer: ua.userAns,
     }));
+    
+    console.log(`### FEEDBACK ANALYSIS: Mapped ${questionsAndAnswers.length} Q&A pairs ###`);
+    if (questionsAndAnswers.length > 0) {
+        console.log("### FEEDBACK ANALYSIS: First Q&A sample ###", {
+            id: questionsAndAnswers[0].userAnswerId,
+            hasQuestion: !!questionsAndAnswers[0].question,
+            hasAnswer: !!questionsAndAnswers[0].userAnswer
+        });
+    }
 
     return `
         Please analyze the following interview questions and answers. For each answer, provide:
@@ -160,4 +222,4 @@ function createAnalysisPrompt(userAnswers) {
         Here is the interview data:
         ${JSON.stringify(questionsAndAnswers)}
     `;
-} 
+}
