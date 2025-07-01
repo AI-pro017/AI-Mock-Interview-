@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import InterviewSession from './_components/InterviewSession';
 import CameraSelection from './_components/CameraSelection';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 
 export default function InterviewStartPage() {
     const params = useParams();
+    const searchParams = useSearchParams();
     const [interview, setInterview] = useState(null);
     const [loading, setLoading] = useState(true);
     const [useCameraInInterview, setUseCameraInInterview] = useState(false);
@@ -15,6 +16,11 @@ export default function InterviewStartPage() {
     const [cameraStream, setCameraStream] = useState(null);
 
     useEffect(() => {
+        const webcamEnabled = searchParams.get('webcam') === 'true';
+        if (webcamEnabled) {
+            setUseCameraInInterview(true);
+        }
+
         async function fetchInterview() {
             try {
                 const response = await fetch(`/api/interview?id=${params.interviewId}`);
@@ -29,7 +35,7 @@ export default function InterviewStartPage() {
         }
         
         fetchInterview();
-    }, [params.interviewId]);
+    }, [params.interviewId, searchParams]);
 
     const handleCameraToggle = (enabled) => {
         setUseCameraInInterview(enabled);
@@ -72,7 +78,10 @@ export default function InterviewStartPage() {
                             )}
                         </Card>
                     </div>
-                    <CameraSelection onCameraToggle={handleCameraToggle} />
+                    <CameraSelection 
+                        initialEnabled={useCameraInInterview} 
+                        onCameraToggle={handleCameraToggle} 
+                    />
                 </div>
                 <div className="mt-6 flex justify-center">
                     <Button 

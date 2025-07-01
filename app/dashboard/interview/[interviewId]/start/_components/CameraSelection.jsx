@@ -6,10 +6,15 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Video, VideoOff, Camera, AlertTriangle } from 'lucide-react';
 
-export default function CameraSelection({ onCameraToggle }) {
-  const [cameraEnabled, setCameraEnabled] = useState(false);
+export default function CameraSelection({ initialEnabled, onCameraToggle }) {
+  const [cameraEnabled, setCameraEnabled] = useState(initialEnabled || false);
   const [browserSupported, setBrowserSupported] = useState(true);
   const [isHttps, setIsHttps] = useState(true);
+
+  // Sync state with parent when initialEnabled prop changes
+  useEffect(() => {
+    setCameraEnabled(initialEnabled || false);
+  }, [initialEnabled]);
 
   // Check browser support on mount
   useEffect(() => {

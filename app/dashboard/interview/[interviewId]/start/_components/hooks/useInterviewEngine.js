@@ -58,13 +58,6 @@ export function useInterviewEngine(interview, isMicMuted) {
     try {
       console.log("Starting text-to-speech for:", text.substring(0, 30) + "...");
       
-      // Clear previous audio
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-      }
-
-      // Simple, direct approach
       const response = await fetch('/api/text-to-speech', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -77,50 +70,36 @@ export function useInterviewEngine(interview, isMicMuted) {
         let errorMessage = `Text-to-speech request failed with status ${response.status}`;
         try {
           const errorData = await response.json();
-          errorMessage += `: ${errorData.error || 'Unknown error'}`;
+          errorMessage += `: ${errorData.details || errorData.error || 'Unknown error'}`;
           console.error("TTS error details:", errorData);
         } catch (e) {
-          // If we can't parse the error as JSON
-          console.error("Couldn't parse error response:", e);
+          console.error("Couldn't parse error response:", await response.text());
         }
         throw new Error(errorMessage);
       }
       
-      // Get the audio data
       const blob = await response.blob();
       console.log("Audio blob received, size:", blob.size, "bytes");
       
       const url = URL.createObjectURL(blob);
-      console.log("Created URL for audio:", url);
-      
-      // Create a new audio element
-      const audio = new Audio();
-      
-      // Set up event handlers
-      audio.onloadedmetadata = () => {
-        console.log("Audio loaded, duration:", audio.duration);
-      };
+      const audio = new Audio(url); // Create a new Audio object with the URL
+
+      audio.onloadedmetadata = () => console.log("Audio loaded, duration:", audio.duration);
       
       audio.onended = () => {
         console.log("Audio playback ended");
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(url); // Clean up the object URL
         setIsAISpeaking(false);
       };
       
-      audio.onerror = (e) => {
-        console.error("Audio playback error:", e);
-        console.error("Audio element error:", audio.error);
-        URL.revokeObjectURL(url);
+      audio.onerror = () => {
+        console.error("Audio playback error:", audio.error);
+        URL.revokeObjectURL(url); // Clean up
         setIsAISpeaking(false);
-        setError(new Error(`Failed to play audio: ${audio.error?.message || 'Unknown error'}`));
+        // Provide a more specific error message
+        setError(new Error(`Failed to play audio: ${audio.error?.message || 'MEDIA_ELEMENT_ERROR'}. Please check browser permissions.`));
       };
       
-      // Set the source and store the element for cleanup
-      audio.src = url;
-      audioRef.current = audio;
-      
-      // Play the audio
-      console.log("Attempting to play audio...");
       await audio.play();
       console.log("Audio playback started successfully");
       

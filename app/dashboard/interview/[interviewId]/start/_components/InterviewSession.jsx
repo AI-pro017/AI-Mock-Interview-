@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Mic, MicOff, VideoOff } from 'lucide-react';
@@ -17,6 +18,7 @@ function safelyAccessCamera(video = true) {
 }
 
 export default function InterviewSession({ interview, useCameraInInterview }) {
+  const router = useRouter();
   const [isInterviewActive, setIsInterviewActive] = useState(false);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [remainingTime, setRemainingTime] = useState(interview.duration * 60);
@@ -89,20 +91,23 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const endInterview = () => {
     setIsInterviewActive(false);
     if (timerRef.current) clearInterval(timerRef.current);
+    
     endConversation();
+    
     if (cameraStream) {
       cameraStream.getTracks().forEach(track => track.stop());
       setCameraStream(null);
     }
+    
+    router.push(`/dashboard/interview/${interview.mockId}/feedback`);
   };
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
-      endConversation();
     };
-  }, []);
+  }, [cameraStream]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
