@@ -287,6 +287,26 @@ export function useInterviewEngine(interview, isMicMuted) {
     setIsGenerating(false);
   }, []);
 
+  // This new useEffect hook manages the mute state
+  useEffect(() => {
+    if (!recognitionRef.current) return;
+
+    if (isMicMuted) {
+      // If the mic is muted, stop recognition
+      recognitionRef.current.stop();
+      console.log("Speech recognition stopped due to mute.");
+    } else {
+      // If the mic is unmuted, start recognition
+      try {
+        recognitionRef.current.start();
+        console.log("Speech recognition started due to unmute.");
+      } catch (e) {
+        // This can happen if start() is called too rapidly
+        console.error("Could not restart speech recognition on unmute:", e);
+      }
+    }
+  }, [isMicMuted]); // This hook runs only when isMicMuted changes
+
   const startConversation = useCallback(async (mediaStream) => {
     const recognition = setupSpeechRecognition();
     if (recognition) {
