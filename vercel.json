@@ -1,16 +1,1 @@
-{
-    "builds": [
-      {
-        "src": "package.json",
-        "use": "@vercel/next",
-        "config": {
-          "installCommand": "npm install --omit=optional --ignore-scripts"
-        }
-      }
-    ],
-    "build": {
-      "env": {
-        "NPM_FLAGS": "--omit=optional --no-fund"
-      }
-    }
-  }
+{}
