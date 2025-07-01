@@ -17,6 +17,7 @@ export function useSpeechRecognition({
   const deepgramConnectionRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const silenceTimerRef = useRef(null);
+  const audioStreamRef = useRef(null);
   
   const startListening = useCallback(async (audioStream) => {
     if (!audioStream || !audioStream.active) {
@@ -26,6 +27,9 @@ export function useSpeechRecognition({
       return;
     }
 
+    // Store the audio stream for mute control
+    audioStreamRef.current = audioStream;
+    
     setError(null);
 
     try {
@@ -73,19 +77,22 @@ export function useSpeechRecognition({
         mediaRecorderRef.current.stop();
       }
 
-      const mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
+      // Only create and start the MediaRecorder if not muted
+      if (!muted) {
+        const mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && !muted && enabled) {
-          connection.send(event.data);
-        }
-      };
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0 && !muted && enabled) {
+            connection.send(event.data);
+          }
+        };
 
-      mediaRecorderRef.current = mediaRecorder;
+        mediaRecorderRef.current = mediaRecorder;
+        // Start recording
+        mediaRecorder.start(250);
+      }
+
       deepgramConnectionRef.current = connection;
-
-      // This is a critical point. Start recording.
-      mediaRecorder.start(250);
 
     } catch (e) {
       console.error("Failed to start listening:", e);
@@ -96,6 +103,7 @@ export function useSpeechRecognition({
   const stopListening = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
     }
     if (deepgramConnectionRef.current) {
       deepgramConnectionRef.current.finish();
@@ -104,6 +112,40 @@ export function useSpeechRecognition({
     clearTimeout(silenceTimerRef.current);
     setIsListening(false);
   }, []);
+
+  // Handle muting changes
+  useEffect(() => {
+    // If we have a stream and a connection but mute state changed
+    if (audioStreamRef.current && deepgramConnectionRef.current) {
+      if (muted) {
+        // Stop recording if muted
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+          mediaRecorderRef.current.stop();
+          mediaRecorderRef.current = null;
+          console.log("Mic recording stopped due to mute");
+        }
+      } else {
+        // Start recording if unmuted and not already recording
+        if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "recording") {
+          try {
+            const mediaRecorder = new MediaRecorder(audioStreamRef.current, { mimeType: 'audio/webm' });
+            
+            mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0 && !muted && enabled) {
+                deepgramConnectionRef.current?.send(event.data);
+              }
+            };
+            
+            mediaRecorderRef.current = mediaRecorder;
+            mediaRecorder.start(250);
+            console.log("Mic recording started due to unmute");
+          } catch (e) {
+            console.error("Failed to restart recording after unmute:", e);
+          }
+        }
+      }
+    }
+  }, [muted, enabled]);
 
   useEffect(() => {
     // Cleanup on unmount

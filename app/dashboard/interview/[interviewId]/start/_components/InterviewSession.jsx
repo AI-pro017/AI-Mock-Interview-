@@ -12,12 +12,33 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
-// This function now safely checks for client-side environment first
+// This function safely checks for client-side environment and handles permissions better
 function safelyAccessCamera(video = true) {
   if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
     return Promise.reject(new Error("Media device access not supported."));
   }
-  return navigator.mediaDevices.getUserMedia({ video, audio: true });
+  
+  // Create constraints object based on whether video is requested
+  const constraints = { 
+    audio: true,
+    video: video ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false 
+  };
+  
+  return navigator.mediaDevices.getUserMedia(constraints)
+    .catch((error) => {
+      console.error("Media access error:", error.name, error.message);
+      
+      // Return more specific error messages based on the error type
+      if (error.name === 'NotAllowedError') {
+        throw new Error("Camera/microphone permission denied. Please check your browser settings.");
+      } else if (error.name === 'NotFoundError') {
+        throw new Error("No camera/microphone found. Please check your device connections.");
+      } else if (error.name === 'NotReadableError') {
+        throw new Error("Camera/microphone is already in use by another application.");
+      } else {
+        throw error; // Re-throw other errors
+      }
+    });
 }
 
 export default function InterviewSession({ interview, useCameraInInterview }) {
@@ -49,29 +70,89 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const initializeMedia = async () => {
     setIsMediaLoading(true);
     setMediaError(null);
+    
+    // First, check if we have permission already
+    try {
+      // Attempt to get permissions status if the browser supports it
+      if (navigator.permissions && navigator.permissions.query) {
+        const micPermission = await navigator.permissions.query({ name: 'microphone' });
+        
+        // Camera permission check only if camera is enabled
+        let cameraPermission = { state: 'granted' }; // Default if not needed
+        if (useCameraInInterview) {
+          try {
+            cameraPermission = await navigator.permissions.query({ name: 'camera' });
+          } catch (e) {
+            console.log("Camera permission query not supported", e);
+          }
+        }
+        
+        // If either permission is denied, show a clear error message
+        if (micPermission.state === 'denied' || (useCameraInInterview && cameraPermission.state === 'denied')) {
+          const errorMsg = `${micPermission.state === 'denied' ? 'Microphone' : ''}${(micPermission.state === 'denied' && useCameraInInterview && cameraPermission.state === 'denied') ? ' and ' : ''}${(useCameraInInterview && cameraPermission.state === 'denied') ? 'Camera' : ''} permission denied. Please allow access in your browser settings.`;
+          setMediaError(errorMsg);
+          setIsMediaLoading(false);
+          return null;
+        }
+      }
+    } catch (permError) {
+      console.log("Permission query not supported", permError);
+    }
+    
+    // Now attempt to access the media
     let stream;
     try {
+      // Try to get the requested media (with or without camera)
       stream = useCameraInInterview 
         ? await safelyAccessCamera(true)
         : await safelyAccessCamera(false);
+        
+      // If we succeeded with camera, ensure we properly set up the video element
+      if (stream && useCameraInInterview) {
+        const videoTracks = stream.getVideoTracks();
+        if (videoTracks.length > 0) {
+          console.log("Camera accessed successfully:", videoTracks[0].label);
+        }
+      }
     } catch (error) {
-      console.warn("Camera access failed, trying audio-only.", error);
-      try {
-        stream = await safelyAccessCamera(false);
-        setMediaError("Camera not available. Using audio only.");
-      } catch (audioError) {
-        console.error("Fatal: Could not access microphone.", audioError);
-        setMediaError("Microphone access is required and was denied.");
+      console.warn("Media access failed:", error.message);
+      
+      // If camera access failed but camera was requested, try audio-only as fallback
+      if (useCameraInInterview) {
+        try {
+          console.log("Falling back to audio-only");
+          stream = await safelyAccessCamera(false);
+          setMediaError("Camera access failed: " + error.message + ". Using audio only.");
+        } catch (audioError) {
+          console.error("Fatal: Could not access microphone either.", audioError);
+          setMediaError("Interview cannot start: " + audioError.message);
+          setIsMediaLoading(false);
+          return null;
+        }
+      } else {
+        // This is a direct audio-only failure
+        setMediaError("Microphone access failed: " + error.message);
         setIsMediaLoading(false);
         return null;
       }
     }
     
+    // Success path - we have a stream
     setIsMediaLoading(false);
     setCameraStream(stream);
-    if (stream && useCameraInInterview && videoRef.current) {
-      videoRef.current.srcObject = stream;
+    
+    // Set up video element if we have video tracks and the reference exists
+    if (stream && videoRef.current) {
+      const hasVideoTracks = stream.getVideoTracks().length > 0;
+      
+      if (hasVideoTracks) {
+        videoRef.current.srcObject = stream;
+        console.log("Video stream attached to video element");
+      } else {
+        console.log("No video tracks available in the stream");
+      }
     }
+    
     return stream;
   };
 
@@ -126,6 +207,21 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
 
   const currentError = engineError || mediaError;
 
+  // Add this function to handle mic muting properly
+  const toggleMicrophone = () => {
+    // Update the UI state
+    setIsMicMuted(!isMicMuted);
+    
+    // If we have an active camera stream, directly mute/unmute the audio tracks
+    if (cameraStream) {
+      const audioTracks = cameraStream.getAudioTracks();
+      audioTracks.forEach(track => {
+        track.enabled = isMicMuted; // Note: we're using the current state before update
+        console.log(`Audio track ${track.label} ${isMicMuted ? 'unmuted' : 'muted'}`);
+      });
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
       <div className="lg:col-span-3 space-y-6">
@@ -145,7 +241,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setIsMicMuted(!isMicMuted)}
+                onClick={toggleMicrophone}
                 disabled={!isInterviewActive}
                 className={isMicMuted ? "bg-red-100" : ""}
               >
@@ -233,7 +329,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
         <Card className="p-6">
           <h2 className="text-xl font-bold mb-4">Camera Feed</h2>
           <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center" style={{ minHeight: '400px' }}>
-            {useCameraInInterview && cameraStream && !mediaError?.includes("Camera") ? (
+            {cameraStream && cameraStream.getVideoTracks().length > 0 ? (
               <video
                 ref={videoRef}
                 autoPlay
@@ -244,7 +340,16 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-white p-4 text-center">
                 <VideoOff className="h-12 w-12 mb-2" />
-                <p>{isMediaLoading ? "Requesting media..." : mediaError || "Camera is disabled"}</p>
+                <p>{isMediaLoading ? "Requesting media..." : 
+                    useCameraInInterview && mediaError ? mediaError : "Camera is disabled"}</p>
+                {useCameraInInterview && !isMediaLoading && (
+                  <div className="mt-4 max-w-md">
+                    <p className="text-sm text-gray-400">
+                      To enable your camera, check the camera permissions in your browser settings 
+                      and ensure no other application is using your camera.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

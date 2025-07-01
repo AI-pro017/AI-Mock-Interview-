@@ -462,6 +462,21 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     };
   }, [shutdownEngine]); // Dependency array ensures this is stable
 
+  // Add this useEffect to properly handle mic muting with browser's SpeechRecognition
+  useEffect(() => {
+    // Ensure we have audio tracks to mute/unmute
+    if (cameraStream) {
+      // Get all audio tracks from the stream
+      const audioTracks = cameraStream.getAudioTracks();
+      
+      // Set enabled state on all audio tracks based on mic mute state
+      audioTracks.forEach(track => {
+        track.enabled = !isMicMuted;
+        console.log(`Audio track ${track.label} ${isMicMuted ? 'muted' : 'unmuted'}`);
+      });
+    }
+  }, [isMicMuted, cameraStream]);
+
   return {
     conversation,
     isAISpeaking,
