@@ -49,6 +49,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const [cameraStream, setCameraStream] = useState(null);
   const [mediaError, setMediaError] = useState(null);
   const [isMediaLoading, setIsMediaLoading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [voiceSpeed, setVoiceSpeed] = useState(1.0);
   const [useNaturalSpeech, setUseNaturalSpeech] = useState(true);
 
@@ -192,41 +193,50 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     }
   };
 
-  const endInterview = () => {
+  const endInterview = async () => {
     console.log("Ending interview");
     
-    // Mark interview as inactive first
     setIsInterviewActive(false);
     
-    // Clear the timer interval
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
     
-    // End the conversation (stop speech recognition, etc.)
     endConversation();
     
-    // Clean up media resources
     if (cameraStream) {
-      try {
-        cameraStream.getTracks().forEach(track => {
-          try {
-            track.stop();
-          } catch (e) {
-            console.error("Error stopping track:", e);
-          }
-        });
-        setCameraStream(null);
-      } catch (e) {
-        console.error("Error cleaning up camera stream:", e);
-      }
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
     }
-    
-    // Navigate to feedback page after a short delay to ensure state updates
-    setTimeout(() => {
+
+    // New: Trigger analysis and then redirect
+    setIsAnalyzing(true);
+    try {
+      console.log("Starting interview analysis...");
+      const response = await fetch('/api/interview/analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ mockId: interview.mockId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to analyze interview');
+      }
+
+      console.log("Analysis complete.");
       router.push(`/dashboard/interview/${interview.mockId}/feedback`);
-    }, 100);
+
+    } catch (error) {
+      console.error("Error during analysis:", error);
+      // Optionally, show an error message to the user
+      // For now, we'll still redirect to the feedback page, which will show 'no feedback'
+      router.push(`/dashboard/interview/${interview.mockId}/feedback`);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   useEffect(() => {

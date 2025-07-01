@@ -37,14 +37,23 @@ export const MockInterview = pgTable('mockInterview', {
 
 export const UserAnswer = pgTable('userAnswer', {
     id: serial('id').primaryKey(),
+    mockIdRef: varchar('mockId').notNull(),
     question: varchar('question').notNull(),
-    correctAns: text('correctAns'),
+    correctAns: text('correctAns'), // Will be populated by AI
     userAns: text('userAns'),
-    feedback: text('feedback'),
+    feedback: text('feedback'), // General feedback
     rating: varchar('rating'),
+    
+    // New fields for detailed analysis
+    clarityScore: integer('clarityScore'), // 1-10
+    paceScore: integer('paceScore'), // 1-10, e.g., words per minute
+    fillerWords: integer('fillerWords'), // Count of filler words
+    confidenceScore: integer('confidenceScore'), // 1-10
+    technicalScore: integer('technicalScore'), // 1-10, if applicable
+    grammarScore: integer('grammarScore'), // 1-10
+    
     userEmail: varchar('userEmail'),
     createdAt: varchar('createdAt'),
-    mockIdRef: varchar('mockId').notNull(),
 });
 
 export const PersonalityFeedback = pgTable('personalityFeedback', {
@@ -113,3 +122,18 @@ export const verificationTokens = pgTable(
     expires: timestamp("expires", { mode: "date" }).notNull(),
   }
 )
+
+// New table for overall interview report
+export const InterviewReport = pgTable('interviewReport', {
+    id: serial('id').primaryKey(),
+    mockIdRef: varchar('mockId').notNull().unique(), // Link to the interview session
+    userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    
+    // Overall scores and summaries
+    overallScore: integer('overallScore'), // Weighted average score
+    strengths: text('strengths'), // Summary of strengths
+    weaknesses: text('weaknesses'), // Summary of weaknesses
+    improvementPlan: text('improvementPlan'), // Personalized suggestions
+    
+    createdAt: timestamp('createdAt').defaultNow(),
+});
