@@ -409,7 +409,7 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     setIsGenerating(false);
   }, []);
 
-  // This new useEffect hook manages the mute state
+  // This useEffect helps manage the speech recognition based on mic mute state
   useEffect(() => {
     if (!recognitionRef.current) return;
 
@@ -417,8 +417,8 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
       // If the mic is muted, stop recognition
       recognitionRef.current.stop();
       console.log("Speech recognition stopped due to mute.");
-    } else {
-      // If the mic is unmuted, start recognition
+    } else if (isListening) {
+      // Only try to start if we're supposed to be listening
       try {
         recognitionRef.current.start();
         console.log("Speech recognition started due to unmute.");
@@ -427,7 +427,7 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
         console.error("Could not restart speech recognition on unmute:", e);
       }
     }
-  }, [isMicMuted]); // This hook runs only when isMicMuted changes
+  }, [isMicMuted, isListening]);
 
   const startConversation = useCallback(async (mediaStream) => {
     const recognition = setupSpeechRecognition();
@@ -461,21 +461,6 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
       shutdownEngine();
     };
   }, [shutdownEngine]); // Dependency array ensures this is stable
-
-  // Add this useEffect to properly handle mic muting with browser's SpeechRecognition
-  useEffect(() => {
-    // Ensure we have audio tracks to mute/unmute
-    if (cameraStream) {
-      // Get all audio tracks from the stream
-      const audioTracks = cameraStream.getAudioTracks();
-      
-      // Set enabled state on all audio tracks based on mic mute state
-      audioTracks.forEach(track => {
-        track.enabled = !isMicMuted;
-        console.log(`Audio track ${track.label} ${isMicMuted ? 'muted' : 'unmuted'}`);
-      });
-    }
-  }, [isMicMuted, cameraStream]);
 
   return {
     conversation,

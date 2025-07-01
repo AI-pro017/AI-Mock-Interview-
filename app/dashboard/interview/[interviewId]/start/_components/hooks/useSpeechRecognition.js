@@ -82,8 +82,12 @@ export function useSpeechRecognition({
         const mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
 
         mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0 && !muted && enabled) {
-            connection.send(event.data);
+          if (event.data.size > 0 && !muted && enabled && deepgramConnectionRef.current) {
+            try {
+              deepgramConnectionRef.current.send(event.data);
+            } catch (e) {
+              console.error("Failed to send audio data:", e);
+            }
           }
         };
 
