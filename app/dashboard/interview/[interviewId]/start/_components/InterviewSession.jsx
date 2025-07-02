@@ -41,6 +41,8 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     startConversation,
     endConversation,
     forceProcessResponse,
+    isGenerating,
+    isInitialTTSLoading
   } = useInterviewEngine(interview, isMicMuted, voiceSpeed, useNaturalSpeech);
 
   // Initialize media with proper camera control
@@ -120,7 +122,6 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
 
   const endInterview = async () => {
     console.log("Ending interview");
-  
     setIsInterviewActive(false);
     
     if (timerRef.current) {
@@ -128,57 +129,92 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       timerRef.current = null;
     }
     
-    // Process Q&A pairs
-    console.log("Conversation data at end:", conversation.length, "items");
-    
-    // Extract and save Q&A pairs
-    let savedCount = 0;
-    let currentQuestion = "";
-    
-    for (let i = 0; i < conversation.length; i++) {
-      const item = conversation[i];
+    try {
+      // First shut down the interview engine and camera
+      endConversation();
       
-      if (item.role === 'ai') {
-        currentQuestion = item.text;
-      } else if (item.role === 'user' && currentQuestion && item.text) {
-        try {
-          await db.insert(UserAnswer).values({
-            mockIdRef: interview.mockId,
-            question: currentQuestion,
-            userAns: item.text,
-            userEmail: interview.createdBy || "",
-            createdAt: new Date().toISOString()
-          });
-          savedCount++;
-        } catch (error) {
-          console.error("Error saving conversation item:", error);
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        setCameraStream(null);
+      }
+      
+      // Process Q&A pairs
+      console.log("Conversation data at end:", conversation.length, "items");
+      
+      // Save the conversation data first
+      let savedCount = 0;
+      let currentQuestion = "";
+      
+      for (let i = 0; i < conversation.length; i++) {
+        const item = conversation[i];
+        
+        if (item.role === 'ai') {
+          currentQuestion = item.text;
+        } else if (item.role === 'user' && currentQuestion && item.text) {
+          try {
+            await db.insert(UserAnswer).values({
+              mockIdRef: interview.mockId,
+              question: currentQuestion,
+              userAns: item.text,
+              userEmail: interview.createdBy || "",
+              createdAt: new Date().toISOString()
+            });
+            savedCount++;
+          } catch (error) {
+            console.error("Error saving conversation item:", error);
+          }
         }
       }
-    }
-    
-    console.log(`Saved ${savedCount} Q&A pairs to database`);
-    
-    endConversation();
-    
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-      setCameraStream(null);
-    }
-
-    // Trigger analysis and redirect
-    setIsAnalyzing(true);
-    try {
-      await fetch('/api/interview-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mockId: interview.mockId }),
-      });
+      
+      console.log(`Saved ${savedCount} Q&A pairs to database`);
+      
+      // Show loading while triggering analysis
+      setIsAnalyzing(true);
+      
+      // Pre-trigger analysis with retry logic
+      let attempts = 0;
+      const maxAttempts = 3;
+      let success = false;
+      
+      while (attempts < maxAttempts && !success) {
+        try {
+          const response = await fetch('/api/interview-analysis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mockId: interview.mockId }),
+            cache: 'no-store',
+          });
+          
+          if (response.ok) {
+            success = true;
+            console.log("Analysis triggered successfully");
+          } else {
+            console.error("Error triggering analysis:", response.status);
+            attempts++;
+            // Wait before retrying
+            await new Promise(r => setTimeout(r, 1000 * attempts));
+          }
+        } catch (error) {
+          console.error("Network error triggering analysis:", error);
+          attempts++;
+          // Wait before retrying
+          await new Promise(r => setTimeout(r, 1000 * attempts));
+        }
+      }
+      
+      // Navigate to feedback page regardless - it will handle missing data
       router.push(`/dashboard/interview/${interview.mockId}/feedback`);
     } catch (error) {
-      console.error("Error during analysis:", error);
-      router.push(`/dashboard/interview/${interview.mockId}/feedback`);
-    } finally {
+      console.error("Error during interview end process:", error);
       setIsAnalyzing(false);
+      
+      // Show error message
+      setMediaError(`An error occurred while ending the interview: ${error.message}`);
+      
+      // Add a delayed redirect to feedback page anyway
+      setTimeout(() => {
+        router.push(`/dashboard/interview/${interview.mockId}/feedback`);
+      }, 3000);
     }
   };
 
@@ -248,6 +284,28 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     if (isInterviewActive) {
       initializeMedia();
     }
+  };
+
+  // Add a debounce mechanism for interim transcripts
+  const [debouncedInterimTranscript, setDebouncedInterimTranscript] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedInterimTranscript(interimTranscript);
+    }, 300); // Show interim results after a small delay to reduce flicker
+    
+    return () => clearTimeout(timer);
+  }, [interimTranscript]);
+
+  // Add a confidence threshold filter
+  const processTranscript = (transcript, confidence) => {
+    // Only accept high-confidence results
+    if (confidence < 0.6) return null; 
+    
+    // Clean up common transcription issues
+    return transcript
+      .replace(/\btimes equal sign\b/gi, "times equals")
+      .replace(/([a-z])([A-Z])/g, "$1 $2") // Add space between words incorrectly joined
+      .replace(/\s+/g, " "); // Remove extra spaces
   };
 
   return (
@@ -348,9 +406,9 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
                     isActive={isUserSpeaking && !isMicMuted}
                     className="w-full h-full"
                   />
-                  {interimTranscript && (
+                  {debouncedInterimTranscript && (
                     <div className="text-xs p-2 bg-gray-100 text-gray-700">
-                      {interimTranscript}
+                      {processTranscript(debouncedInterimTranscript, 0.8)}
                     </div>
                   )}
                 </div>
@@ -409,7 +467,9 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
         conversation={conversation} 
         isAISpeaking={isAISpeaking} 
         isUserSpeaking={isUserSpeaking}
-        interimTranscript={interimTranscript}
+        interimTranscript={debouncedInterimTranscript}
+        isGenerating={isGenerating}
+        isInitialTTSLoading={isInitialTTSLoading}
       />
 
       {/* Show loading or error messages if present */}
@@ -438,8 +498,22 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
                   </svg>
                 </div>
                 <p className="text-lg font-medium text-red-700 mb-2">Error</p>
-                <p className="text-gray-700">{mediaError || engineError}</p>
-                <Button className="mt-4" onClick={() => setMediaError(null)}>Dismiss</Button>
+                <p className="text-gray-700">
+                  {/* Safely extract error message from Error objects */}
+                  {mediaError ? (typeof mediaError === 'object' ? 
+                    (mediaError?.message || 'Unknown media error') : mediaError) : ''}
+                  {engineError ? (typeof engineError === 'object' ? 
+                    (engineError?.message || 'Unknown engine error') : engineError) : ''}
+                </p>
+                <Button 
+                  className="mt-4" 
+                  onClick={() => {
+                    setMediaError(null);
+                    setError(null);
+                  }}
+                >
+                  Dismiss
+                </Button>
               </div>
             )}
           </div>
@@ -450,7 +524,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
 }
 
 // Add this component to the same file or create a new file for it
-function ConversationDisplayWithAutoScroll({ conversation, isAISpeaking, isUserSpeaking, interimTranscript }) {
+function ConversationDisplayWithAutoScroll({ conversation, isAISpeaking, isUserSpeaking, interimTranscript, isGenerating, isInitialTTSLoading }) {
   const scrollContainerRef = useRef(null);
   
   // Auto-scroll to bottom when conversation changes
@@ -465,9 +539,18 @@ function ConversationDisplayWithAutoScroll({ conversation, isAISpeaking, isUserS
     <div 
       ref={scrollContainerRef} 
       className="flex-grow bg-white rounded-lg shadow-sm overflow-y-auto"
-      style={{ maxHeight: 'calc(100vh - 350px)' }} // Adjust based on the height of your fixed sections
+      style={{ maxHeight: 'calc(100vh - 350px)' }}
     >
       <div className="p-4">
+        {/* If we're loading TTS and there's no conversation yet, show loading indicator */}
+        {isInitialTTSLoading && conversation.length === 0 && (
+          <div className="text-center p-8">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-lg font-medium">Preparing interview...</p>
+          </div>
+        )}
+        
+        {/* Display conversation items */}
         {conversation.map((item, index) => (
           <div 
             key={index} 
@@ -484,6 +567,15 @@ function ConversationDisplayWithAutoScroll({ conversation, isAISpeaking, isUserS
             <div>{item.text}</div>
           </div>
         ))}
+        
+        {/* Show "Loading voice..." when generating but not yet speaking */}
+        {isGenerating && !isAISpeaking && !isInitialTTSLoading && (
+          <div className="mb-4 p-4 rounded-lg bg-blue-50">
+            <div className="font-medium mb-1">
+              Interviewer <span className="ml-2 text-amber-500 text-sm animate-pulse">Loading voice...</span>
+            </div>
+          </div>
+        )}
         
         {/* Show interim transcript when user is speaking */}
         {isUserSpeaking && interimTranscript && (

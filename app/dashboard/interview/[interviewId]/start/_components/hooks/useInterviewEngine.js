@@ -15,6 +15,8 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
   const [questionPhase, setQuestionPhase] = useState('initial'); // 'initial', 'behavioral', 'technical', 'closing'
   const [questionCount, setQuestionCount] = useState(0);
   const [coveredTopics, setCoveredTopics] = useState([]);
+  const [isInitialTTSLoading, setIsInitialTTSLoading] = useState(false);
+  const [displayedConversation, setDisplayedConversation] = useState([]);
 
   // --- REFS ---
   const audioRef = useRef(new Audio());
@@ -23,6 +25,9 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
   const timeoutRef = useRef(null);
   const retryTimeoutRef = useRef(null);
   const noSpeechErrorShownRef = useRef(false);
+
+  // First, declare processUserResponse as a ref so it can be used before definition
+  const processUserResponseRef = useRef(null);
 
   // --- AI RESPONSE & SPEECH ---
   const generateAIResponse = useCallback(async (prompt) => {
@@ -55,17 +60,32 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
   const speakText = useCallback(async (text) => {
     if (!text || text.trim() === "") return;
 
-    setIsAISpeaking(true);
+    // Set loading state for speech but don't set isAISpeaking yet
+    setIsGenerating(true);
     setError(null);
     
     try {
-      console.log("Starting text-to-speech for:", text.substring(0, 30) + "...");
+      // Enhanced sanitization for TTS - fix "time equal sign" and other issues
+      const sanitizedText = text
+        .replace(/(\d+)\s*ms/gi, "$1 milliseconds")
+        .replace(/(\d+)\s*s\b/gi, "$1 seconds")
+        // Fix time equal sign issues with more robust patterns
+        .replace(/[Tt]ime\s*=+\s*(\d+)/g, "time is $1")
+        .replace(/([A-Za-z]+)\s*=+\s*(\d+)/g, "$1 equals $2")
+        // Replace equals signs more carefully to avoid over-replacement
+        .replace(/\s=\s/g, " equals ")
+        .replace(/\s==\s/g, " equals ")
+        .replace(/\s===\s/g, " equals ")
+        .replace(/\s+/g, " ")
+        .trim();
+      
+      console.log("Starting text-to-speech for:", sanitizedText.substring(0, 30) + "...");
       
       const response = await fetch('/api/text-to-speech', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          text,
+          text: sanitizedText,
           speed: voiceSpeed,
           naturalSpeech: useNaturalSpeech
         }),
@@ -90,33 +110,72 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
       
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      
+      // Store in the ref for potential cancellation
+      audioRef.current = audio;
 
       audio.playbackRate = voiceSpeed;
       
-      audio.onloadedmetadata = () => console.log("Audio loaded, duration:", audio.duration);
+      // Make sure audio is fully loaded before playing
+      await new Promise((resolve) => {
+        audio.onloadeddata = resolve;
+        // Set a timeout in case onloadeddata doesn't fire
+        const timeout = setTimeout(resolve, 3000);
+        audio.onloadedmetadata = () => {
+          console.log("Audio loaded, duration:", audio.duration);
+          clearTimeout(timeout);
+        };
+      });
+      
+      // Now that the audio is loaded, set isAISpeaking to true
+      setIsAISpeaking(true);
+      setIsInitialTTSLoading(false);
       
       audio.onended = () => {
         console.log("Audio playback ended");
         URL.revokeObjectURL(url);
         setIsAISpeaking(false);
+        
+        // Process any pending user response when AI finishes speaking
+        if (userResponseBufferRef.current.trim() && !isUserSpeaking && processUserResponseRef.current) {
+          console.log("Processing pending user response after AI finished speaking");
+          processUserResponseRef.current();
+        }
       };
       
       audio.onerror = (e) => {
         console.error("Audio playback error:", e);
-        URL.revokeObjectURL(url);
+        
+        // Safely clean up the URL
+        try {
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          console.error("Error revoking URL:", err);
+        }
+        
+        // Reset states
         setIsAISpeaking(false);
-        setError(new Error(`Failed to play audio: ${e?.message || 'MEDIA_ELEMENT_ERROR'}. Please check browser permissions.`));
+        setIsGenerating(false);
+        setIsInitialTTSLoading(false);
+        
+        // Only set an error if we're not in the process of shutting down
+        if (recognitionRef.current) {
+          setError(new Error(`Failed to play audio: ${e?.message || 'MEDIA_ELEMENT_ERROR'}. Please check browser permissions.`));
+        }
       };
       
       await audio.play();
       console.log("Audio playback started successfully");
+      setIsGenerating(false);
       
     } catch (err) {
       console.error("Error in text-to-speech process:", err);
       setError(new Error(`Text-to-speech error: ${err.message}`));
       setIsAISpeaking(false);
+      setIsGenerating(false);
+      setIsInitialTTSLoading(false);
     }
-  }, [voiceSpeed, useNaturalSpeech]);
+  }, [voiceSpeed, useNaturalSpeech, isUserSpeaking]);
 
   const createPrompt = useCallback((convHistory, type) => {
     if (type === 'greeting') {
@@ -225,17 +284,22 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
   }, [interview, questionPhase, questionCount, coveredTopics]);
 
   const processUserResponse = useCallback(async () => {
+    // Don't process if AI is still speaking or generating content
+    if (isAISpeaking || isGenerating) {
+      console.log("AI is still speaking or generating, delaying response processing");
+      return;
+    }
+
     const userResponse = userResponseBufferRef.current.trim();
     userResponseBufferRef.current = '';
     setInterimTranscript('');
     setCurrentUserResponse('');
     if (!userResponse) return;
 
-    // Update conversation with user response - USING FUNCTION UPDATER
-    setConversation(prevConversation => [...prevConversation, { role: 'user', text: userResponse }]);
-
-    // Get the latest conversation (this is important)
+    // Update conversation with user response
     const updatedConversation = [...conversation, { role: 'user', text: userResponse }];
+    setConversation(updatedConversation);
+    setDisplayedConversation(updatedConversation);
 
     // Extract potential topics from response for tracking
     const newTopics = userResponse
@@ -245,22 +309,61 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     
     setCoveredTopics(prev => [...new Set([...prev, ...newTopics])]);
 
+    // Ensure the AI is not already speaking before generating a new response
+    if (isAISpeaking) {
+      console.log("AI is already speaking, cannot generate new response yet");
+      return;
+    }
+
+    // Set generating state to show loading indicator
+    setIsGenerating(true);
+
     // Generate AI response
     const prompt = createPrompt(updatedConversation, 'response');
     const aiResponseText = await generateAIResponse(prompt);
     
     if (aiResponseText) {
-      // Use function updater to ensure we're working with the latest state
-      setConversation(prevConversation => [...prevConversation, { role: 'ai', text: aiResponseText }]);
+      // Store the AI response in the conversation state but don't display it yet
+      setConversation(prevConversation => [...prevConversation, { 
+        role: 'ai', 
+        text: aiResponseText,
+        isLoading: true 
+      }]);
       
       // If the AI is asking a question, increment the counter
       if (aiResponseText.includes('?')) {
         setQuestionCount(prev => prev + 1);
       }
       
+      // Now speak the text (this will set isAISpeaking to true)
       await speakText(aiResponseText);
+      
+      // Only after the voice is loaded, update the displayed conversation
+      setDisplayedConversation(prevConversation => [...prevConversation, { 
+        role: 'ai', 
+        text: aiResponseText
+      }]);
+      
+      // Update the conversation to remove loading state
+      setConversation(prevConversation => {
+        const updated = [...prevConversation];
+        if (updated.length > 0) {
+          updated[updated.length - 1] = { 
+            ...updated[updated.length - 1], 
+            isLoading: false 
+          };
+        }
+        return updated;
+      });
+    } else {
+      setIsGenerating(false);
     }
-  }, [conversation, createPrompt, generateAIResponse, speakText, setCoveredTopics]);
+  }, [conversation, createPrompt, generateAIResponse, speakText, setCoveredTopics, isAISpeaking, isGenerating]);
+
+  // Store the callback function in the ref to break the circular dependency
+  useEffect(() => {
+    processUserResponseRef.current = processUserResponse;
+  }, [processUserResponse]);
 
   // --- BROWSER SPEECH RECOGNITION ---
   const setupSpeechRecognition = useCallback(() => {
@@ -362,16 +465,19 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
         
         timeoutRef.current = setTimeout(() => {
           setIsUserSpeaking(false);
-          // Only process the response if we have something to say
-          if (userResponseBufferRef.current.trim()) {
-            processUserResponse();
+          // Only process the response if we have something to say AND the AI is not speaking
+          if (userResponseBufferRef.current.trim() && !isAISpeaking && processUserResponseRef.current) {
+            processUserResponseRef.current();
+          } else if (userResponseBufferRef.current.trim() && isAISpeaking) {
+            // Store the response but wait for AI to finish speaking
+            console.log("Waiting for AI to finish speaking before processing response");
           }
         }, 1200); // Slightly shorter delay
       }
     };
 
     return recognition;
-  }, [isMicMuted, processUserResponse]);
+  }, [isMicMuted]);  // Remove processUserResponse dependency
 
   // --- LIFECYCLE & CONTROL ---
   
@@ -379,37 +485,90 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
   const shutdownEngine = useCallback(() => {
     console.log("Shutting down interview engine...");
 
-    // 1. Stop Speech Recognition
-    if (recognitionRef.current) {
-      // Remove the onend handler to prevent auto-restarting
-      recognitionRef.current.onend = null; 
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-      console.log("Speech recognition stopped.");
-    }
-    
-    // 2. Stop any playing audio
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = ''; // Clear source
-      console.log("Audio playback stopped.");
-    }
+    try {
+      // 1. Stop Speech Recognition
+      if (recognitionRef.current) {
+        try {
+          // Remove the onend handler to prevent auto-restarting
+          recognitionRef.current.onend = null; 
+          recognitionRef.current.stop();
+        } catch (e) {
+          console.error("Error stopping speech recognition:", e);
+        } finally {
+          recognitionRef.current = null;
+          console.log("Speech recognition stopped.");
+        }
+      }
+      
+      // 2. Properly clean up audio playback with improved error handling
+      if (audioRef.current) {
+        try {
+          // First remove all event listeners to prevent errors
+          audioRef.current.onended = null;
+          audioRef.current.onerror = null;
+          audioRef.current.onloadeddata = null;
+          audioRef.current.onloadedmetadata = null;
+          audioRef.current.onpause = null;
+          audioRef.current.onplay = null;
+          
+          // Pause the audio before doing anything else
+          audioRef.current.pause();
+          
+          // Set audio volume to 0 to prevent any potential sound issues
+          audioRef.current.volume = 0;
+          
+          // Handle different browser implementations
+          try {
+            // Method 1: Set empty source and load
+            audioRef.current.src = '';
+            audioRef.current.load();
+          } catch (loadError) {
+            console.log("Alternative audio cleanup method used");
+            // Method 2: Create a new empty audio element and replace
+            audioRef.current = new Audio();
+          }
+          
+          // Don't set audioRef.current to null yet, to prevent 
+          // potential race conditions with audio event handlers
+        } catch (e) {
+          console.error("Error stopping audio playback:", e);
+        } finally {
+          console.log("Audio playback stopped.");
+          // After a delay, we can safely set the ref to null
+          setTimeout(() => {
+            audioRef.current = null;
+          }, 200);
+        }
+      }
 
-    // 3. Clear all timers
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
+      // 3. Clear all timers
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+      
+      // 4. Reset all state flags
+      setIsAISpeaking(false);
+      setIsUserSpeaking(false);
+      setIsListening(false);
+      setIsGenerating(false);
+      setIsInitialTTSLoading(false);
+      
+      // 5. Clear any displayed errors related to audio
+      setError(prev => {
+        if (prev && prev.message && prev.message.includes('audio')) {
+          return null;
+        }
+        return prev;
+      });
+    } catch (error) {
+      console.error("Error during engine shutdown:", error);
+      // Don't set an error state here as this could be during component unmount
     }
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
-    
-    // 4. Reset all state flags
-    setIsAISpeaking(false);
-    setIsUserSpeaking(false);
-    setIsListening(false);
-    setIsGenerating(false);
   }, []);
 
   // This useEffect properly handles mic muting with browser's SpeechRecognition
@@ -478,16 +637,42 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
       }
     }
     
+    // Set loading states for initial greeting
+    setIsGenerating(true);
+    setIsInitialTTSLoading(true);
+    
+    // First get the AI response text
     const initialPrompt = createPrompt([], 'greeting');
     const aiResponseText = await generateAIResponse(initialPrompt);
+    
     if (aiResponseText) {
-      // Use a function updater to ensure we're always working with the latest state
+      // Store the AI response in conversation state but don't display it yet
       setConversation(prevConversation => 
         prevConversation.length === 0 
-          ? [{ role: 'ai', text: aiResponseText }] 
-          : [...prevConversation, { role: 'ai', text: aiResponseText }]
+          ? [{ role: 'ai', text: aiResponseText, isLoading: true }] 
+          : [...prevConversation, { role: 'ai', text: aiResponseText, isLoading: true }]
       );
+      
+      // Process TTS after updating the UI
       await speakText(aiResponseText);
+      
+      // Only after voice is loaded, update the displayed conversation
+      setDisplayedConversation([{ role: 'ai', text: aiResponseText }]);
+      
+      // Update the conversation to remove loading state
+      setConversation(prevConversation => {
+        const updated = [...prevConversation];
+        if (updated.length > 0) {
+          updated[updated.length - 1] = { 
+            ...updated[updated.length - 1], 
+            isLoading: false 
+          };
+        }
+        return updated;
+      });
+    } else {
+      setIsGenerating(false);
+      setIsInitialTTSLoading(false);
     }
   }, [setupSpeechRecognition, createPrompt, generateAIResponse, speakText]);
 
@@ -520,8 +705,17 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     }
   }, [processUserResponse, currentUserResponse]);
 
+  // Add this useEffect after the other useEffect hooks
+  useEffect(() => {
+    // Check if the AI stopped speaking and we have a pending user response
+    if (!isAISpeaking && userResponseBufferRef.current.trim() && !isUserSpeaking) {
+      console.log("AI finished speaking, now processing pending user response");
+      processUserResponse();
+    }
+  }, [isAISpeaking, isUserSpeaking, processUserResponse]);
+
   return {
-    conversation,
+    conversation: displayedConversation,
     isAISpeaking,
     isUserSpeaking,
     isListening,
@@ -530,6 +724,8 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     error,
     startConversation,
     endConversation,
-    forceProcessResponse
+    forceProcessResponse,
+    isGenerating,
+    isInitialTTSLoading
   };
 } 
