@@ -21,7 +21,7 @@ export default function NewInterviewPage() {
     const [keySkills, setKeySkills] = useState('');
     const [difficulty, setDifficulty] = useState('Medium');
     const [focus, setFocus] = useState('Behavioral');
-    const [duration, setDuration] = useState(30);
+    const [duration, setDuration] = useState(15);
     const [interviewStyle, setInterviewStyle] = useState('Conversational');
     const [interviewMode, setInterviewMode] = useState('Practice');
     const [loading, setLoading] = useState(false);
@@ -101,15 +101,22 @@ export default function NewInterviewPage() {
                                 </Select>
                             </div>
 
+                            <div className="space-y-2">
+                                <Label htmlFor="jobDescription">Job Description</Label>
+                                <Textarea 
+                                    id="jobDescription" 
+                                    value={jobDescription} 
+                                    onChange={(e) => setJobDescription(e.target.value)} 
+                                    placeholder="Paste the job description or focus area here (optional)..." 
+                                />
+                                <p className="text-xs text-gray-500">Adding a job description helps tailor questions more accurately to your goals.</p>
+                            </div>
+
                             {showCustomRoleFields && (
                                 <div className="space-y-6 p-4 border rounded-lg bg-gray-50">
                                     <div className="space-y-2">
                                         <Label htmlFor="customJobRole">Custom Job Role</Label>
                                         <Input id="customJobRole" value={customJobRole} onChange={(e) => setCustomJobRole(e.target.value)} placeholder="E.g., Senior Python Developer" required={showCustomRoleFields} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="jobDescription">Custom Job Description</Label>
-                                        <Textarea id="jobDescription" value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} placeholder="Paste the full job description here..." />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="industry">Industry</Label>
@@ -192,7 +199,7 @@ export default function NewInterviewPage() {
 
                             <div className="space-y-2">
                                 <Label>Interview Duration (minutes)</Label>
-                                <Select defaultValue="30" onValueChange={(val) => setDuration(parseInt(val))}>
+                                <Select defaultValue="15" onValueChange={(val) => setDuration(parseInt(val))}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {DURATION_OPTIONS.map(opt => (

@@ -173,6 +173,7 @@ export function useConversationManager(interview, isMicMuted) {
     if (type === 'greeting') {
       return `You are conducting a job interview for a ${interview.jobPosition} position. 
               The candidate has ${interview.jobExperience} years of experience. 
+              ${interview.jobDesc ? `Job Description: ${interview.jobDesc}` : ''}
               
               Start by introducing yourself briefly as the interviewer for ${interview.jobPosition}.
               Give a warm, professional welcome and then ask your first question.
@@ -223,6 +224,7 @@ export function useConversationManager(interview, isMicMuted) {
             
             You are interviewing for a ${interview.jobPosition} position with a ${interview.interviewStyle} style 
             and focus on ${interview.focus}.
+            ${interview.jobDesc ? `Job Description: ${interview.jobDesc}` : ''}
             
             Current interview progress: Question #${questionCounter + 1}
             Topics already discussed: ${questionTopics.join(', ')}

@@ -25,7 +25,7 @@ export const MockInterview = pgTable('mockInterview', {
     skills: text('skills'),
     difficulty: varchar('difficulty', { length: 50 }).default('Medium'),
     focus: varchar('focus', { length: 50 }).default('Balanced'), // e.g., 'Technical', 'Behavioral', 'Balanced'
-    duration: integer('duration').default(30), // in minutes
+    duration: integer('duration').default(15), // in minutes
     interviewStyle: varchar('interviewStyle', { length: 50 }).default('Conversational'),
     interviewMode: varchar('interviewMode', { length: 50 }).default('Practice'),
     questionCategories: text('questionCategories'), // User-defined categories

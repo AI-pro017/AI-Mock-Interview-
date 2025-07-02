@@ -59,7 +59,9 @@ export async function POST(req) {
             }
         };
 
-        const prompt = `Generate 5 interview questions for a ${jobRole} with ${jobExperience} years of experience.`;
+        const prompt = `Generate 5 interview questions for a ${jobRole} with ${jobExperience} years of experience.
+${jobDescription ? `Job Description: ${jobDescription}` : ''}
+The questions should focus on ${focus} aspects and be at a ${difficulty} difficulty level.`;
         console.log("[DIAGNOSTIC] Calling OpenAI with simplified prompt...");
 
         const response = await openai.chat.completions.create({
