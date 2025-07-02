@@ -211,7 +211,7 @@ export default function RecordAnswerSection({ mockInterview }) {
         }
       };
 
-    const stopUserRecording = () => {
+      const stopUserRecording = () => {
         setIsRecording(false);
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             mediaRecorderRef.current.stop();
@@ -220,6 +220,12 @@ export default function RecordAnswerSection({ mockInterview }) {
             deepgramConnectionRef.current.finish();
         }
         console.log("Final Answer:", userAnswer);
+        
+        // IMPORTANT: Call UpdateUserAnswer to save the answer to the database
+        if (userAnswer.trim()) {
+            UpdateUserAnswer();
+        }
+        
         setIsAwaitingAIResponse(true);
     };
 

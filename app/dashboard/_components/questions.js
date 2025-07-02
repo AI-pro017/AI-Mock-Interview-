@@ -101,8 +101,6 @@ export const DIFFICULTY_LEVELS = [
 export const DURATION_OPTIONS = [
     { value: 15, label: '15 Minutes' },
     { value: 30, label: '30 Minutes' },
-    { value: 45, label: '45 Minutes' },
-    { value: 60, label: '60 Minutes' },
 ];
 
 export const INTERVIEW_MODES = [

@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback } from 'react';
 import { useAIResponse } from './useAIResponse';
 import { useSpeechRecognition } from './useSpeechRecognition';
+import { db } from '@/utils/db';
+import { UserAnswer } from '@/utils/schema';
 
 export function useConversationManager(interview, isMicMuted) {
   const [conversation, setConversation] = useState([]);
@@ -25,6 +27,7 @@ export function useConversationManager(interview, isMicMuted) {
   
   // Handle user speech start
   const handleSpeechStart = useCallback(() => {
+    console.log("SPEECH FLOW: Speech started");
     clearTimeout(silenceTimerRef.current);
     setIsUserSpeaking(true);
     if (isAISpeaking) {
@@ -34,7 +37,9 @@ export function useConversationManager(interview, isMicMuted) {
   
   // Handle user speech end
   const handleSpeechEnd = useCallback(() => {
+    console.log("SPEECH FLOW: Speech ended");
     silenceTimerRef.current = setTimeout(() => {
+      console.log("SPEECH FLOW: Silence timeout - buffer:", userResponseBufferRef.current.length > 0 ? "HAS CONTENT" : "EMPTY");
       if (userResponseBufferRef.current.trim()) {
         processUserResponse();
       } else {
@@ -45,12 +50,15 @@ export function useConversationManager(interview, isMicMuted) {
   
   // Handle transcript updates
   const handleTranscriptUpdate = useCallback((transcript, isFinal) => {
+    console.log(`SPEECH FLOW: Transcript update, isFinal: ${isFinal}, length: ${transcript.length}`);
+    
     if (isAISpeaking) {
       stopSpeaking();
     }
     
     if (isFinal) {
       userResponseBufferRef.current += transcript + ' ';
+      console.log("SPEECH FLOW: Updated buffer:", userResponseBufferRef.current.substring(0, 50));
       setCurrentUserResponse(userResponseBufferRef.current.trim());
       setInterimTranscript('');
     } else {
@@ -71,6 +79,10 @@ export function useConversationManager(interview, isMicMuted) {
   
   // Process completed user response
   const processUserResponse = useCallback(async () => {
+    console.log("CONVERSATION FLOW: processUserResponse called");
+    console.log("CONVERSATION FLOW: Current conversation length:", conversation.length);
+    console.log("CONVERSATION FLOW: User response:", userResponseBufferRef.current.trim().substring(0, 50));
+
     const userResponse = userResponseBufferRef.current.trim();
     if (!userResponse) {
       setIsUserSpeaking(false);
@@ -83,6 +95,60 @@ export function useConversationManager(interview, isMicMuted) {
     // Extract potential topics from the user's response
     const topics = extractTopics(userResponse);
     setQuestionTopics(prev => [...new Set([...prev, ...topics])]);
+    
+    // Find the last AI message (which should be the question)
+    let lastQuestion = "";
+    for (let i = conversation.length - 1; i >= 0; i--) {
+      if (conversation[i].role === 'ai') {
+        lastQuestion = conversation[i].text;
+        break;
+      }
+    }
+    
+    console.log("CONVERSATION FLOW: Last question found:", lastQuestion ? "YES" : "NO");
+    if (lastQuestion) {
+      console.log("CONVERSATION FLOW: Last question:", lastQuestion.substring(0, 50));
+    }
+    
+    // Save answer to the database
+    if (lastQuestion) {
+      try {
+        console.log("Saving answer to database:", {
+          question: lastQuestion.substring(0, 30) + "...",
+          answer: userResponse.substring(0, 30) + "..."
+        });
+        
+        // Try the original save method
+        let saveSuccess = false;
+        try {
+          await db.insert(UserAnswer).values({
+            mockIdRef: interview.mockId,
+            question: lastQuestion,
+            userAns: userResponse,
+            userEmail: interview.createdBy || "",
+            createdAt: new Date().toISOString()
+          });
+          saveSuccess = true;
+          console.log("Answer saved successfully using direct DB insert");
+        } catch (dbError) {
+          console.error("Error with direct DB save:", dbError);
+        }
+        
+        // If direct save failed, try the debug function
+        if (!saveSuccess) {
+          const debugSuccess = await debugSaveAnswer(
+            interview.mockId, 
+            lastQuestion, 
+            userResponse, 
+            interview.createdBy || ""
+          );
+          console.log("Debug save result:", debugSuccess ? "Success" : "Failed");
+        }
+        
+      } catch (error) {
+        console.error("Error saving answer to database:", error);
+      }
+    }
     
     const conversationHistory = [...conversation, { role: 'user', text: userResponse }];
     const prompt = createPromptFromConversation(conversationHistory, 'response');
@@ -205,6 +271,42 @@ export function useConversationManager(interview, isMicMuted) {
     stopSpeechRecognition();
     stopSpeaking();
     clearTimeout(silenceTimerRef.current);
+    
+    // Return the conversation history for saving to the database
+    return conversation;
+  };
+  
+  const debugSaveAnswer = async (mockId, question, answer, userEmail) => {
+    try {
+      console.log("DEBUG: Saving answer to database");
+      console.log("- mockId:", mockId);
+      console.log("- question:", question?.substring(0, 50));
+      console.log("- answer:", answer?.substring(0, 50));
+      console.log("- userEmail:", userEmail);
+      
+      const result = await db.insert(UserAnswer).values({
+        mockIdRef: mockId,
+        question: question || "No question recorded",
+        userAns: answer || "No answer recorded",
+        userEmail: userEmail || "",
+        createdAt: new Date().toISOString()
+      });
+      
+      console.log("DEBUG: Save result:", result);
+      return true;
+    } catch (error) {
+      console.error("DEBUG: Error saving answer:", error);
+      return false;
+    }
+  };
+  
+  const forceProcessResponse = () => {
+    console.log("MANUAL: Forcing process of current response");
+    if (userResponseBufferRef.current.trim()) {
+      processUserResponse();
+    } else {
+      console.log("MANUAL: No response to process");
+    }
   };
   
   return {
@@ -217,6 +319,7 @@ export function useConversationManager(interview, isMicMuted) {
     speechError,
     startConversation,
     endConversation,
-    questionCounter
+    questionCounter,
+    forceProcessResponse
   };
 } 

@@ -11,6 +11,9 @@ import AudioVisualizer from './AudioVisualizer';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { db } from '@/utils/db';
+import { UserAnswer } from '@/utils/schema';
+import { eq, sql } from 'drizzle-orm';
 
 // This function safely checks for client-side environment and handles permissions better
 function safelyAccessCamera(video = true) {
@@ -66,6 +69,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     error: engineError,
     startConversation,
     endConversation,
+    forceProcessResponse,
   } = useInterviewEngine(interview, isMicMuted, voiceSpeed, useNaturalSpeech);
 
   const initializeMedia = async () => {
@@ -195,7 +199,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
 
   const endInterview = async () => {
     console.log("Ending interview");
-    
+  
     setIsInterviewActive(false);
     
     if (timerRef.current) {
@@ -203,6 +207,51 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       timerRef.current = null;
     }
     
+    // Get the conversation data directly
+    console.log("Conversation data at end:", conversation.length, "items");
+    
+    // Manually log all conversation items to debug
+    conversation.forEach((item, index) => {
+      console.log(`Item ${index}: role=${item.role}, text="${item.text.substring(0, 30)}..."`);
+    });
+    
+    // Make a copy of the conversation to avoid any state issues
+    const conversationCopy = [...conversation];
+    
+    // Manual extraction of Q&A pairs
+    let savedCount = 0;
+    let currentQuestion = "";
+    
+    // Process each item in conversation
+    for (let i = 0; i < conversationCopy.length; i++) {
+      const item = conversationCopy[i];
+      
+      if (item.role === 'ai') {
+        // This is a question or response from the AI
+        currentQuestion = item.text;
+        console.log(`Found AI question: "${currentQuestion.substring(0, 30)}..."`);
+      } else if (item.role === 'user' && currentQuestion && item.text) {
+        // This is a user answer to the previous AI question
+        console.log(`Found user answer: "${item.text.substring(0, 30)}..."`);
+        try {
+          await db.insert(UserAnswer).values({
+            mockIdRef: interview.mockId,
+            question: currentQuestion,
+            userAns: item.text,
+            userEmail: interview.createdBy || "",
+            createdAt: new Date().toISOString()
+          });
+          savedCount++;
+          console.log(`Saved Q&A pair #${savedCount}`);
+        } catch (error) {
+          console.error("Error saving conversation item:", error);
+        }
+      }
+    }
+    
+    console.log(`Saved ${savedCount} Q&A pairs to database`);
+    
+    // End the conversation and stop media
     endConversation();
     
     if (cameraStream) {
@@ -210,7 +259,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       setCameraStream(null);
     }
 
-    // New: Trigger analysis and then redirect
+    // Trigger analysis and then redirect
     setIsAnalyzing(true);
     try {
       console.log("Starting interview analysis...");
@@ -231,8 +280,6 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
 
     } catch (error) {
       console.error("Error during analysis:", error);
-      // Optionally, show an error message to the user
-      // For now, we'll still redirect to the feedback page, which will show 'no feedback'
       router.push(`/dashboard/interview/${interview.mockId}/feedback`);
     } finally {
       setIsAnalyzing(false);
@@ -302,7 +349,6 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       // Set up a new interval for countdown
       timerRef.current = setInterval(() => {
         setRemainingTime(prev => {
-          console.log("Timer tick, remaining time:", prev - 1);
           
           // When time is up, end the interview
           if (prev <= 1) {

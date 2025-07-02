@@ -231,9 +231,11 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     setCurrentUserResponse('');
     if (!userResponse) return;
 
-    // Update conversation with user response
-    const newConversation = [...conversation, { role: 'user', text: userResponse }];
-    setConversation(newConversation);
+    // Update conversation with user response - USING FUNCTION UPDATER
+    setConversation(prevConversation => [...prevConversation, { role: 'user', text: userResponse }]);
+
+    // Get the latest conversation (this is important)
+    const updatedConversation = [...conversation, { role: 'user', text: userResponse }];
 
     // Extract potential topics from response for tracking
     const newTopics = userResponse
@@ -244,11 +246,12 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     setCoveredTopics(prev => [...new Set([...prev, ...newTopics])]);
 
     // Generate AI response
-    const prompt = createPrompt(newConversation, 'response');
+    const prompt = createPrompt(updatedConversation, 'response');
     const aiResponseText = await generateAIResponse(prompt);
     
     if (aiResponseText) {
-      setConversation(prev => [...prev, { role: 'ai', text: aiResponseText }]);
+      // Use function updater to ensure we're working with the latest state
+      setConversation(prevConversation => [...prevConversation, { role: 'ai', text: aiResponseText }]);
       
       // If the AI is asking a question, increment the counter
       if (aiResponseText.includes('?')) {
@@ -478,7 +481,12 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     const initialPrompt = createPrompt([], 'greeting');
     const aiResponseText = await generateAIResponse(initialPrompt);
     if (aiResponseText) {
-      setConversation([{ role: 'ai', text: aiResponseText }]);
+      // Use a function updater to ensure we're always working with the latest state
+      setConversation(prevConversation => 
+        prevConversation.length === 0 
+          ? [{ role: 'ai', text: aiResponseText }] 
+          : [...prevConversation, { role: 'ai', text: aiResponseText }]
+      );
       await speakText(aiResponseText);
     }
   }, [setupSpeechRecognition, createPrompt, generateAIResponse, speakText]);
@@ -496,6 +504,22 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     };
   }, [shutdownEngine]); // Dependency array ensures this is stable
 
+  // Function to manually trigger response processing
+  const forceProcessResponse = useCallback(() => {
+    console.log("Manual trigger of response processing");
+    if (userResponseBufferRef.current.trim()) {
+      console.log("Processing user response:", userResponseBufferRef.current.substring(0, 50));
+      processUserResponse();
+    } else if (currentUserResponse.trim()) {
+      // If the buffer is empty but we have a response in the UI, use that
+      console.log("Using current user response as backup:", currentUserResponse.substring(0, 50));
+      userResponseBufferRef.current = currentUserResponse.trim();
+      processUserResponse();
+    } else {
+      console.log("No user response to process");
+    }
+  }, [processUserResponse, currentUserResponse]);
+
   return {
     conversation,
     isAISpeaking,
@@ -506,5 +530,6 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     error,
     startConversation,
     endConversation,
+    forceProcessResponse
   };
 } 
