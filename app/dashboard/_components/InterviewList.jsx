@@ -17,7 +17,7 @@ function InterviewList({ interviews = [], limit = null }) {
         </div>
         {interviews.length > 0 && limit && (
           <Link 
-            href="/dashboard/history"
+            href="/dashboard/interview-history"
             className="text-xs text-slate-400 hover:text-white transition-colors"
           >
             View all
@@ -44,7 +44,7 @@ function InterviewList({ interviews = [], limit = null }) {
       {limit && interviews.length > limit && (
         <div className="mt-6 text-center">
           <Link 
-            href="/dashboard/history" 
+            href="/dashboard/interview-history" 
             className="inline-flex items-center px-4 py-2 bg-slate-700/50 hover:bg-slate-700 text-slate-200 rounded-full text-sm font-medium group transition-all"
           >
             View all {interviews.length} interviews
