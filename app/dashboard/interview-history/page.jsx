@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, Award, BookOpen } from 'lucide-react';
+import { Clock, Award, BookOpen, ArrowLeft, History } from 'lucide-react';
+import Link from 'next/link';
 
 export default function InterviewHistory() {
   const [interviews, setInterviews] = useState([]);
@@ -42,8 +43,13 @@ export default function InterviewHistory() {
   
   if (loading) {
     return (
-      <div className="p-10 bg-gray-900 text-white min-h-screen">
-        <h2 className="font-bold text-3xl mb-4">Interview History</h2>
+      <div className="p-10 bg-[#0d1526] text-white min-h-screen">
+        <div className="flex items-center gap-2 mb-6">
+          <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="text-3xl font-bold">Interview History</h1>
+        </div>
         <p className="text-gray-300">Loading your past interviews...</p>
       </div>
     );
@@ -51,68 +57,90 @@ export default function InterviewHistory() {
 
   if (error) {
     return (
-      <div className="p-10 bg-gray-900 text-white min-h-screen">
-        <h2 className="font-bold text-3xl mb-4">Interview History</h2>
+      <div className="p-10 bg-[#0d1526] text-white min-h-screen">
+        <div className="flex items-center gap-2 mb-6">
+          <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="text-3xl font-bold">Interview History</h1>
+        </div>
         <p className="text-red-400">Error: {error}</p>
       </div>
     );
   }
 
   return (
-    <div className="p-10 bg-gray-900 text-white min-h-screen">
-      <h2 className="font-bold text-3xl mb-4">Interview History</h2>
-      <p className="text-gray-300 mb-8">Review your past interviews and see your feedback.</p>
+    <div className="p-10 bg-[#0d1526] text-white min-h-screen">
+      <div className="flex items-center gap-2 mb-4">
+        <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors">
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+        <h1 className="text-3xl font-bold">Interview History</h1>
+      </div>
+      <p className="text-gray-400 mb-8">View all your previous interviews and their feedback.</p>
       
-      <div className="space-y-6">
-        {interviews.length > 0 ? (
-          interviews.map((interview) => (
-            <div key={interview.id} className="bg-gray-800 p-6 rounded-lg shadow-md border border-gray-700 hover:border-blue-500 transition-all">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <h3 className="text-xl font-semibold text-white">{interview.jobPosition}</h3>
-                  <p className="text-gray-400 mt-1">
-                    Conducted on: {new Date(interview.createdAt).toLocaleDateString()}
-                  </p>
+      {/* Replace white container with dark container */}
+      <div className="bg-[#111827] p-6 rounded-xl shadow-none">
+        <div className="flex items-center mb-6">
+          <History className="h-5 w-5 text-gray-400 mr-2" />
+          <h2 className="text-xl font-semibold text-white">Recent Interviews</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {interviews.length > 0 ? (
+            interviews.map((interview) => (
+              <div 
+                key={interview.id} 
+                className="bg-[#1a2234] p-6 rounded-lg border border-[#2c3648] hover:border-blue-500 transition-all"
+              >
+                <h3 className="text-xl font-semibold text-white mb-1">{interview.jobPosition}</h3>
+                
+                <div className="flex items-center text-gray-400 mb-3">
+                  <span className="text-sm">
+                    {new Date(interview.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center text-gray-300">
+                    <Clock className="h-4 w-4 mr-2 text-blue-400" />
+                    <span className="text-sm">Duration: {interview.duration || 15} min</span>
+                  </div>
                   
-                  <div className="flex flex-wrap gap-4 mt-4">
-                    <div className="flex items-center text-gray-300">
-                      <Clock className="h-4 w-4 mr-2 text-blue-400" />
-                      <span>Duration: {interview.duration || 15} minutes</span>
-                    </div>
-                    
-                    {interview.report ? (
-                      <div className="flex items-center text-gray-300">
+                  <div className="flex items-center text-gray-300">
+                    {interview.report && interview.report.overallScore ? (
+                      <>
                         <Award className="h-4 w-4 mr-2 text-green-400" />
-                        <span>Score: {interview.report.overallScore || 'N/A'}/100</span>
-                      </div>
+                        <span className="text-sm">Score: {interview.report.overallScore}/100</span>
+                      </>
                     ) : (
-                      <div className="flex items-center text-gray-400">
-                        <Award className="h-4 w-4 mr-2" />
-                        <span>Score: Pending</span>
-                      </div>
+                      <>
+                        <Award className="h-4 w-4 mr-2 text-gray-500" />
+                        <span className="text-sm text-gray-500">No Score</span>
+                      </>
                     )}
-                    
-                    <div className="flex items-center text-gray-300">
-                      <BookOpen className="h-4 w-4 mr-2 text-purple-400" />
-                      <span>Focus: {interview.focus || 'Balanced'}</span>
-                    </div>
+                  </div>
+                  
+                  <div className="flex items-center text-gray-300">
+                    <BookOpen className="h-4 w-4 mr-2 text-purple-400" />
+                    <span className="text-sm">Focus: {interview.focus || 'Behavioral'}</span>
                   </div>
                 </div>
                 
                 <button
                   onClick={() => handleViewFeedback(interview.mockId)}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
+                  className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                 >
                   View Feedback
                 </button>
               </div>
+            ))
+          ) : (
+            <div className="col-span-full bg-[#1a2234] p-8 rounded-lg border border-[#2c3648] text-center">
+              <p className="text-gray-300">You have not completed any interviews yet.</p>
             </div>
-          ))
-        ) : (
-          <div className="bg-gray-800 p-8 rounded-lg border border-gray-700 text-center">
-            <p className="text-gray-300">You have not completed any interviews yet.</p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

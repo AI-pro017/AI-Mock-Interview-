@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import timezones from "@/lib/timezones"; // We will create this file next
+import timezones from "@/lib/timezones";
+import { User } from 'lucide-react';
 
 export default function ProfileForm({ user }) {
   const [formData, setFormData] = useState({
@@ -62,47 +62,65 @@ export default function ProfileForm({ user }) {
   };
 
   return (
-    <Card>
+    <div className="bg-slate-800/50 rounded-xl p-6 ring-1 ring-white/10">
       <form onSubmit={handleSubmit}>
-        <CardHeader>
-          <CardTitle>Personal & Professional Details</CardTitle>
-          <CardDescription>Update your information to get tailored interview questions.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+        <div className="flex items-center mb-4">
+          <User className="h-5 w-5 text-slate-400 mr-2" />
+          <h2 className="text-xl font-semibold text-white">Personal & Professional Details</h2>
+        </div>
+        <p className="text-sm text-slate-400 mb-6">
+          Update your information to get tailored interview questions.
+        </p>
+        
+        <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input id="name" name="name" value={formData.name} onChange={handleChange} required />
+              <Label htmlFor="name" className="text-slate-300">Full Name</Label>
+              <Input 
+                id="name" 
+                name="name" 
+                value={formData.name} 
+                onChange={handleChange} 
+                required 
+                className="bg-slate-900/50 border-slate-700 text-white"
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" value={formData.email} disabled />
-              <p className="text-xs text-muted-foreground">Email cannot be changed.</p>
+              <Label htmlFor="email" className="text-slate-300">Email</Label>
+              <Input 
+                id="email" 
+                name="email" 
+                type="email" 
+                value={formData.email} 
+                disabled 
+                className="bg-slate-900/50 border-slate-700 text-white opacity-70"
+              />
+              <p className="text-xs text-slate-500">Email cannot be changed.</p>
             </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="experienceLevel">Experience Level</Label>
+              <Label htmlFor="experienceLevel" className="text-slate-300">Experience Level</Label>
               <select
                 id="experienceLevel"
                 name="experienceLevel"
                 value={formData.experienceLevel}
                 onChange={handleChange}
-                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-10 w-full items-center justify-between rounded-md border border-slate-700 bg-slate-900/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-slate-500"
               >
                 <option value="" disabled>Select your experience</option>
                 {experienceLevels.map(level => <option key={level} value={level}>{level}</option>)}
               </select>
             </div>
-             <div className="space-y-2">
-              <Label htmlFor="timezone">Timezone</Label>
+            <div className="space-y-2">
+              <Label htmlFor="timezone" className="text-slate-300">Timezone</Label>
               <select
                 id="timezone"
                 name="timezone"
                 value={formData.timezone}
                 onChange={handleChange}
-                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-10 w-full items-center justify-between rounded-md border border-slate-700 bg-slate-900/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-slate-500"
               >
                 <option value="" disabled>Select your timezone</option>
                 {timezones.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
@@ -111,23 +129,29 @@ export default function ProfileForm({ user }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="targetRoles">Target Roles</Label>
+            <Label htmlFor="targetRoles" className="text-slate-300">Target Roles</Label>
             <Textarea
               id="targetRoles"
               name="targetRoles"
               value={formData.targetRoles}
               onChange={handleChange}
               placeholder="e.g., Frontend Developer, Product Manager, Data Scientist"
+              className="bg-slate-900/50 border-slate-700 text-white min-h-[80px]"
             />
-             <p className="text-xs text-muted-foreground">Enter roles separated by commas.</p>
+            <p className="text-xs text-slate-500">Enter roles separated by commas.</p>
           </div>
-        </CardContent>
-        <CardFooter>
-          <Button type="submit" disabled={loading}>
+        </div>
+        
+        <div className="mt-6">
+          <Button 
+            type="submit" 
+            disabled={loading}
+            className="w-full py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium transition-colors duration-200"
+          >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>
-        </CardFooter>
+        </div>
       </form>
-    </Card>
+    </div>
   );
 } 

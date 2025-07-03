@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -47,37 +46,46 @@ const Sidebar = () => {
     },
   ];
 
-  const activeMenu = menuList.find((item) => item.path === pathname);
+  // Improved matching logic that prevents partial matches
+  const isActive = (itemPath) => {
+    // Exact match for the dashboard path
+    if (itemPath === '/dashboard') {
+      return pathname === '/dashboard';
+    }
+    
+    // For other items, we need to ensure we don't match substrings
+    if (pathname.startsWith(itemPath)) {
+      if (pathname === itemPath) {
+        return true;
+      }
+      
+      const nextChar = pathname.charAt(itemPath.length);
+      return nextChar === '/' || nextChar === '';
+    }
+    
+    return false;
+  };
 
   return (
-    <div className="hidden md:block h-screen w-64 bg-[#111827] fixed left-0 top-0 text-white">
-      <div className="p-4 flex items-center gap-3 border-b border-gray-700">
-        <Image
-          src="/favicon.jpg"
-          alt="logo"
-          width={40}
-          height={40}
-          className="rounded-md"
-        />
-        {activeMenu && (
-          <h2 className="font-bold text-lg">{activeMenu.name}</h2>
-        )}
-      </div>
-      <div className="p-4">
-        {menuList.map((item) => (
-          <Link href={item.path} key={item.id}>
-            <div
-              className={`flex items-center gap-3 p-3 mb-2 rounded-lg cursor-pointer transition-all
-              ${pathname === item.path 
-                ? 'bg-gray-700 text-white' 
-                : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-              }`}
-            >
-              <item.icon className="h-5 w-5" />
-              <span className="font-medium">{item.name}</span>
-            </div>
-          </Link>
-        ))}
+    <div className="hidden md:block h-screen fixed left-0 top-[65px] w-64 text-white bg-[#0d1526] border-r border-[#1e293b]">
+      <div className="py-8">
+        {/* Menu items */}
+        <div className="px-4">
+          {menuList.map((item) => (
+            <Link href={item.path} key={item.id}>
+              <div
+                className={`flex items-center justify-start gap-3 p-3 mb-2 px-4 rounded-lg cursor-pointer transition-all
+                ${isActive(item.path) 
+                  ? 'bg-gray-700 text-white' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                }`}
+              >
+                <item.icon className="h-6 w-6 flex-shrink-0" />
+                <span className="font-medium">{item.name}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );
