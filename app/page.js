@@ -95,13 +95,14 @@ export default function Home() {
             </a>
           </div>
           <div className="hidden lg:mt-0 lg:col-span-5 lg:flex">
-             <Image 
+            <Image 
               src="/ai-interview-hero.png"
               alt="AI mock interview illustration"
               width={1000}
               height={720}
               className="rounded-lg"
-             />
+              style={{ color: 'transparent', visibility: 'visible' }}
+            />
           </div>
           </div>
         </section>
@@ -172,7 +173,14 @@ export default function Home() {
                 <div key={index} className="p-8 bg-gray-50 rounded-xl shadow-md">
                   <p className="text-gray-600 italic">"{testimonial.quote}"</p>
                   <div className="mt-4 flex items-center">
-                    <Image src={testimonial.avatar} alt={testimonial.name} width={48} height={48} className="rounded-full" />
+                    <Image 
+                      src={testimonial.avatar} 
+                      alt={testimonial.name} 
+                      width={48} 
+                      height={48} 
+                      className="rounded-full" 
+                      style={{ color: 'transparent', visibility: 'visible' }}
+                    />
                     <div className="ml-4">
                       <p className="font-semibold text-gray-900">{testimonial.name}</p>
                       <p className="text-gray-500">{testimonial.role}</p>

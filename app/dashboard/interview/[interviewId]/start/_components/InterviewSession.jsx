@@ -13,11 +13,13 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { db } from '@/utils/db';
 import { UserAnswer } from '@/utils/schema';
+import { getRandomInterviewer, getInterviewerByGender, getInterviewerByIndustry } from '@/utils/interviewerProfiles';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function InterviewSession({ interview, useCameraInInterview }) {
   const router = useRouter();
   const [isInterviewActive, setIsInterviewActive] = useState(false);
-  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [isMicMuted, setIsMicMuted] = useState(true);
   const [remainingTime, setRemainingTime] = useState(interview.duration * 60);
   const [cameraStream, setCameraStream] = useState(null);
   const [mediaError, setMediaError] = useState(null);
@@ -26,9 +28,23 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const [voiceSpeed, setVoiceSpeed] = useState(1.0);
   const [useNaturalSpeech, setUseNaturalSpeech] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(useCameraInInterview);
+  const [interviewerGender, setInterviewerGender] = useState("random");
+  const [interviewerIndustry, setInterviewerIndustry] = useState("random");
 
   const timerRef = useRef(null);
   const videoRef = useRef(null);
+
+  const getAppropriateInterviewer = () => {
+    if (interviewerIndustry !== "random") {
+      return getInterviewerByIndustry(interviewerIndustry);
+    }
+    
+    if (interviewerGender !== "random") {
+      return getInterviewerByGender(interviewerGender);
+    }
+    
+    return getRandomInterviewer();
+  };
 
   const {
     conversation,
@@ -42,8 +58,10 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     endConversation,
     forceProcessResponse,
     isGenerating,
-    isInitialTTSLoading
-  } = useInterviewEngine(interview, isMicMuted, voiceSpeed, useNaturalSpeech);
+    isInitialTTSLoading,
+    interviewer,
+    shouldUnmute
+  } = useInterviewEngine(interview, isMicMuted, voiceSpeed, useNaturalSpeech, getAppropriateInterviewer, setIsMicMuted);
 
   // Initialize media with proper camera control
   const initializeMedia = async () => {
@@ -93,6 +111,13 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       // Store the stream
       setCameraStream(stream);
       
+      // Ensure audio tracks are muted if not in an active interview
+      if (!isInterviewActive) {
+        audioTracks.forEach(track => {
+          track.enabled = false;
+        });
+      }
+      
       // Connect stream to video element if we have video tracks and camera is enabled
       if (videoRef.current && videoTracks.length > 0 && cameraEnabled) {
         videoRef.current.srcObject = stream;
@@ -112,11 +137,25 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   };
 
   const startInterview = async () => {
+    // Get the interviewer before starting
+    const selectedInterviewer = getAppropriateInterviewer();
+    console.log("Starting interview with interviewer:", selectedInterviewer.name);
+    
     const mediaStream = await initializeMedia();
     if (mediaStream) {
       setRemainingTime(interview.duration * 60);
       setIsInterviewActive(true);
-      startConversation(mediaStream);
+      
+      // Only unmute mic when starting the interview if it should be unmuted
+      if (!isMicMuted) {
+        const audioTracks = mediaStream.getAudioTracks();
+        audioTracks.forEach(track => {
+          track.enabled = true;
+        });
+      }
+      
+      // Pass the selected interviewer directly
+      startConversation(mediaStream, selectedInterviewer);
     }
   };
 
@@ -266,6 +305,12 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   };
 
   const toggleMicrophone = () => {
+    // Don't allow unmuting before the interview starts
+    if (!isInterviewActive && isMicMuted) {
+      console.log("Cannot unmute before interview starts");
+      return;
+    }
+    
     const newMuteState = !isMicMuted;
     setIsMicMuted(newMuteState);
     
@@ -307,6 +352,13 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       .replace(/([a-z])([A-Z])/g, "$1 $2") // Add space between words incorrectly joined
       .replace(/\s+/g, " "); // Remove extra spaces
   };
+
+  // Add an effect to handle the shouldUnmute flag
+  useEffect(() => {
+    if (shouldUnmute && isMicMuted) {
+      toggleMicrophone(); // This will unmute
+    }
+  }, [shouldUnmute, isMicMuted]);
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -381,24 +433,41 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
               <div className="mt-2">
                 <div className="flex items-center justify-between mb-2">
                   <div className="font-medium">Voice Input</div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={toggleMicrophone}
-                    className="flex items-center gap-1"
-                  >
-                    {isMicMuted ? (
-                      <>
-                        <MicOff className="h-4 w-4" />
-                        <span>Unmute</span>
-                      </>
-                    ) : (
-                      <>
-                        <Mic className="h-4 w-4" />
-                        <span>Mute</span>
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex items-center justify-between gap-2">
+                    <Button
+                      onClick={toggleMicrophone}
+                      variant={isMicMuted ? "destructive" : "default"}
+                      className="flex items-center gap-1"
+                      disabled={isAISpeaking || isInitialTTSLoading || (isGenerating && !isAISpeaking) || (!isInterviewActive && isMicMuted)}
+                    >
+                      {isMicMuted ? (
+                        <>
+                          <MicOff className="w-4 h-4" /> {isInterviewActive ? "Unmute" : "Disabled until interview starts"}
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-4 h-4" /> {isListening ? "Mute" : "Disabled"}
+                        </>
+                      )}
+                    </Button>
+                    
+                    {/* Clear indicator of mic status */}
+                    <div className="text-sm">
+                      {!isInterviewActive && isMicMuted ? (
+                        <span className="text-amber-500">Microphone disabled until interview starts</span>
+                      ) : isInitialTTSLoading ? (
+                        <span className="text-amber-500">Microphone disabled during interview loading</span>
+                      ) : isGenerating && !isAISpeaking ? (
+                        <span className="text-amber-500">Microphone disabled while loading voice</span>
+                      ) : isAISpeaking ? (
+                        <span className="text-amber-500">Microphone disabled while AI is speaking</span>
+                      ) : isListening ? (
+                        <span className="text-green-500">Microphone active - speak now</span>
+                      ) : (
+                        <span className="text-gray-500">Microphone inactive</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div className="h-16 bg-gray-100 rounded-md overflow-hidden">
                   <AudioVisualizer 
@@ -470,6 +539,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
         interimTranscript={debouncedInterimTranscript}
         isGenerating={isGenerating}
         isInitialTTSLoading={isInitialTTSLoading}
+        interviewer={interviewer}
       />
 
       {/* Show loading or error messages if present */}
@@ -524,7 +594,15 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
 }
 
 // Add this component to the same file or create a new file for it
-function ConversationDisplayWithAutoScroll({ conversation, isAISpeaking, isUserSpeaking, interimTranscript, isGenerating, isInitialTTSLoading }) {
+function ConversationDisplayWithAutoScroll({ 
+  conversation, 
+  isAISpeaking, 
+  isUserSpeaking, 
+  interimTranscript, 
+  isGenerating, 
+  isInitialTTSLoading,
+  interviewer
+}) {
   const scrollContainerRef = useRef(null);
   
   // Auto-scroll to bottom when conversation changes
@@ -542,11 +620,21 @@ function ConversationDisplayWithAutoScroll({ conversation, isAISpeaking, isUserS
       style={{ maxHeight: 'calc(100vh - 350px)' }}
     >
       <div className="p-4">
+        {/* Display interviewer info at the beginning when no conversation yet */}
+        {interviewer && conversation.length === 0 && !isAISpeaking && !isInitialTTSLoading && (
+          <div className="mb-4 p-4 rounded-lg bg-blue-50">
+            <div className="font-medium mb-1">Your Interviewer</div>
+            <p className="text-sm text-blue-800">
+              {interviewer.name}, {interviewer.title} at {interviewer.company}
+            </p>
+          </div>
+        )}
+        
         {/* If we're loading TTS and there's no conversation yet, show loading indicator */}
         {isInitialTTSLoading && conversation.length === 0 && (
           <div className="text-center p-8">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-lg font-medium">Preparing interview...</p>
+            <p className="text-lg font-medium">Loading interview...</p>
           </div>
         )}
         

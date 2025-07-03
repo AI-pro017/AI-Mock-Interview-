@@ -1,21 +1,24 @@
 "use client";
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAIResponse } from './useAIResponse';
 import { useSpeechRecognition } from './useSpeechRecognition';
 import { db } from '@/utils/db';
 import { UserAnswer } from '@/utils/schema';
+import { getRandomInterviewer } from '@/utils/interviewerProfiles';
 
-export function useConversationManager(interview, isMicMuted) {
+export function useConversationManager(interview, isMicMuted, getInterviewerFn = getRandomInterviewer) {
   const [conversation, setConversation] = useState([]);
   const [currentUserResponse, setCurrentUserResponse] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const [questionCounter, setQuestionCounter] = useState(0); // Track question count
   const [questionTopics, setQuestionTopics] = useState([]); // Track covered topics
+  const [interviewer, setInterviewer] = useState(() => getInterviewerFn());
   
   const userResponseBufferRef = useRef('');
   const silenceTimerRef = useRef(null);
+  const processUserResponseRef = useRef(null); // Add this ref to break the circular dependency
   
   // Set up AI response generation
   const { 
@@ -40,13 +43,13 @@ export function useConversationManager(interview, isMicMuted) {
     console.log("SPEECH FLOW: Speech ended");
     silenceTimerRef.current = setTimeout(() => {
       console.log("SPEECH FLOW: Silence timeout - buffer:", userResponseBufferRef.current.length > 0 ? "HAS CONTENT" : "EMPTY");
-      if (userResponseBufferRef.current.trim()) {
-        processUserResponse();
+      if (userResponseBufferRef.current.trim() && processUserResponseRef.current) {
+        processUserResponseRef.current(); // Use the ref instead of direct function call
       } else {
         setIsUserSpeaking(false);
       }
     }, 1500);
-  }, [processUserResponse]);
+  }, []);  // Remove processUserResponse from dependencies
   
   // Handle transcript updates
   const handleTranscriptUpdate = useCallback((transcript, isFinal) => {
@@ -152,7 +155,7 @@ export function useConversationManager(interview, isMicMuted) {
     
     const conversationHistory = [...conversation, { role: 'user', text: userResponse }];
     const prompt = createPromptFromConversation(conversationHistory, 'response');
-    const aiResponse = await generateAndSpeak(prompt, interview);
+    const aiResponse = await generateAndSpeak(prompt, interview, interviewer);
     
     if (aiResponse) {
       setConversation(prev => [...prev, { role: 'ai', text: aiResponse }]);
@@ -166,7 +169,12 @@ export function useConversationManager(interview, isMicMuted) {
     userResponseBufferRef.current = '';
     setCurrentUserResponse('');
     setIsUserSpeaking(false);
-  }, [conversation, generateAndSpeak, interview, extractTopics]);
+  }, [conversation, generateAndSpeak, interview, extractTopics, interviewer]);
+  
+  // Update the ref whenever processUserResponse changes
+  useEffect(() => {
+    processUserResponseRef.current = processUserResponse;
+  }, [processUserResponse]);
   
   // Create a prompt from conversation history
   const createPromptFromConversation = (conversationHistory, type) => {
@@ -174,6 +182,9 @@ export function useConversationManager(interview, isMicMuted) {
       return `You are conducting a job interview for a ${interview.jobPosition} position. 
               The candidate has ${interview.jobExperience} years of experience. 
               ${interview.jobDesc ? `Job Description: ${interview.jobDesc}` : ''}
+              
+              Your name is ${interviewer.name} and you are a ${interviewer.title} at ${interviewer.company} ${interviewer.background}.
+              Your interview style is ${interviewer.style}.
               
               Start by introducing yourself briefly as the interviewer for ${interview.jobPosition}.
               Give a warm, professional welcome and then ask your first question.
@@ -183,7 +194,9 @@ export function useConversationManager(interview, isMicMuted) {
               
               Keep it natural and conversational, as if you're speaking to them in person.
               This is a real-time conversation where the candidate might interrupt you,
-              so keep your responses relatively brief and engaging.`;
+              so keep your responses relatively brief and engaging.
+              
+              IMPORTANT: DO NOT use placeholder text - your name is ${interviewer.name}.`;
     }
     
     // Format conversation history
@@ -222,6 +235,8 @@ export function useConversationManager(interview, isMicMuted) {
     return `The following is a real-time interview conversation between you (the interviewer) and a candidate:
             ${formattedHistory}
             
+            You are ${interviewer.name}, a ${interviewer.title} at ${interviewer.company} ${interviewer.background}.
+            Your interview style is ${interviewer.style}.
             You are interviewing for a ${interview.jobPosition} position with a ${interview.interviewStyle} style 
             and focus on ${interview.focus}.
             ${interview.jobDesc ? `Job Description: ${interview.jobDesc}` : ''}
@@ -239,20 +254,29 @@ export function useConversationManager(interview, isMicMuted) {
   };
   
   // Start interview with greeting
-  const startConversation = async (audioStream) => {
+  const startConversation = async (audioStream, selectedInterviewer = null) => {
+    // If a specific interviewer is passed, use it; otherwise keep the existing one
+    if (selectedInterviewer) {
+      console.log("Setting interviewer from selection:", selectedInterviewer.name);
+      setInterviewer(selectedInterviewer);
+    }
+    
     // Start continuous speech recognition
     startSpeechRecognition(audioStream);
     
-    // Generate initial AI greeting
-    const prompt = createPromptFromConversation([], 'greeting');
-    const aiResponse = await generateAndSpeak(prompt, interview);
-    
-    if (aiResponse) {
-      setConversation([{ role: 'ai', text: aiResponse }]);
-      if (aiResponse.includes('?')) {
-        setQuestionCounter(1); // Initialize with first question
+    // Use a small timeout to ensure interviewer state is updated
+    setTimeout(async () => {
+      // Generate initial AI greeting
+      const prompt = createPromptFromConversation([], 'greeting');
+      const aiResponse = await generateAndSpeak(prompt, interview, selectedInterviewer || interviewer);
+      
+      if (aiResponse) {
+        setConversation([{ role: 'ai', text: aiResponse }]);
+        if (aiResponse.includes('?')) {
+          setQuestionCounter(1); // Initialize with first question
+        }
       }
-    }
+    }, 50);
   };
   
   // Set up speech recognition with callbacks
@@ -322,6 +346,7 @@ export function useConversationManager(interview, isMicMuted) {
     startConversation,
     endConversation,
     questionCounter,
-    forceProcessResponse
+    forceProcessResponse,
+    interviewer
   };
 } 

@@ -1,15 +1,57 @@
 import { NextResponse } from 'next/server';
 
+// Define voice IDs for different genders with expanded options
+// These are ElevenLabs voice IDs - you may need to verify these with your account
+const VOICE_IDS = {
+  male: [
+    "ZthjuvLPty3kTMaNKVKb", // Antoni - male voice
+    "Bj9UqZbhQsanLzgalpEG", // Adam - male voice
+    "EiNlNiXeDU1pqqOPrYMO", // Sam - male voice
+    "IRHApOXLvnW57QJPQH2P", // Josh - male voice
+    "kmSVBPu7loj4ayNinwWM", // Patrick - male voice
+    "qAZH0aMXY8tw1QufPN0D", // Thomas - male voice
+    "Ix8C14HEHgIQkJswik2o", // Ethan - male voice
+    "GROMoQXjD2D16z0prfB1", // Marcus - male voice
+    "3SF4rB1fGBMXU9xRM7pz", // Daniel - male voice
+    "gUABw7pXQjhjt0kNFBTF", // James - male voice
+    "scOwDtmlUjD3prqpp97I", // Michael - male voice
+    "UQoLnPXvf18gaKpLzfb8", // David - male voice
+  ],
+  female: [
+    "Z3R5wn05IrDiVCyEkUrK", // Rachel - female voice
+    "ecp3DWciuUyW7BYM7II1", // Bella - female voice
+    "yj30vwTGJxSHezdAGsv9", // Elli - female voice
+    "BpjGufoPiobT79j2vtj4", // Domi - female voice
+    "XW70ikSsadUbinwLMZ5w", // Ava - female voice
+    "BZgkqPqms7Kj9ulSkVzn", // Grace - female voice
+    "ZtcPZrt9K4w8e1OB9M6w", // Emily - female voice
+    "yhFUAoS32gPDJFQHbH68", // Sophie - female voice
+    "eBvoGh8YGJn1xokno71w", // Anna - female voice
+    "iBo5PWT1qLiEyqhM7TrG", // Lily - female voice
+    "SaqYcK3ZpDKBAImA8AdW", // Jessica - female voice
+    "EQu48Nbp4OqDxsnYh27f", // Olivia - female voice
+  ]
+};
+
 export async function POST(req) {
   console.log("Text-to-speech API called");
   
   try {
     // Parse the request body
     const body = await req.json();
-    const { text, speed } = body;
+    const { 
+      text, 
+      speed, 
+      naturalSpeech = true, 
+      gender = 'female', 
+      voiceId = null,
+      selectNewVoice = false
+    } = body;
     
     console.log("Text to convert:", text?.substring(0, 50) + "...");
     console.log("Voice speed:", speed || "default (1.0)");
+    console.log("Natural speech:", naturalSpeech ? "enabled" : "disabled");
+    console.log("Gender requested:", gender);
 
     if (!text) {
       console.log("No text provided");
@@ -26,82 +68,93 @@ export async function POST(req) {
       }, { status: 500 });
     }
 
-    // Process text to add natural speech patterns
-    const processedText = addNaturalSpeechPatterns(text);
-    console.log("Processed text with natural pauses");
+    let selectedVoiceId = voiceId;
+    
+    // Select a new voice ID if requested or if none is provided
+    if (!selectedVoiceId || selectNewVoice) {
+      if (gender === 'male' && VOICE_IDS.male.length > 0) {
+        const randomIndex = Math.floor(Math.random() * VOICE_IDS.male.length);
+        selectedVoiceId = VOICE_IDS.male[randomIndex];
+      } else {
+        const randomIndex = Math.floor(Math.random() * VOICE_IDS.female.length);
+        selectedVoiceId = VOICE_IDS.female[randomIndex];
+      }
+      console.log("Selected new voice ID:", selectedVoiceId);
+    } else {
+      console.log("Using provided voice ID:", selectedVoiceId);
+    }
+    
+    // Process text for natural speech patterns if enabled
+    let processedText = text;
+    if (naturalSpeech) {
+      processedText = addNaturalSpeechPatterns(text);
+    }
 
     console.log("Making direct request to ElevenLabs API");
     
-    // Make direct fetch request to ElevenLabs API
-    const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
+    // Call the ElevenLabs API
+    const elevenLabsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`, {
       method: 'POST',
       headers: {
-        'Accept': 'audio/mpeg',
         'Content-Type': 'application/json',
-        'xi-api-key': apiKey
+        'xi-api-key': apiKey,
       },
       body: JSON.stringify({
         text: processedText,
-        model_id: 'eleven_monolingual_v1',
+        model_id: "eleven_multilingual_v2",
         voice_settings: {
           stability: 0.5,
-          similarity_boost: 0.75
+          similarity_boost: 0.75,
+          style: 0.0,
+          speed: parseFloat(speed) || 1.0,
         }
-      })
+      }),
     });
 
-    console.log("ElevenLabs API response status:", response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("ElevenLabs API error:", errorText);
-      return NextResponse.json({ 
-        error: `ElevenLabs API returned ${response.status}`, 
-        details: errorText 
-      }, { status: response.status });
+    if (!elevenLabsResponse.ok) {
+      const errorText = await elevenLabsResponse.text();
+      return NextResponse.json(
+        { error: `ElevenLabs API error: ${errorText}` }, 
+        { status: elevenLabsResponse.status }
+      );
     }
 
-    // Get the audio buffer
-    const audioBuffer = await response.arrayBuffer();
-    console.log("Audio buffer received, size:", audioBuffer.byteLength, "bytes");
-
-    // Return the audio with correct MIME type
-    return new Response(audioBuffer, {
+    // Get the audio data as a blob/arrayBuffer
+    const audioData = await elevenLabsResponse.arrayBuffer();
+    
+    // Return the audio data directly as audio/mpeg
+    return new NextResponse(audioData, {
       headers: {
-        'Content-Type': 'audio/mpeg'
+        'Content-Type': 'audio/mpeg',
+        'x-voice-id': selectedVoiceId // Include the voice ID in a header
       }
     });
     
   } catch (error) {
     console.error("Text-to-speech error:", error);
-    return NextResponse.json({ 
-      error: 'Failed to generate audio', 
-      message: error.message,
-      stack: error.stack
-    }, { status: 500 });
+    return NextResponse.json(
+      { error: `Text-to-speech error: ${error.message}` }, 
+      { status: 500 }
+    );
   }
 }
 
-// Helper function to add natural speech patterns with pauses
+// Helper function to add natural speech patterns with pauses using ElevenLabs syntax
 function addNaturalSpeechPatterns(text) {
-  // Replace periods with a slightly longer pause (using SSML)
-  let processedText = text.replace(/\./g, '.<break time="500ms"/>');
+  // Instead of using SSML tags, use natural punctuation to create pauses
+  // ElevenLabs will automatically add appropriate pauses for punctuation
   
-  // Replace commas with a shorter pause
-  processedText = processedText.replace(/,/g, ',<break time="300ms"/>');
+  // Add more periods where longer pauses are needed (instead of SSML)
+  let processedText = text.replace(/\./g, '...');
   
-  // Add pauses after question marks
-  processedText = processedText.replace(/\?/g, '?<break time="600ms"/>');
+  // Add slight pauses with commas where needed
+  processedText = processedText.replace(/,/g, ', ');
   
-  // Add slight pauses between sentences when there are no punctuation marks
-  processedText = processedText.replace(/(\w+)(\s+)(\w+)/g, (match, word1, space, word2) => {
-    // Only add a pause occasionally to make it sound more natural
-    if (Math.random() < 0.1 && word1.length > 3 && word2.length > 3) {
-      return `${word1}<break time="150ms"/>${space}${word2}`;
-    }
-    return match;
-  });
+  // Add strong pause after question marks
+  processedText = processedText.replace(/\?/g, '?...');
   
-  // Wrap the text in SSML to enable breaks
-  return `<speak>${processedText}</speak>`;
+  // Do not use the <break> tags that are causing issues
+  // Do not wrap in <speak> tags
+  
+  return processedText;
 } 

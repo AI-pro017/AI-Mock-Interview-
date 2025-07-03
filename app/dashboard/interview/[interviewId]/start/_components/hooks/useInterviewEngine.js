@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useConversationManager } from './useConversationManager';
 
-export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useNaturalSpeech = true) {
+export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useNaturalSpeech = true, getInterviewerFn, setIsMicMutedExternal = null) {
   // --- STATE MANAGEMENT ---
   const [conversation, setConversation] = useState([]);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
@@ -17,6 +18,9 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
   const [coveredTopics, setCoveredTopics] = useState([]);
   const [isInitialTTSLoading, setIsInitialTTSLoading] = useState(false);
   const [displayedConversation, setDisplayedConversation] = useState([]);
+  const [interviewer, setInterviewer] = useState(getInterviewerFn ? getInterviewerFn() : null);
+  const [selectedVoiceId, setSelectedVoiceId] = useState(null);
+  const [isActiveInterview, setIsActiveInterview] = useState(false);
 
   // --- REFS ---
   const audioRef = useRef(new Audio());
@@ -28,6 +32,9 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
 
   // First, declare processUserResponse as a ref so it can be used before definition
   const processUserResponseRef = useRef(null);
+
+  // Track if we should unmute in a ref
+  const shouldUnmuteRef = useRef(false);
 
   // --- AI RESPONSE & SPEECH ---
   const generateAIResponse = useCallback(async (prompt) => {
@@ -41,7 +48,8 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
           prompt, 
           role: interview.jobPosition, 
           interviewStyle: interview.interviewStyle, 
-          focus: interview.focus 
+          focus: interview.focus,
+          interviewer: interviewer // Use the interviewer state
         }),
       });
       
@@ -55,18 +63,75 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     } finally {
       setIsGenerating(false);
     }
-  }, [interview]);
+  }, [interview, interviewer]); // Include interviewer in dependencies
   
-  const speakText = useCallback(async (text) => {
+  const shutdownSpeechRecognition = useCallback(() => {
+    console.log("COMPLETELY shutting down speech recognition");
+    
+    try {
+      if (recognitionRef.current) {
+        // Remove ALL event handlers to prevent any processing
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onstart = null;
+        
+        // Stop the recognition
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {
+          try {
+            recognitionRef.current.stop();
+          } catch (innerError) {
+            console.log("Could not stop recognition, but continuing cleanup");
+          }
+        }
+        
+        // Remove the reference completely
+        recognitionRef.current = null;
+      }
+      
+      // Clear all state and buffers
+      setIsListening(false);
+      userResponseBufferRef.current = '';
+      setCurrentUserResponse('');
+      setInterimTranscript('');
+      setIsUserSpeaking(false);
+      
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      
+      return true;
+    } catch (e) {
+      console.error("Error during speech recognition shutdown:", e);
+      setIsListening(false);
+      return false;
+    }
+  }, []);
+
+  const speakText = useCallback(async (text, gender = null, isFirstUtterance = false) => {
     if (!text || text.trim() === "") return;
 
-    // Set loading state for speech but don't set isAISpeaking yet
+    // Set loading state for speech
     setIsGenerating(true);
     setError(null);
+    
+    // IMPORTANT: Shut down speech recognition BEFORE AI starts speaking
+    shutdownSpeechRecognition();
+    
+    // Clear any pending user input when AI starts speaking
+    userResponseBufferRef.current = '';
+    setCurrentUserResponse('');
+    setInterimTranscript('');
     
     try {
       // Enhanced sanitization for TTS - fix "time equal sign" and other issues
       const sanitizedText = text
+        .replace(/<break[^>]*>/g, '')
+        .replace(/<speak>|<\/speak>/g, '')
+        .replace(/<[^>]*>/g, '')
         .replace(/(\d+)\s*ms/gi, "$1 milliseconds")
         .replace(/(\d+)\s*s\b/gi, "$1 seconds")
         // Fix time equal sign issues with more robust patterns
@@ -80,6 +145,11 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
         .trim();
       
       console.log("Starting text-to-speech for:", sanitizedText.substring(0, 30) + "...");
+      console.log("Using gender:", gender || interviewer?.gender || 'female');
+      console.log("Using voice ID:", selectedVoiceId || "None (will be selected)");
+      
+      // Use the interviewer's gender if none provided
+      const voiceGender = gender || interviewer?.gender || 'female';
       
       const response = await fetch('/api/text-to-speech', {
         method: 'POST',
@@ -87,86 +157,85 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
         body: JSON.stringify({ 
           text: sanitizedText,
           speed: voiceSpeed,
-          naturalSpeech: useNaturalSpeech
+          naturalSpeech: useNaturalSpeech,
+          gender: voiceGender,
+          voiceId: selectedVoiceId,
+          selectNewVoice: isFirstUtterance || !selectedVoiceId
         }),
       });
 
-      console.log("TTS API response status:", response.status);
-
       if (!response.ok) {
-        let errorMessage = `Text-to-speech request failed with status ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorMessage += `: ${errorData.details || errorData.error || 'Unknown error'}`;
-          console.error("TTS error details:", errorData);
-        } catch (e) {
-          console.error("Couldn't parse error response:", await response.text());
-        }
-        throw new Error(errorMessage);
+        const errorText = await response.text();
+        throw new Error(`Text-to-speech request failed: ${errorText}`);
       }
       
+      // Check if the response has a voice ID header
+      const responseVoiceId = response.headers.get('x-voice-id');
+      if (responseVoiceId && (isFirstUtterance || !selectedVoiceId)) {
+        console.log("Received voice ID from header:", responseVoiceId);
+        // We'll return this at the end of the function
+      }
+      
+      // Get the response as a blob
       const blob = await response.blob();
       console.log("Audio blob received, size:", blob.size, "bytes");
       
+      // Check if we have a valid audio blob
+      if (!blob || blob.size === 0) {
+        throw new Error("Received empty audio data from TTS API");
+      }
+      
+      // Create URL from blob
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       
-      // Store in the ref for potential cancellation
+      // Store in ref for potential cancellation
       audioRef.current = audio;
-
+      
+      // Set playback rate
       audio.playbackRate = voiceSpeed;
       
       // Make sure audio is fully loaded before playing
-      await new Promise((resolve) => {
+      await new Promise((resolve, reject) => {
         audio.onloadeddata = resolve;
+        audio.onerror = (e) => reject(new Error(`Audio load error: ${e.toString()}`));
         // Set a timeout in case onloadeddata doesn't fire
-        const timeout = setTimeout(resolve, 3000);
+        const timeout = setTimeout(() => {
+          resolve(); // Resolve anyway after timeout
+          console.warn("Audio load timeout, continuing anyway");
+        }, 3000);
+        
         audio.onloadedmetadata = () => {
           console.log("Audio loaded, duration:", audio.duration);
           clearTimeout(timeout);
         };
       });
       
-      // Now that the audio is loaded, set isAISpeaking to true
+      // Now that audio is loaded, update states
       setIsAISpeaking(true);
       setIsInitialTTSLoading(false);
+      setIsGenerating(false);
       
+      // Play the audio
+      try {
+        await audio.play();
+        console.log("Audio playback started successfully");
+      } catch (playError) {
+        console.error("Audio play error:", playError);
+        throw new Error(`Failed to play audio: ${playError.message}`);
+      }
+      
+      // Set up event handlers for completion
       audio.onended = () => {
         console.log("Audio playback ended");
         URL.revokeObjectURL(url);
         setIsAISpeaking(false);
         
-        // Process any pending user response when AI finishes speaking
-        if (userResponseBufferRef.current.trim() && !isUserSpeaking && processUserResponseRef.current) {
-          console.log("Processing pending user response after AI finished speaking");
-          processUserResponseRef.current();
-        }
+        // Let the useEffect handle starting speech recognition
       };
       
-      audio.onerror = (e) => {
-        console.error("Audio playback error:", e);
-        
-        // Safely clean up the URL
-        try {
-          URL.revokeObjectURL(url);
-        } catch (err) {
-          console.error("Error revoking URL:", err);
-        }
-        
-        // Reset states
-        setIsAISpeaking(false);
-        setIsGenerating(false);
-        setIsInitialTTSLoading(false);
-        
-        // Only set an error if we're not in the process of shutting down
-        if (recognitionRef.current) {
-          setError(new Error(`Failed to play audio: ${e?.message || 'MEDIA_ELEMENT_ERROR'}. Please check browser permissions.`));
-        }
-      };
-      
-      await audio.play();
-      console.log("Audio playback started successfully");
-      setIsGenerating(false);
+      // Return the voice ID if we got one
+      return responseVoiceId;
       
     } catch (err) {
       console.error("Error in text-to-speech process:", err);
@@ -174,8 +243,9 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
       setIsAISpeaking(false);
       setIsGenerating(false);
       setIsInitialTTSLoading(false);
+      return null;
     }
-  }, [voiceSpeed, useNaturalSpeech, isUserSpeaking]);
+  }, [voiceSpeed, useNaturalSpeech, isUserSpeaking, interviewer, selectedVoiceId, shutdownSpeechRecognition]);
 
   const createPrompt = useCallback((convHistory, type) => {
     if (type === 'greeting') {
@@ -335,7 +405,7 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
         setQuestionCount(prev => prev + 1);
       }
       
-      // Now speak the text (this will set isAISpeaking to true)
+      // Now speak the text with the current interviewer
       await speakText(aiResponseText);
       
       // Only after the voice is loaded, update the displayed conversation
@@ -358,7 +428,7 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     } else {
       setIsGenerating(false);
     }
-  }, [conversation, createPrompt, generateAIResponse, speakText, setCoveredTopics, isAISpeaking, isGenerating]);
+  }, [conversation, createPrompt, generateAIResponse, speakText, setCoveredTopics, isAISpeaking, isGenerating, interviewer]);
 
   // Store the callback function in the ref to break the circular dependency
   useEffect(() => {
@@ -369,60 +439,78 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
   const setupSpeechRecognition = useCallback(() => {
     if (typeof window === 'undefined') return null;
     
-    // Browser Speech Recognition API
+    // Check browser support
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setError(new Error("Speech recognition is not supported in this browser."));
       return null;
     }
 
+    console.log("Creating new speech recognition instance");
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
     recognition.onstart = () => {
-      console.log("Speech recognition started");
+      console.log("Speech recognition started successfully");
       setIsListening(true);
     };
 
     recognition.onend = () => {
       console.log("Speech recognition ended");
       
-      // Auto-restart if not manually stopped
-      if (!isMicMuted) {
-        try {
-          recognition.start();
-          console.log("Speech recognition restarted");
-        } catch (e) {
-          console.error("Failed to restart speech recognition:", e);
-          // If we can't restart immediately, try again after a short delay
-          setTimeout(() => {
+      // Only auto-restart if AI isn't speaking and mic isn't muted
+      if (!isAISpeaking && !isMicMuted) {
+        // Use a delay to prevent rapid restart attempts
+        setTimeout(() => {
+          if (!isAISpeaking && !isMicMuted && recognition) {
             try {
               recognition.start();
-            } catch (innerError) {
-              // If it still fails, then we set listening to false
-              setIsListening(false);
+              console.log("Speech recognition auto-restarted");
+            } catch (e) {
+              console.error("Failed to auto-restart speech recognition:", e);
+              
+              if (e.name === 'InvalidStateError' && e.message.includes('already started')) {
+                console.log("Recognition already started, which is fine");
+                setIsListening(true);
+              } else {
+                setIsListening(false);
+              }
             }
-          }, 300);
-        }
+          }
+        }, 300);
       } else {
         setIsListening(false);
       }
     };
 
     recognition.onerror = (event) => {
-      // CRITICAL CHANGE: Only log no-speech errors, don't show them to the user
+      // Handle different error types appropriately
       if (event.error === 'no-speech') {
         console.log("No speech detected, continuing to listen");
-        // Don't set any error state for no-speech
+      } else if (event.error === 'aborted') {
+        console.log("Speech recognition was aborted - this is expected when AI speaks");
+      } else if (event.error === 'network') {
+        console.error("Network error in speech recognition");
+        // Don't set error state as this might be temporary
       } else {
         console.error("Speech recognition error:", event.error);
-        setError(new Error(`Speech recognition error: ${event.error}`));
+        // Only set error for critical errors
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
+          setError(new Error(`Speech recognition error: ${event.error}`));
+        }
       }
     };
 
     recognition.onresult = (event) => {
+      // Ignore results if AI is speaking (this is a safety measure)
+      if (isAISpeaking) {
+        console.log("Ignoring speech results while AI is speaking");
+        return;
+      }
+      
+      // Process speech results as normal
       let interim = '';
       let final = '';
       
@@ -435,12 +523,10 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
         }
       }
       
-      // Always update the live, interim transcript
+      // Update state with transcripts
       setInterimTranscript(interim);
-
       if (interim) {
         setIsUserSpeaking(true);
-        // Clear any pending end-of-speech timeout as long as the user is talking
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
@@ -448,36 +534,25 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
       }
 
       if (final) {
-        // A final result has arrived.
-        // 1. Add it to our permanent buffer for this turn.
         userResponseBufferRef.current += final;
-        
-        // 2. Update the UI to show the full, finalized text for this turn.
         setCurrentUserResponse(userResponseBufferRef.current.trim());
-
-        // 3. IMPORTANT: Clear the live/interim transcript display.
         setInterimTranscript('');
         
-        // 4. Set a timeout to detect the end of speech.
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
         
         timeoutRef.current = setTimeout(() => {
           setIsUserSpeaking(false);
-          // Only process the response if we have something to say AND the AI is not speaking
-          if (userResponseBufferRef.current.trim() && !isAISpeaking && processUserResponseRef.current) {
+          if (userResponseBufferRef.current.trim() && processUserResponseRef.current) {
             processUserResponseRef.current();
-          } else if (userResponseBufferRef.current.trim() && isAISpeaking) {
-            // Store the response but wait for AI to finish speaking
-            console.log("Waiting for AI to finish speaking before processing response");
           }
-        }, 1200); // Slightly shorter delay
+        }, 1200);
       }
     };
 
     return recognition;
-  }, [isMicMuted]);  // Remove processUserResponse dependency
+  }, [isAISpeaking, isMicMuted]); // Include these in dependencies
 
   // --- LIFECYCLE & CONTROL ---
   
@@ -557,6 +632,7 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
       setIsListening(false);
       setIsGenerating(false);
       setIsInitialTTSLoading(false);
+      setIsActiveInterview(false);
       
       // 5. Clear any displayed errors related to audio
       setError(prev => {
@@ -624,57 +700,226 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
       console.error("Error managing speech recognition:", error);
     }
   }, [isMicMuted, isListening]);
-
-  const startConversation = useCallback(async (mediaStream) => {
-    const recognition = setupSpeechRecognition();
-    if (recognition) {
-      recognitionRef.current = recognition;
-      try {
-        recognition.start();
-      } catch (e) {
-        setError(new Error("Could not start speech recognition. Please check microphone permissions."));
-        return;
+  
+  // Modify the autoUnmute callback to use the external setter if available
+  const autoUnmute = useCallback(() => {
+    if (isMicMuted) {
+      console.log("Auto-unmuting microphone after AI finished speaking");
+      if (setIsMicMutedExternal) {
+        // If we have a setter, use it
+        setIsMicMutedExternal(false);
+      } else {
+        // Otherwise, just set a flag for the parent to check
+        shouldUnmuteRef.current = true;
       }
     }
+  }, [isMicMuted, setIsMicMutedExternal]);
+
+  // 1. First, move the initializeSpeechRecognition function above the useEffect that uses it
+  const initializeSpeechRecognition = useCallback(() => {
+    console.log("Initializing new speech recognition from scratch");
     
-    // Set loading states for initial greeting
-    setIsGenerating(true);
+    try {
+      // Make sure nothing is running
+      shutdownSpeechRecognition();
+      
+      // Create a completely new recognition instance
+      if (typeof window === 'undefined') return false;
+      
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        setError(new Error("Speech recognition is not supported in this browser."));
+        return false;
+      }
+      
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      
+      // Set up event handlers
+      recognition.onstart = () => {
+        console.log("NEW speech recognition started successfully");
+        setIsListening(true);
+      };
+      
+      recognition.onend = () => {
+        console.log("Speech recognition ended");
+        
+        // Only auto-restart if not in AI speaking mode and not muted
+        if (!isAISpeaking && !isMicMuted) {
+          try {
+            recognition.start();
+            console.log("Speech recognition auto-restarted");
+          } catch (e) {
+            console.error("Failed to auto-restart speech recognition:", e);
+            setIsListening(false);
+          }
+        } else {
+          setIsListening(false);
+        }
+      };
+      
+      recognition.onerror = (event) => {
+        if (event.error === 'no-speech') {
+          console.log("No speech detected, continuing to listen");
+        } else if (event.error === 'aborted') {
+          console.log("Speech recognition was aborted");
+        } else {
+          console.error("Speech recognition error:", event.error);
+        }
+      };
+      
+      recognition.onresult = (event) => {
+        // Extra safety check - never process results if AI is speaking
+        if (isAISpeaking) {
+          console.log("CRITICAL: Ignoring speech results while AI is speaking");
+          return;
+        }
+        
+        let interim = '';
+        let final = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            final += transcript + ' ';
+          } else {
+            interim += transcript;
+          }
+        }
+        
+        setInterimTranscript(interim);
+        
+        if (interim) {
+          setIsUserSpeaking(true);
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+        }
+        
+        if (final) {
+          userResponseBufferRef.current += final;
+          setCurrentUserResponse(userResponseBufferRef.current.trim());
+          setInterimTranscript('');
+          
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
+          
+          timeoutRef.current = setTimeout(() => {
+            setIsUserSpeaking(false);
+            if (userResponseBufferRef.current.trim() && processUserResponseRef.current) {
+              processUserResponseRef.current();
+            }
+          }, 1200);
+        }
+      };
+      
+      // Store the recognition instance
+      recognitionRef.current = recognition;
+      
+      // Start it
+      try {
+        recognition.start();
+        console.log("NEW speech recognition started successfully");
+        return true;
+      } catch (e) {
+        console.error("Error starting new speech recognition:", e);
+        return false;
+      }
+    } catch (e) {
+      console.error("Error initializing speech recognition:", e);
+      return false;
+    }
+  }, [isAISpeaking, isMicMuted, shutdownSpeechRecognition]);
+
+  // Then modify the AI speaking effect to use this function
+  useEffect(() => {
+    console.log("AI speaking state changed:", isAISpeaking);
+    
+    if (isAISpeaking) {
+      // AI started speaking - COMPLETELY shut down speech recognition
+      shutdownSpeechRecognition();
+    } else if (isActiveInterview) {
+      // AI stopped speaking during an active interview
+      
+      // 1. Auto-unmute if needed
+      autoUnmute();
+      
+      // 2. Initialize speech recognition with a short delay
+      const timer = setTimeout(() => {
+        initializeSpeechRecognition();
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isAISpeaking, isActiveInterview, shutdownSpeechRecognition, initializeSpeechRecognition, autoUnmute]);
+
+  // Add this effect to disable speech recognition during initial loading
+  useEffect(() => {
+    if (isInitialTTSLoading || (isGenerating && !isAISpeaking)) {
+      console.log("Loading state detected - disabling speech recognition");
+      shutdownSpeechRecognition();
+    }
+  }, [isInitialTTSLoading, isGenerating, isAISpeaking, shutdownSpeechRecognition]);
+
+  // Add a new useEffect to handle pre-interview state
+  useEffect(() => {
+    // If interview is not active yet, ensure speech recognition is off
+    if (!isActiveInterview) {
+      shutdownSpeechRecognition();
+    }
+  }, [isActiveInterview, shutdownSpeechRecognition]);
+
+  // Then use it in startConversation
+  const startConversation = useCallback(async (audioStream, selectedInterviewer = null) => {
+    // Set loading state
     setIsInitialTTSLoading(true);
     
-    // First get the AI response text
-    const initialPrompt = createPrompt([], 'greeting');
-    const aiResponseText = await generateAIResponse(initialPrompt);
+    // Explicitly shut down speech recognition during loading
+    shutdownSpeechRecognition();
     
-    if (aiResponseText) {
-      // Store the AI response in conversation state but don't display it yet
-      setConversation(prevConversation => 
-        prevConversation.length === 0 
-          ? [{ role: 'ai', text: aiResponseText, isLoading: true }] 
-          : [...prevConversation, { role: 'ai', text: aiResponseText, isLoading: true }]
-      );
+    // Update interviewer state
+    if (selectedInterviewer) {
+      console.log("Setting interviewer from selection:", selectedInterviewer.name);
+      setInterviewer(selectedInterviewer);
+    } else if (getInterviewerFn) {
+      const newInterviewer = getInterviewerFn();
+      console.log("Setting random interviewer:", newInterviewer.name);
+      setInterviewer(newInterviewer);
+    }
+    
+    // Generate initial AI greeting
+    const prompt = createPrompt([], 'greeting');
+    const currentInterviewer = selectedInterviewer || interviewer;
+    const aiResponse = await generateAIResponse(prompt);
+    
+    if (aiResponse) {
+      // Update conversation state
+      setConversation([{ role: 'ai', text: aiResponse }]);
       
-      // Process TTS after updating the UI
-      await speakText(aiResponseText);
+      // For the first utterance, get a voice ID back
+      const gender = currentInterviewer?.gender || 'female';
+      const voiceIdResponse = await speakText(aiResponse, gender, true);
       
-      // Only after voice is loaded, update the displayed conversation
-      setDisplayedConversation([{ role: 'ai', text: aiResponseText }]);
+      // Save voice ID if returned
+      if (voiceIdResponse) {
+        setSelectedVoiceId(voiceIdResponse);
+      }
       
-      // Update the conversation to remove loading state
-      setConversation(prevConversation => {
-        const updated = [...prevConversation];
-        if (updated.length > 0) {
-          updated[updated.length - 1] = { 
-            ...updated[updated.length - 1], 
-            isLoading: false 
-          };
-        }
-        return updated;
-      });
+      // Update displayed conversation
+      setDisplayedConversation([{ role: 'ai', text: aiResponse }]);
+      
+      if (aiResponse.includes('?')) {
+        setQuestionCount(1);
+      }
     } else {
-      setIsGenerating(false);
       setIsInitialTTSLoading(false);
     }
-  }, [setupSpeechRecognition, createPrompt, generateAIResponse, speakText]);
+    setIsActiveInterview(true);
+  }, [createPrompt, generateAIResponse, speakText, getInterviewerFn, interviewer, shutdownSpeechRecognition]);
 
   // This function is now just a public-facing wrapper for shutdown
   const endConversation = useCallback(() => {
@@ -714,18 +959,131 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     }
   }, [isAISpeaking, isUserSpeaking, processUserResponse]);
 
+  // Pass the interviewer selection function to the conversation manager
+  const {
+    conversation: convo,
+    currentUserResponse: convoCurrentUserResponse,
+    interimTranscript: convoInterimTranscript,
+    isUserSpeaking: convoIsUserSpeaking,
+    isAISpeaking: convoIsAISpeaking,
+    isListening: convoIsListening,
+    speechError: convoSpeechError,
+    startConversation: startConvo,
+    endConversation: endConvo,
+    questionCounter,
+    forceProcessResponse: convoForceProcessResponse,
+    interviewer: convoInterviewer
+  } = useConversationManager(interview, isMicMuted, getInterviewerFn);
+
+  // Add a helper function to safely start/stop speech recognition
+  const safelyControlRecognition = useCallback((shouldBeActive) => {
+    if (shouldBeActive) {
+      // Should be active - start it if it's not already running
+      if (!isListening) {
+        try {
+          // Create new instance if needed
+          if (!recognitionRef.current) {
+            recognitionRef.current = setupSpeechRecognition();
+          }
+          
+          // Check if it's already started (this is a real issue)
+          let isAlreadyStarted = false;
+          try {
+            // This is a hack to check if recognition is already started
+            // If it's already started, this will throw an InvalidStateError
+            recognitionRef.current.start();
+            console.log("Speech recognition started successfully");
+            setIsListening(true);
+          } catch (e) {
+            if (e.name === 'InvalidStateError' && e.message.includes('already started')) {
+              console.log("Recognition was already started - updating state only");
+              isAlreadyStarted = true;
+              setIsListening(true);
+            } else {
+              // Some other error
+              console.error("Error starting speech recognition:", e);
+              return false;
+            }
+          }
+          
+          return true;
+        } catch (e) {
+          console.error("Error setting up speech recognition:", e);
+          return false;
+        }
+      } else {
+        // Already listening, no action needed
+        return true;
+      }
+    } else {
+      // Should be inactive - stop it if it's running
+      if (isListening && recognitionRef.current) {
+        try {
+          // Prevent auto-restart
+          const originalOnEnd = recognitionRef.current.onend;
+          recognitionRef.current.onend = () => {
+            setIsListening(false);
+            // Restore original handler after execution
+            recognitionRef.current.onend = originalOnEnd;
+          };
+          
+          recognitionRef.current.stop();
+          console.log("Speech recognition stopped successfully");
+          return true;
+        } catch (e) {
+          console.error("Error stopping speech recognition:", e);
+          // Force the state to match reality
+          setIsListening(false);
+          return false;
+        }
+      } else {
+        // Already not listening, no action needed
+        return true;
+      }
+    }
+  }, [isListening, setupSpeechRecognition]);
+
+  // 2. Now use this helper in our effect that handles AI speaking state
+  useEffect(() => {
+    if (isAISpeaking) {
+      // AI is speaking - stop recognition and clear buffer
+      console.log("AI is speaking - stopping speech recognition");
+      
+      // Stop speech recognition
+      safelyControlRecognition(false);
+      
+      // Clear any buffered speech
+      userResponseBufferRef.current = '';
+      setCurrentUserResponse('');
+      setInterimTranscript('');
+    } else if (!isMicMuted) {
+      // AI stopped speaking and mic isn't muted - start recognition
+      console.log("AI stopped speaking - starting speech recognition");
+      
+      // Use a delay to ensure clean transition
+      const timer = setTimeout(() => {
+        // Start speech recognition
+        safelyControlRecognition(true);
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isAISpeaking, isMicMuted, safelyControlRecognition]);
+
   return {
     conversation: displayedConversation,
-    isAISpeaking,
-    isUserSpeaking,
-    isListening,
     currentUserResponse,
     interimTranscript,
+    isUserSpeaking,
+    isAISpeaking,
+    isListening,
     error,
     startConversation,
     endConversation,
-    forceProcessResponse,
     isGenerating,
-    isInitialTTSLoading
+    isInitialTTSLoading,
+    forceProcessResponse,
+    interviewer,
+    shouldUnmute: shouldUnmuteRef.current
   };
 } 
