@@ -8,6 +8,7 @@ import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FaGoogle } from 'react-icons/fa';
 
 export default function SignUpPage() {
   const [name, setName] = useState('');
@@ -60,19 +61,17 @@ export default function SignUpPage() {
   };
 
   return (
-    <div
-      className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-green-100"
-    >
-      <div className="w-full max-w-md p-8 space-y-6 bg-white text-card-foreground rounded-xl shadow-lg z-10">
+    <div className="flex items-center justify-center min-h-screen bg-[#0d1526]">
+      <div className="w-full max-w-md p-8 space-y-6 bg-[#111827] text-white rounded-2xl shadow-2xl z-10">
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Create an Account</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight">Create an Account</h1>
+          <p className="text-gray-400 mt-2">
             Start your journey with a new account
           </p>
         </div>
         <form onSubmit={handleCredentialSignUp} className="space-y-4">
           <div>
-            <Label htmlFor="name">Full Name</Label>
+            <Label htmlFor="name" className="text-gray-400">Full Name</Label>
             <Input
               id="name"
               type="text"
@@ -80,10 +79,11 @@ export default function SignUpPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              className="bg-[#1a2234] border-[#2c3648] text-white focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="text-gray-400">Email</Label>
             <Input
               id="email"
               type="email"
@@ -91,11 +91,12 @@ export default function SignUpPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              className="bg-[#1a2234] border-[#2c3648] text-white focus:ring-blue-500 focus:border-blue-500"
             />
             
           </div>
           <div>
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password" className="text-gray-400">Password</Label>
             <Input
               id="password"
               type="password"
@@ -103,36 +104,35 @@ export default function SignUpPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              className="bg-[#1a2234] border-[#2c3648] text-white focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {error && <p className="text-sm text-red-400">{error}</p>}
+          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold" disabled={isSubmitting}>
             {isSubmitting ? 'Creating Account...' : 'Create Account'}
           </Button>
         </form>
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
+            <span className="w-full border-t border-gray-600" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">
+            <span className="bg-[#111827] px-2 text-gray-400">
               Or continue with
             </span>
           </div>
         </div>
         <Button
           variant="outline"
-          className="w-full flex items-center justify-center gap-2"
+          className="w-full flex items-center justify-center gap-2 bg-[#1a2234] border-[#2c3648] hover:bg-[#2c3648] text-white"
           onClick={handleGoogleSignIn}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 488 512">
-            <path fill="#4285F4" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"/>
-          </svg>
+          <FaGoogle className="text-red-500" />
           Sign Up with Google
         </Button>
-        <div className="text-center text-sm text-muted-foreground">
+        <div className="text-center text-sm text-gray-400">
           Already have an account?{' '}
-          <Link href="/sign-in" className="text-primary hover:underline">
+          <Link href="/sign-in" className="text-blue-500 hover:underline">
             Sign In
           </Link>
         </div>
