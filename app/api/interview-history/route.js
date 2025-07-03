@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/utils/db';
-import { MockInterview } from '@/utils/schema';
-import { eq } from 'drizzle-orm';
+import { MockInterview, InterviewReport } from '@/utils/schema';
+import { eq, and } from 'drizzle-orm';
 import { auth } from '@/auth';
 
 export async function GET(req) {
@@ -20,7 +20,24 @@ export async function GET(req) {
       .where(eq(MockInterview.createdBy, userEmail))
       .orderBy(MockInterview.createdAt, 'desc'); // Show the newest first
 
-    return NextResponse.json(interviews);
+    // Fetch report data for each interview
+    const interviewsWithReports = await Promise.all(
+      interviews.map(async (interview) => {
+        // Get the report data if it exists
+        const reports = await db.select()
+          .from(InterviewReport)
+          .where(eq(InterviewReport.mockIdRef, interview.mockId));
+        
+        const report = reports.length > 0 ? reports[0] : null;
+        
+        return {
+          ...interview,
+          report
+        };
+      })
+    );
+
+    return NextResponse.json(interviewsWithReports);
 
   } catch (error) {
     console.error('Error fetching interview history:', error);

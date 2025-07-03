@@ -74,14 +74,14 @@ export default function NewInterviewPage() {
 
 
     return (
-        <div className="p-10 bg-[#0d1117] min-h-screen text-white">
+        <div className="p-10 bg-gray-900 min-h-screen text-white">
             <h2 className="font-bold text-3xl text-white">Let's Get Started</h2>
             <h3 className="text-gray-400 mt-2">Create a new mock interview session with your custom settings.</h3>
 
             <form onSubmit={onSubmit}>
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-10 mt-8'>
                     {/* Role Selection & Configuration */}
-                    <Card className="bg-[#161b22] border-gray-700 text-white">
+                    <Card className="bg-gray-800 border-gray-700 text-white">
                         <CardHeader>
                             <CardTitle className="text-2xl font-semibold text-white">1. Role Selection & Configuration</CardTitle>
                         </CardHeader>
@@ -89,10 +89,10 @@ export default function NewInterviewPage() {
                             <div className="space-y-3">
                                 <Label htmlFor="role" className="text-gray-300">Select a Role</Label>
                                 <Select onValueChange={setSelectedRole} required>
-                                    <SelectTrigger className="bg-[#0d1117] border-gray-600 text-white">
+                                    <SelectTrigger className="bg-gray-900 border-gray-600 text-white">
                                         <SelectValue placeholder="E.g., Software Engineer" />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-[#161b22] border-gray-600 text-white">
+                                    <SelectContent className="bg-gray-800 border-gray-600 text-white">
                                         {PRE_CONFIGURED_ROLES.map((role) => (
                                             <SelectItem key={role.value} value={role.value} className="hover:bg-gray-700">{role.label}</SelectItem>
                                         ))}
@@ -108,27 +108,27 @@ export default function NewInterviewPage() {
                                     value={jobDescription}
                                     onChange={(e) => setJobDescription(e.target.value)}
                                     placeholder="Paste the job description or focus area here (optional)..."
-                                    className="bg-[#0d1117] border-gray-600 text-white placeholder-gray-500 min-h-[100px]"
+                                    className="bg-gray-900 border-gray-600 text-white placeholder-gray-500 min-h-[100px]"
                                 />
                                 <p className="text-xs text-gray-500">Adding a job description helps tailor questions more accurately to your goals.</p>
                             </div>
 
                             {showCustomRoleFields && (
-                                <div className="space-y-6 p-4 border border-gray-700 rounded-lg bg-[#0d1117]">
+                                <div className="space-y-6 p-4 border border-gray-700 rounded-lg bg-gray-900">
                                     <div className="space-y-3">
                                         <Label htmlFor="customJobRole" className="text-gray-300">Custom Job Role</Label>
-                                        <Input id="customJobRole" value={customJobRole} onChange={(e) => setCustomJobRole(e.target.value)} placeholder="E.g., Senior Python Developer" required={showCustomRoleFields} className="bg-[#0d1117] border-gray-600 text-white placeholder-gray-500" />
+                                        <Input id="customJobRole" value={customJobRole} onChange={(e) => setCustomJobRole(e.target.value)} placeholder="E.g., Senior Python Developer" required={showCustomRoleFields} className="bg-gray-900 border-gray-600 text-white placeholder-gray-500" />
                                     </div>
                                     <div className="space-y-3">
                                         <Label htmlFor="industry" className="text-gray-300">Industry</Label>
-                                        <Input id="industry" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="E.g., FinTech, Healthcare" className="bg-[#0d1117] border-gray-600 text-white placeholder-gray-500" />
+                                        <Input id="industry" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="E.g., FinTech, Healthcare" className="bg-gray-900 border-gray-600 text-white placeholder-gray-500" />
                                     </div>
                                 </div>
                             )}
 
                             <div className="space-y-3">
                                 <Label htmlFor="keySkills" className="text-gray-300">Key Skills</Label>
-                                <Input id="keySkills" value={keySkills} onChange={(e) => setKeySkills(e.target.value)} placeholder="E.g., React, Node.js, SQL" className="bg-[#0d1117] border-gray-600 text-white placeholder-gray-500" />
+                                <Input id="keySkills" value={keySkills} onChange={(e) => setKeySkills(e.target.value)} placeholder="E.g., React, Node.js, SQL" className="bg-gray-900 border-gray-600 text-white placeholder-gray-500" />
                             </div>
 
                             <div className="space-y-4">
@@ -145,7 +145,7 @@ export default function NewInterviewPage() {
                     </Card>
 
                     {/* Interview Setup & Configuration */}
-                    <Card className="bg-[#161b22] border-gray-700 text-white">
+                    <Card className="bg-gray-800 border-gray-700 text-white">
                         <CardHeader>
                             <CardTitle className="text-2xl font-semibold text-white">2. Interview Setup & Configuration</CardTitle>
                         </CardHeader>
@@ -178,8 +178,8 @@ export default function NewInterviewPage() {
                             <div className="space-y-3">
                                 <Label className="text-gray-300">Interview Style</Label>
                                 <Select defaultValue="Conversational" onValueChange={setInterviewStyle}>
-                                    <SelectTrigger className="bg-[#0d1117] border-gray-600 text-white"><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-[#161b22] border-gray-600 text-white">
+                                    <SelectTrigger className="bg-gray-900 border-gray-600 text-white"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="bg-gray-800 border-gray-600 text-white">
                                         {INTERVIEW_STYLES.map(style => (
                                             <SelectItem key={style.value} value={style.value} className="hover:bg-gray-700">{style.label}</SelectItem>
                                         ))}
@@ -190,8 +190,8 @@ export default function NewInterviewPage() {
                              <div className="space-y-3">
                                 <Label className="text-gray-300">Interview Mode</Label>
                                 <Select defaultValue="Practice" onValueChange={setInterviewMode}>
-                                    <SelectTrigger className="bg-[#0d1117] border-gray-600 text-white"><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-[#161b22] border-gray-600 text-white">
+                                    <SelectTrigger className="bg-gray-900 border-gray-600 text-white"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="bg-gray-800 border-gray-600 text-white">
                                         {INTERVIEW_MODES.map(mode => (
                                             <SelectItem key={mode.value} value={mode.value} className="hover:bg-gray-700">{mode.label}</SelectItem>
                                         ))}
@@ -202,8 +202,8 @@ export default function NewInterviewPage() {
                             <div className="space-y-3">
                                 <Label className="text-gray-300">Interview Duration (minutes)</Label>
                                 <Select defaultValue="15" onValueChange={(val) => setDuration(parseInt(val))}>
-                                    <SelectTrigger className="bg-[#0d1117] border-gray-600 text-white"><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-[#161b22] border-gray-600 text-white">
+                                    <SelectTrigger className="bg-gray-900 border-gray-600 text-white"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="bg-gray-800 border-gray-600 text-white">
                                         {DURATION_OPTIONS.map(opt => (
                                             <SelectItem key={opt.value} value={opt.value.toString()} className="hover:bg-gray-700">{opt.label}</SelectItem>
                                         ))}

@@ -21,7 +21,7 @@ export default async function ProfilePage() {
     }
 
     return (
-        <div className="p-4 md:p-8">
+        <div className="p-8 bg-gray-900 min-h-screen text-white">
             <h1 className="text-3xl font-bold mb-6">Manage Your Profile</h1>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-1">

@@ -37,20 +37,20 @@ const UpgradePage = () => {
   ];
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-8 bg-gray-900 min-h-screen text-white">
       <div className="max-w-4xl mx-auto">
         <header className="text-center mb-12">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
+          <h1 className="text-4xl font-bold tracking-tight text-white">
             Find the perfect plan
           </h1>
-          <p className="mt-4 text-lg text-gray-600 dark:text-gray-300">
+          <p className="mt-4 text-lg text-gray-300">
             Unlock advanced features and take your interview preparation to the next level.
           </p>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           {plans.map((plan) => (
-            <Card key={plan.name} className={`flex flex-col h-full ${plan.popular ? 'border-primary shadow-lg' : ''}`}>
+            <Card key={plan.name} className={`flex flex-col h-full bg-gray-800 border-gray-700 ${plan.popular ? 'border-primary shadow-lg' : ''}`}>
               {plan.popular && (
                 <div className="bg-primary text-primary-foreground py-1 px-4 text-sm font-semibold rounded-t-lg -mb-px flex items-center justify-center">
                   <Star className="w-4 h-4 mr-2" />
@@ -58,17 +58,17 @@ const UpgradePage = () => {
                 </div>
               )}
               <CardHeader className="flex-shrink-0">
-                <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
-                <CardDescription>{plan.description}</CardDescription>
+                <CardTitle className="text-2xl font-bold text-white">{plan.name}</CardTitle>
+                <CardDescription className="text-gray-300">{plan.description}</CardDescription>
               </CardHeader>
               <CardContent className="flex-grow">
                 <div className="mb-6">
-                  <span className="text-4xl font-extrabold">{plan.price}</span>
-                  <span className="text-lg font-medium text-gray-500">{plan.priceSuffix}</span>
+                  <span className="text-4xl font-extrabold text-white">{plan.price}</span>
+                  <span className="text-lg font-medium text-gray-400">{plan.priceSuffix}</span>
                 </div>
                 <ul className="space-y-3">
                   {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center">
+                    <li key={feature} className="flex items-center text-gray-300">
                       <Check className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" />
                       <span>{feature}</span>
                     </li>
@@ -84,7 +84,7 @@ const UpgradePage = () => {
           ))}
         </div>
         
-        <div className="mt-12 text-center text-sm text-gray-500">
+        <div className="mt-12 text-center text-sm text-gray-400">
           <p>All prices are in USD. You can cancel your subscription at any time.</p>
         </div>
       </div>
