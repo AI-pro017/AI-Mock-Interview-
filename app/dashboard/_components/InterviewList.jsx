@@ -1,65 +1,57 @@
 "use client"
-import { db } from '@/utils/db';
-import { MockInterview } from '@/utils/schema';
-import { desc, eq } from 'drizzle-orm';
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import InterviewItemCard from './InterviewItemCard';
+import Link from 'next/link';
+import { ChevronRight, History } from 'lucide-react';
 
-function InterviewList() {
-    const [interviewList, setInterviewList] = useState([]);
-    
-    const [currentUserEmail, setCurrentUserEmail] = useState(null);
-
-    useEffect(() => {
-        const fetchedUserEmail = 'temp_user@example.com'; 
-        setCurrentUserEmail(fetchedUserEmail);
-        console.log("InterviewList: Current placeholder user email:", fetchedUserEmail);
-    }, []);
-
-    useEffect(() => {
-        if (currentUserEmail) {
-            GetInterviewList();
-        }
-    }, [currentUserEmail]);
-
-    const GetInterviewList = async () => {
-        if (!currentUserEmail) {
-            console.log("No current user email available to fetch interviews.");
-            setInterviewList([]);
-            return;
-        }
-        console.log("Fetching interviews for:", currentUserEmail);
-        try {
-            const result = await db.select()
-                .from(MockInterview)
-                .where(eq(MockInterview.createdBy, currentUserEmail))
-                .orderBy(desc(MockInterview.id));
-            
-            console.log("Fetched interviews:", result);
-            setInterviewList(result);
-        } catch (error) {
-            console.error("Error fetching interview list:", error);
-            setInterviewList([]);
-        }
-    }
-
+function InterviewList({ interviews = [], limit = null }) {
+  // Apply limit if specified
+  const displayedInterviews = limit ? interviews.slice(0, limit) : interviews;
+  
   return (
-    <div>
-        <h2 className='font-medium text-xl mt-10 mb-5'>
-            History of previous interviews
-        </h2>
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 my-3'>
-            {interviewList && interviewList.length > 0 ? (
-                interviewList.map((interview, index) => (
-                    <InterviewItemCard 
-                        interview={interview}
-                        key={interview.id || index}
-                    />
-                ))
-            ) : (
-                <p className="text-gray-500">No interviews found yet, or still loading...</p>
-            )}
+    <div className="bg-slate-800/50 rounded-xl p-6 ring-1 ring-white/10">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <History className="h-5 w-5 text-slate-400 mr-2" />
+          <h2 className="text-xl font-semibold text-white">Recent Interviews</h2>
         </div>
+        {interviews.length > 0 && limit && (
+          <Link 
+            href="/dashboard/history"
+            className="text-xs text-slate-400 hover:text-white transition-colors"
+          >
+            View all
+          </Link>
+        )}
+      </div>
+      
+      {displayedInterviews && displayedInterviews.length > 0 ? (
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'>
+          {displayedInterviews.map((interview, index) => (
+            <InterviewItemCard 
+              interview={interview}
+              key={interview.id || index}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="bg-slate-900/50 rounded-lg p-8 text-center">
+          <p className="text-slate-300 mb-2">No interviews found yet</p>
+          <p className="text-sm text-slate-500">Start your first interview to see your history</p>
+        </div>
+      )}
+      
+      {limit && interviews.length > limit && (
+        <div className="mt-6 text-center">
+          <Link 
+            href="/dashboard/history" 
+            className="inline-flex items-center px-4 py-2 bg-slate-700/50 hover:bg-slate-700 text-slate-200 rounded-full text-sm font-medium group transition-all"
+          >
+            View all {interviews.length} interviews
+            <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform duration-200" />
+          </Link>
+        </div>
+      )}
     </div>
   )
 }

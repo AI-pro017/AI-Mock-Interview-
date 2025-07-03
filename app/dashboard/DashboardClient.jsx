@@ -6,17 +6,19 @@ import InterviewList from './_components/InterviewList'
 import ProfileCompletion from './_components/ProfileCompletion'
 import PerformanceSnapshot from './_components/PerformanceSnapshot'
 import UpgradeTeaser from './_components/UpgradeTeaser'
+import { History } from 'lucide-react'
+import Link from 'next/link'
 
 function DashboardClient({ user, interviews }) { // Receive user data as a prop
 
   const isProfileComplete = user && user.experienceLevel && user.targetRoles && user.timezone;
 
   return (
-    <div className='p-10'>
-      <h1 className="text-3xl font-bold text-gray-800">
+    <div className='p-10 bg-slate-900 min-h-screen'>
+      <h1 className="text-3xl font-bold text-slate-100">
         Welcome back, {user?.name?.split(' ')[0] || 'User'}!
       </h1>
-      <p className="text-gray-500 mt-1 mb-8">
+      <p className="text-slate-400 mt-1 mb-8">
         Ready to ace your next interview? Let's get started.
       </p>
 
@@ -26,11 +28,8 @@ function DashboardClient({ user, interviews }) { // Receive user data as a prop
           {/* Main call to action - New clean button */}
           <StartInterviewButton />
           
-          {/* Recent Interview History */}
-          <div className="bg-white p-6 rounded-xl shadow-sm">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">Recent Interviews</h2>
-            <InterviewList interviews={interviews} limit={3} />
-          </div>
+          {/* Recent Interview History - self-contained component */}
+          <InterviewList interviews={interviews} limit={6} />
         </div>
 
         {/* Sidebar Widgets (Right Column) */}

@@ -22,7 +22,7 @@ export const metadata = {
   title: "AI Mock Interview | Land Your Dream Job",
   description: "Practice your interview skills with an AI-powered mock interviewer. Get instant feedback and improve your performance.",
   icons: {
-    icon: '/logo.svg',
+    icon: '/favicon.jpg',
   },
 };
 
@@ -31,7 +31,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} ${inter.className} antialiased`}>
         <Provider>
-          <Toaster />
+          <Toaster theme="dark" />
         {children}
         </Provider>
       </body>

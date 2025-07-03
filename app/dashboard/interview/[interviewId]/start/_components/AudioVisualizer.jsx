@@ -12,7 +12,7 @@ export default function AudioVisualizer({ audioStream, isActive = true, classNam
       if (canvasRef.current) {
         const canvas = canvasRef.current;
         const canvasCtx = canvas.getContext('2d');
-        canvasCtx.fillStyle = '#F3F4F6'; // bg-gray-100
+        canvasCtx.fillStyle = '#111827'; // Dark background (bg-gray-900)
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
       }
       return;
@@ -49,7 +49,7 @@ export default function AudioVisualizer({ audioStream, isActive = true, classNam
       
       analyser.getByteFrequencyData(dataArray);
       
-      canvasCtx.fillStyle = '#F3F4F6'; // bg-gray-100
+      canvasCtx.fillStyle = '#111827'; // Dark background (bg-gray-900)
       canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
       
       // Calculate bar width based on canvas size and buffer length
@@ -59,6 +59,7 @@ export default function AudioVisualizer({ audioStream, isActive = true, classNam
       for(let i = 0; i < bufferLength; i++) {
         const barHeight = (dataArray[i] / 255) * canvas.height;
         
+        // Use blue color for the visualizer bars
         canvasCtx.fillStyle = `rgb(59, 130, 246, ${Math.min(1, barHeight / (canvas.height/2))})`;
         canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
         

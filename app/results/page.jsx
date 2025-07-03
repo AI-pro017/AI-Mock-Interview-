@@ -87,12 +87,12 @@ function PersonalityResults() {
 
   return (
     <div  className="p-10">
-      <h2 className="font-bold text-2xl mb-4 p-2 border rounded-lg bg-[#538fa7]  text-[#efdd99] text-center">Personality Analysis Results</h2>
+      <h2 className="font-bold text-2xl mb-4 p-2 border rounded-lg text-center">Personality Analysis Results</h2>
       <div>
-        <h3 className='p-2 border rounded-lg text-[#e4aa74]    text-xl'>Personality Type: {results.personalityType}</h3>
+        <h3 className='p-2 border rounded-lg text-xl'>Personality Type: {results.personalityType}</h3>
         <div>
-          <h4 className='p-2 border rounded-lg text-[#187396]    text-xl'>Feedback:</h4>
-          <ul className='p-2 border rounded-lg text-[#187396]    text-xl'>
+          <h4 className='p-2 border rounded-lg text-xl'>Feedback:</h4>
+          <ul className='p-2 border rounded-lg text-xl'>
             {Object.keys(feedback).map((trait) => (
               <li key={trait}>
                 {trait}: {feedback[trait]}

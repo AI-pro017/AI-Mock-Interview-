@@ -70,14 +70,14 @@ function FindJob() {
 
         <button
           type="submit"
-          className="mt-5 p-2 bg-blue-500 text-white rounded"
+          className="mt-5 p-2 rounded"
           disabled={loading}
         >
           {loading ? "Searching..." : "Search Jobs"}
         </button>
       </form>
 
-      {error && <p className="text-red-500 mt-2">{error}</p>}
+      {error && <p className="mt-2">{error}</p>}
 
       <div className="mt-5">
         {jobs.length > 0 ? (
@@ -86,7 +86,7 @@ function FindJob() {
               <h4 className="font-bold text-xl">{job.title}</h4>
               <p>{job.location.display_name}</p>
               <p>{job.description}</p>
-              <a href={job.redirect_url} className="text-blue-500">
+              <a href={job.redirect_url}>
                 View Job
               </a>
             </div>

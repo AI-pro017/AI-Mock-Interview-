@@ -1,26 +1,29 @@
-import { Shield, Zap } from 'lucide-react';
-import Link from 'next/link';
+import React from 'react';
+import { Crown } from 'lucide-react';
 
 function UpgradeTeaser() {
   return (
-    <div className="bg-gray-900 p-6 rounded-xl shadow-sm text-white">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="bg-yellow-400/20 p-2 rounded-md">
-          <Shield className="h-5 w-5 text-yellow-400" />
+    <div className="bg-gray-900 rounded-xl shadow-lg overflow-hidden ring-1 ring-amber-500/30">
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl text-amber-400 font-semibold">Go Pro</h3>
+          <Crown className="h-6 w-6 text-amber-400" />
         </div>
-        <h2 className="text-lg font-semibold">Go Pro</h2>
-      </div>
-      
-      <p className="text-sm text-gray-300 mb-5">
-        Unlock unlimited interviews, custom roles, and advanced performance analytics.
-      </p>
-      
-      <Link href="/dashboard/upgrade">
-        <button className="w-full flex items-center justify-center gap-2 bg-yellow-400 text-gray-900 font-medium py-3 px-4 rounded-lg hover:bg-yellow-500 transition-colors">
-          <Zap className="h-4 w-4" />
+        
+        <p className="text-sm text-gray-400 mb-4">
+          Unlock advanced features with our Pro subscription:
+        </p>
+        
+        <ul className="space-y-2 mb-5">
+          <li className="flex items-center text-sm text-gray-300"><span className="text-amber-500 mr-3">●</span>Unlimited interviews</li>
+          <li className="flex items-center text-sm text-gray-300"><span className="text-amber-500 mr-3">●</span>Advanced AI feedback</li>
+          <li className="flex items-center text-sm text-gray-300"><span className="text-amber-500 mr-3">●</span>Performance tracking</li>
+        </ul>
+        
+        <button className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-black rounded-lg text-sm font-bold transition-colors duration-200">
           Upgrade Now
         </button>
-      </Link>
+      </div>
     </div>
   );
 }

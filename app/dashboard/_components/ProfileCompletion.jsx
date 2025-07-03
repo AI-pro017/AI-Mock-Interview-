@@ -1,59 +1,49 @@
 'use client';
 
-import { Progress } from "@/components/ui/progress";
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import React from 'react';
+import { UserCircle } from 'lucide-react';
 
-export default function ProfileCompletion({ user }) {
-  const calculateCompletion = () => {
-    if (!user) return 0;
-
-    const fields = [
-      user.name,
-      user.image,
-      user.experienceLevel,
-      user.targetRoles,
-      user.resumeUrl,
-      user.timezone
-    ];
-
-    const filledFields = fields.filter(field => field && field.toString().trim() !== '').length;
-    const totalFields = fields.length;
-    
-    if (totalFields === 0) return 100;
-
-    const percentage = Math.round((filledFields / totalFields) * 100);
-    return percentage;
-  };
-
-  const completionPercentage = calculateCompletion();
-
+function ProfileCompletion({ user }) {
+  const router = useRouter();
+  
+  // Calculate completion percentage based on required fields
+  const requiredFields = ['name', 'experienceLevel', 'targetRoles', 'timezone'];
+  const completedFields = requiredFields.filter(field => user && user[field]);
+  const completionPercentage = Math.round((completedFields.length / requiredFields.length) * 100);
+  
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm">
-      <h2 className="text-xl font-semibold mb-4 text-gray-800">Profile Completion</h2>
-      
-      <div className="mb-2 flex justify-between items-center">
-        <span className="text-sm text-gray-500">Progress</span>
-        <span className="text-sm font-medium text-gray-700">{completionPercentage}% Complete</span>
+    <div className="bg-slate-800/50 rounded-xl p-6 ring-1 ring-white/10">
+      <div className="flex items-center mb-4">
+        <UserCircle className="h-5 w-5 text-slate-400 mr-2" />
+        <h2 className="text-xl font-semibold text-white">Profile Completion</h2>
       </div>
       
-      <div className="h-2 w-full bg-gray-200 rounded-full mb-4">
-        <div 
-          className="h-2 bg-blue-600 rounded-full" 
-          style={{ width: `${completionPercentage}%` }}
-        ></div>
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-sm text-slate-400">Progress</span>
+          <span className="text-sm font-medium text-white">{completionPercentage}% Complete</span>
+        </div>
+        <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-sky-400 rounded-full" 
+            style={{ width: `${completionPercentage}%` }}
+          ></div>
+        </div>
       </div>
       
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-slate-400 mb-4">
         A complete profile leads to better interview questions.
       </p>
       
-      {completionPercentage < 100 && (
-        <Link href="/dashboard/profile">
-          <button className="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
-            Complete Profile
-          </button>
-        </Link>
-      )}
+      <button
+        onClick={() => router.push('/dashboard/profile')}
+        className="w-full py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium transition-colors duration-200"
+      >
+        Complete Profile
+      </button>
     </div>
   );
-} 
+}
+
+export default ProfileCompletion; 

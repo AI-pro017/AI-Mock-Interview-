@@ -200,22 +200,22 @@ function Feedback({ params }) {
 
   if (isLoading) {
     return (
-      <div className="p-10 flex flex-col items-center justify-center h-screen">
-        <h2 className="text-2xl font-bold text-gray-700">Generating your feedback report...</h2>
-        <p className="text-gray-500 mt-2">This might take a moment. Please don't refresh the page.</p>
-        <Progress value={50} className="w-1/3 mt-4 animate-pulse" />
+      <div className="p-10 flex flex-col items-center justify-center h-screen bg-gray-900 text-white">
+        <h2 className="text-2xl font-bold">Generating your feedback report...</h2>
+        <p className="text-gray-300 mt-2">This might take a moment. Please don't refresh the page.</p>
+        <Progress value={50} className="w-1/3 mt-4 animate-pulse bg-gray-700" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-10 flex flex-col items-center justify-center">
-        <h2 className='font-bold text-xl text-red-500'>Sorry, we couldn't generate your feedback report at this time.</h2>
-        <p className="text-gray-500 mt-4">{error}</p>
+      <div className="p-10 flex flex-col items-center justify-center bg-gray-900 text-white">
+        <h2 className='font-bold text-xl text-red-400'>Sorry, we couldn't generate your feedback report at this time.</h2>
+        <p className="text-gray-300 mt-4">{error}</p>
         <div className="flex gap-4 mt-6">
-          <Button onClick={handleRetry} variant="outline">Try Again</Button>
-          <Button onClick={() => router.replace('/dashboard')}>Go to Dashboard</Button>
+          <Button onClick={handleRetry} variant="outline" className="border-gray-600 text-white hover:bg-gray-800">Try Again</Button>
+          <Button onClick={() => router.replace('/dashboard')} className="bg-blue-600 hover:bg-blue-700 text-white">Go to Dashboard</Button>
         </div>
       </div>
     );
@@ -223,12 +223,12 @@ function Feedback({ params }) {
   
   if (!interviewReport) {
     return (
-      <div className="p-10 text-center">
-        <h2 className='font-bold text-xl text-gray-500'>No Interview Feedback Report Found</h2>
-        <p className="text-gray-500 mt-2">It seems the analysis for this interview has not been completed yet.</p>
+      <div className="p-10 text-center bg-gray-900 text-white">
+        <h2 className='font-bold text-xl'>No Interview Feedback Report Found</h2>
+        <p className="text-gray-300 mt-2">It seems the analysis for this interview has not been completed yet.</p>
         <div className="flex gap-4 mt-6 justify-center">
-          <Button onClick={handleRetry} variant="outline">Try Again</Button>
-          <Button onClick={() => router.replace('/dashboard')}>Go to Dashboard</Button>
+          <Button onClick={handleRetry} variant="outline" className="border-gray-600 text-white hover:bg-gray-800">Try Again</Button>
+          <Button onClick={() => router.replace('/dashboard')} className="bg-blue-600 hover:bg-blue-700 text-white">Go to Dashboard</Button>
         </div>
       </div>
     );
@@ -245,90 +245,90 @@ function Feedback({ params }) {
   })));
 
   return (
-    <div className='p-4 md:p-10 bg-gray-50 min-h-screen'>
-      <h2 className='text-3xl font-bold text-gray-800'>Interview Performance Report</h2>
-      <p className='text-gray-600 mt-1'>Here's a detailed breakdown of your performance.</p>
+    <div className='p-4 md:p-10 bg-gray-900 min-h-screen text-white'>
+      <h2 className='text-3xl font-bold'>Interview Performance Report</h2>
+      <p className='text-gray-300 mt-1'>Here's a detailed breakdown of your performance.</p>
 
       {/* Overall Performance Section */}
-      <div className='mt-8 p-6 bg-white rounded-xl shadow-md'>
-        <h3 className="text-2xl font-semibold text-gray-800 flex items-center">
-          <BarChart className="mr-3 text-blue-500" />
+      <div className='mt-8 p-6 bg-gray-800 rounded-xl shadow-md border border-gray-700'>
+        <h3 className="text-2xl font-semibold flex items-center">
+          <BarChart className="mr-3 text-blue-400" />
           Overall Summary
         </h3>
         <div className="mt-4 grid md:grid-cols-3 gap-6 text-center">
-          <div className="p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm font-medium text-blue-700">Overall Score</p>
-            <p className="text-4xl font-bold text-blue-600">{interviewReport.overallScore}/100</p>
+          <div className="p-4 bg-blue-900 bg-opacity-30 rounded-lg border border-blue-800">
+            <p className="text-sm font-medium text-blue-300">Overall Score</p>
+            <p className="text-4xl font-bold text-blue-400">{interviewReport.overallScore}/100</p>
           </div>
-          <div className="p-4 bg-green-50 rounded-lg md:col-span-2 text-left">
-            <p className="text-sm font-medium text-green-700">Strengths</p>
-            <p className="text-gray-700 mt-1">{interviewReport.strengths}</p>
+          <div className="p-4 bg-green-900 bg-opacity-20 rounded-lg md:col-span-2 text-left border border-green-800">
+            <p className="text-sm font-medium text-green-300">Strengths</p>
+            <p className="text-gray-300 mt-1">{interviewReport.strengths}</p>
           </div>
-          <div className="p-4 bg-red-50 rounded-lg md:col-span-3 text-left">
-            <p className="text-sm font-medium text-red-700">Areas for Improvement</p>
-            <p className="text-gray-700 mt-1">{interviewReport.weaknesses}</p>
+          <div className="p-4 bg-red-900 bg-opacity-20 rounded-lg md:col-span-3 text-left border border-red-800">
+            <p className="text-sm font-medium text-red-300">Areas for Improvement</p>
+            <p className="text-gray-300 mt-1">{interviewReport.weaknesses}</p>
           </div>
-          <div className="p-4 bg-yellow-50 rounded-lg md:col-span-3 text-left">
-            <p className="text-sm font-medium text-yellow-800">Your Personalized Improvement Plan</p>
-            <p className="text-gray-700 mt-1 whitespace-pre-wrap">{interviewReport.improvementPlan}</p>
+          <div className="p-4 bg-yellow-900 bg-opacity-20 rounded-lg md:col-span-3 text-left border border-yellow-800">
+            <p className="text-sm font-medium text-yellow-300">Your Personalized Improvement Plan</p>
+            <p className="text-gray-300 mt-1 whitespace-pre-wrap">{interviewReport.improvementPlan}</p>
           </div>
         </div>
       </div>
 
       {/* Detailed Question-by-Question Analysis */}
       <div className="mt-8">
-        <h3 className="text-2xl font-semibold text-gray-800 mb-4">Detailed Analysis</h3>
+        <h3 className="text-2xl font-semibold mb-4">Detailed Analysis</h3>
         {detailedFeedback.map((item, index) => (
-          <Collapsible key={index} className='mb-4 bg-white rounded-xl shadow-sm overflow-hidden'>
-            <CollapsibleTrigger className='p-4 bg-gray-50 hover:bg-gray-100 flex justify-between items-center w-full text-left'>
-              <span className="font-semibold text-gray-700">{index + 1}. {item.question}</span>
+          <Collapsible key={index} className='mb-4 bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-700'>
+            <CollapsibleTrigger className='p-4 bg-gray-800 hover:bg-gray-700 flex justify-between items-center w-full text-left'>
+              <span className="font-semibold text-white">{index + 1}. {item.question}</span>
               <div className="flex items-center">
-                <span className={`font-bold mr-4 ${item.rating >= 7 ? 'text-green-600' : item.rating >= 4 ? 'text-yellow-600' : 'text-red-600'}`}>
+                <span className={`font-bold mr-4 ${item.rating >= 7 ? 'text-green-400' : item.rating >= 4 ? 'text-yellow-400' : 'text-red-400'}`}>
                   {item.rating}/10
                 </span>
-                <ChevronsUpDown className='h-5 w-5 text-gray-500' />
+                <ChevronsUpDown className='h-5 w-5 text-gray-400' />
               </div>
             </CollapsibleTrigger>
-            <CollapsibleContent className="p-4 border-t border-gray-200">
+            <CollapsibleContent className="p-4 border-t border-gray-700">
               <div className='flex flex-col gap-4'>
                 <div>
-                  <h4 className="font-semibold text-gray-600">Your Answer:</h4>
-                  <p className="p-3 mt-1 border rounded-lg bg-gray-50 text-gray-800">{item.userAns || "No answer provided."}</p>
+                  <h4 className="font-semibold text-gray-300">Your Answer:</h4>
+                  <p className="p-3 mt-1 border border-gray-700 rounded-lg bg-gray-900 text-gray-300">{item.userAns || "No answer provided."}</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-600">AI Feedback:</h4>
-                  <p className="p-3 mt-1 border rounded-lg bg-blue-50 text-blue-800">{item.feedback}</p>
+                  <h4 className="font-semibold text-gray-300">AI Feedback:</h4>
+                  <p className="p-3 mt-1 border border-blue-800 rounded-lg bg-blue-900 bg-opacity-20 text-blue-300">{item.feedback}</p>
                 </div>
 
                 {/* Analysis Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2">
                   <MetricItem 
-                    icon={<Speech />} 
+                    icon={<Speech className="text-blue-400" />} 
                     label="Clarity" 
                     value={item.clarityScore} 
                   />
                   <MetricItem 
-                    icon={<Zap />} 
+                    icon={<Zap className="text-yellow-400" />} 
                     label="Pace" 
                     value={item.paceScore} 
                   />
                   <MetricItem 
-                    icon={<Smile />} 
+                    icon={<Smile className="text-green-400" />} 
                     label="Confidence" 
                     value={item.confidenceScore} 
                   />
                   <MetricItem 
-                    icon={<BrainCircuit />} 
+                    icon={<BrainCircuit className="text-purple-400" />} 
                     label="Technical" 
                     value={item.technicalScore} 
                   />
                   <MetricItem 
-                    icon={<BookCheck />} 
+                    icon={<BookCheck className="text-teal-400" />} 
                     label="Grammar" 
                     value={item.grammarScore} 
                   />
                   <MetricItem 
-                    icon={<Speech />} 
+                    icon={<Speech className="text-orange-400" />} 
                     label="Filler Words" 
                     value={item.fillerWords} 
                     isCount={true} 
@@ -341,7 +341,7 @@ function Feedback({ params }) {
       </div>
       
       <div className="text-center mt-8">
-        <Button onClick={() => router.replace('/dashboard')}>Back to Dashboard</Button>
+        <Button onClick={() => router.replace('/dashboard')} className="bg-blue-600 hover:bg-blue-700 text-white">Back to Dashboard</Button>
       </div>
     </div>
   );
@@ -360,11 +360,11 @@ const MetricItem = ({ icon, label, value, isCount = false }) => {
   }
   
   return (
-    <div className="flex items-center p-2 bg-gray-100 rounded-lg">
-      <div className="text-gray-500">{icon}</div>
+    <div className="flex items-center p-2 bg-gray-700 rounded-lg">
+      <div className="text-gray-400">{icon}</div>
       <div className="ml-3">
-        <p className="text-sm font-medium text-gray-600">{label}</p>
-        <p className="text-lg font-semibold text-gray-900">
+        <p className="text-sm font-medium text-gray-300">{label}</p>
+        <p className="text-lg font-semibold text-gray-100">
           {displayValue}{isCount ? '' : '/10'}
         </p>
       </div>

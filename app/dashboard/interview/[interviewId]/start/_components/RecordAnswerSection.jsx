@@ -230,7 +230,7 @@ export default function RecordAnswerSection({ mockInterview }) {
     };
 
     return (
-        <div className='flex items-center justify-center flex-col'>
+        <div className='flex items-center justify-center flex-col bg-gray-900 text-white'>
             <div className='relative flex flex-col justify-center items-center bg-black rounded-lg p-5'>
                 <Webcam
                     ref={webcamRef}
@@ -245,15 +245,30 @@ export default function RecordAnswerSection({ mockInterview }) {
             <Button
                 disabled={isAwaitingAIResponse && isInterviewStarted}
                 onClick={isInterviewStarted ? (isRecording ? stopUserRecording : startRecording) : startInterview}
-                className="my-10"
+                className="my-10 bg-blue-600 hover:bg-blue-700 text-white"
             >
                 {isInterviewStarted ? 
                     (isRecording ? 
-                        <span className='flex items-center gap-2'><StopCircle /> Stop Answering</span> : 
-                        (isAwaitingAIResponse ? 'AI is Speaking...' : 'Start Answering')
-                    ) 
-                : 'Start Interview'}
+                        <><StopCircle className="mr-2" /> Stop Recording</> : 
+                        <><Mic className="mr-2" /> Start Recording</>
+                    ) : 
+                    "Start Interview"
+                }
             </Button>
+
+            {userAnswer && (
+                <div className='p-5 border border-gray-700 rounded-lg bg-gray-800 w-full mb-5'>
+                    <h2 className='font-bold mb-2'>Your Answer:</h2>
+                    <p>{userAnswer}</p>
+                </div>
+            )}
+
+            {isAwaitingAIResponse && isInterviewStarted && (
+                <div className='text-center my-5'>
+                    <div className='inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]'></div>
+                    <p className='mt-2'>Processing response...</p>
+                </div>
+            )}
         </div>
     );
 }

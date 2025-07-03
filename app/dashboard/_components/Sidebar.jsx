@@ -47,17 +47,21 @@ const Sidebar = () => {
     },
   ];
 
+  const activeMenu = menuList.find((item) => item.path === pathname);
+
   return (
-    <div className="h-screen w-64 bg-[#111827] fixed left-0 top-0 text-white">
-      <div className="p-4 flex justify-center items-center border-b border-gray-700">
-        <Link href="/">
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 rounded-md p-1">
-              <Image src="/logo.svg" alt="logo" width={28} height={28} />
-            </div>
-            <span className="font-bold text-lg">Logoipsum</span>
-          </div>
-        </Link>
+    <div className="hidden md:block h-screen w-64 bg-[#111827] fixed left-0 top-0 text-white">
+      <div className="p-4 flex items-center gap-3 border-b border-gray-700">
+        <Image
+          src="/favicon.jpg"
+          alt="logo"
+          width={40}
+          height={40}
+          className="rounded-md"
+        />
+        {activeMenu && (
+          <h2 className="font-bold text-lg">{activeMenu.name}</h2>
+        )}
       </div>
       <div className="p-4">
         {menuList.map((item) => (

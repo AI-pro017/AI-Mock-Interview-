@@ -1,12 +1,11 @@
-// app/dashboard/page.jsx
 import { auth } from "@/auth"
 import { db } from "@/utils/db";
 import { users, MockInterview, InterviewReport } from "@/utils/schema";
 import { eq, desc } from "drizzle-orm";
 import { redirect } from 'next/navigation';
-import DashboardClient from "./DashboardClient";
+import InterviewHistoryClient from "./InterviewHistoryClient";
 
-async function DashboardPage() {
+async function InterviewHistoryPage() {
     const session = await auth();
     if (!session?.user) {
         redirect('/api/auth/signin');
@@ -23,22 +22,22 @@ async function DashboardPage() {
 
     // Fetch interviews and join with reports to get scores
     const interviewsWithScores = await db.select({
-        interview: MockInterview,
-        report: InterviewReport
-      })
-      .from(MockInterview)
-      .leftJoin(InterviewReport, eq(MockInterview.mockId, InterviewReport.mockIdRef))
-      .where(eq(MockInterview.createdBy, session.user.email))
-      .orderBy(desc(MockInterview.id));
+      interview: MockInterview,
+      report: InterviewReport
+    })
+    .from(MockInterview)
+    .leftJoin(InterviewReport, eq(MockInterview.mockId, InterviewReport.mockIdRef))
+    .where(eq(MockInterview.createdBy, session.user.email))
+    .orderBy(desc(MockInterview.id));
 
     const interviews = interviewsWithScores.map(result => ({
-        ...result.interview,
-        overallScore: result.report?.overallScore
+      ...result.interview,
+      overallScore: result.report?.overallScore
     }));
 
-  return (
-        <DashboardClient user={user} interviews={interviews} />
+    return (
+        <InterviewHistoryClient user={user} interviews={interviews} />
     )
 }
 
-export default DashboardPage;
+export default InterviewHistoryPage; 

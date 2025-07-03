@@ -51,11 +51,11 @@ export default function InterviewStartPage() {
 
     if (!isSetupComplete) {
         return (
-            <div className="container mx-auto p-5">
+            <div className="container mx-auto p-5 bg-gray-900 text-white">
                 <h1 className="text-2xl font-bold mb-6">Interview Setup</h1>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <Card className="p-6">
+                        <Card className="p-6 bg-gray-800 border-gray-700">
                             <h2 className="text-xl font-bold mb-4">Interview Details</h2>
                             {interview && (
                                 <div className="space-y-4">
@@ -87,6 +87,7 @@ export default function InterviewStartPage() {
                     <Button 
                         size="lg" 
                         onClick={handleStartInterview}
+                        className="bg-blue-600 hover:bg-blue-700"
                     >
                         Start Interview
                     </Button>
@@ -96,7 +97,7 @@ export default function InterviewStartPage() {
     }
 
     return (
-        <div className="container mx-auto p-5">
+        <div className="container mx-auto p-5 bg-gray-900 text-white">
             {interview && (
                 <InterviewSession 
                     interview={interview} 

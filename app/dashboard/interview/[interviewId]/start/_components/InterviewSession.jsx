@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Mic, MicOff, VideoOff, Volume2, Play } from 'lucide-react';
+import { Mic, MicOff, VideoOff, Volume2, Play, AlertTriangle } from 'lucide-react';
 import { useInterviewEngine } from './hooks/useInterviewEngine';
 import ConversationDisplay from './ConversationDisplay';
 import AudioVisualizer from './AudioVisualizer';
@@ -311,15 +311,25 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       return;
     }
     
+    // Toggle the mute state
     const newMuteState = !isMicMuted;
+    console.log("Toggling microphone state to:", newMuteState ? "muted" : "unmuted");
+    
+    // Always set the state first
     setIsMicMuted(newMuteState);
     
+    // If we have audio tracks, update them
     if (cameraStream) {
       const audioTracks = cameraStream.getAudioTracks();
       audioTracks.forEach(track => {
         track.enabled = !newMuteState;
       });
     }
+    
+    // Add a small delay to allow the state to propagate
+    setTimeout(() => {
+      console.log("Microphone state is now:", isMicMuted ? "muted" : "unmuted");
+    }, 100);
   };
 
   const toggleCamera = () => {
@@ -360,235 +370,229 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     }
   }, [shouldUnmute, isMicMuted]);
 
+  // Add a useEffect to log microphone state changes for debugging
+  useEffect(() => {
+    console.log("Microphone state changed:", isMicMuted ? "muted" : "unmuted");
+  }, [isMicMuted]);
+
   return (
-    <div className="flex flex-col h-full w-full">
-      {/* Header with title and timer - fixed at top */}
-      <div className="bg-white z-10 pt-4 pb-2">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">
-            {interview.jobPosition} Interview <span className="text-gray-500 font-normal">({interview.interviewStyle}, {interview.focus} Focus)</span>
-          </h2>
-          <div className="flex items-center gap-4">
-            <div className="font-medium">Time Remaining: {formatTime(remainingTime)}</div>
-            <Button 
-              variant={isInterviewActive ? "destructive" : "default"}
-              onClick={isInterviewActive ? endInterview : startInterview}
-              className="px-4 py-2 flex items-center gap-2"
-              disabled={isMediaLoading || isAnalyzing}
-            >
-              {isInterviewActive ? (
-                "End Interview"
-              ) : (
-                <>
-                  <Play className="h-4 w-4" />
-                  Start Interview
-                </>
-              )}
-            </Button>
+    <div className="bg-gray-900 text-white">
+      {isAnalyzing ? (
+        <div className="flex flex-col items-center justify-center h-screen">
+          <div className="text-center mb-8">
+            <h2 className="text-xl font-bold mb-3">Analyzing your interview</h2>
+            <p className="text-gray-300">
+              We're processing your responses and preparing your feedback.
+            </p>
+            <p className="text-gray-300 mt-2">
+              This may take a few moments.
+            </p>
+          </div>
+          <div className="relative w-16 h-16">
+            <div className="absolute inset-0 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
           </div>
         </div>
-        
-        {/* Controls section - fixed at top with sticky behavior */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          {/* Left column: Voice settings */}
-          <div className="bg-white p-4 rounded-lg shadow-sm">
-            <h3 className="font-medium mb-3">Voice Settings</h3>
-            
-            <div className="space-y-4">
-              {/* Voice Speed Slider */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <span>Voice Speed: {voiceSpeed.toFixed(1)}x</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="0.5" 
-                  max="1.5" 
-                  step="0.1" 
-                  value={voiceSpeed} 
-                  onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
-                  className="w-full"
+      ) : (
+        <div className="p-4">
+          {/* Header with interview info */}
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-lg font-bold">
+                {interview.jobPosition} Interview
+              </h2>
+              <p className="text-sm text-gray-300">
+                {interview.interviewStyle} ({interview.focus})
+              </p>
+            </div>
+            <div className="text-xl font-mono bg-gray-700 px-3 py-1 rounded">
+              {formatTime(remainingTime)}
+            </div>
+          </div>
+
+          {/* Main content area - full width */}
+          <div className="flex flex-col">
+            {/* Video and conversation area */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              {/* Camera/video area */}
+              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                {cameraEnabled ? (
+                  <>
+                    <video
+                      ref={videoRef}
+                      className="w-full h-full object-cover"
+                      autoPlay
+                      playsInline
+                      muted
+                    />
+                    {!cameraStream && !isMediaLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center text-center p-4 bg-gray-900 bg-opacity-80">
+                        <div>
+                          <VideoOff className="h-12 w-12 mx-auto mb-2" />
+                          <p>Camera is unavailable</p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2 bg-gray-700 hover:bg-gray-600 text-white"
+                            onClick={() => initializeMedia()}
+                          >
+                            Retry Camera Access
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <VideoOff className="h-12 w-12 mx-auto mb-2" />
+                      <p>Camera disabled</p>
+                    </div>
+                  </div>
+                )}
+
+                {isMediaLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-80">
+                    <div className="text-center">
+                      <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                      <p>Setting up media...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Interviewer information */}
+              <div className="flex flex-col items-center justify-center bg-gray-800 rounded-lg p-4">
+                <p className="text-sm text-gray-400 mb-2">Interviewer</p>
+                <h3 className="text-xl font-semibold mb-1">{interviewer?.name || "Priya Patel"}</h3>
+                <p className="text-gray-400 mb-4">{interviewer?.title || "Talent Acquisition Specialist"}</p>
+                
+                <p className="text-center text-sm text-gray-300 max-w-md">
+                  Your interview will begin when you click the "Start Interview" button.
+                  Remember to speak clearly and take your time with responses.
+                </p>
+              </div>
+            </div>
+
+            {/* Conversation display - full width */}
+            <Card className="bg-gray-800 border-gray-700 overflow-hidden h-[calc(70vh-8rem)] mb-4">
+              {isInterviewActive ? (
+                <ConversationDisplayWithAutoScroll
+                  conversation={conversation}
+                  isAISpeaking={isAISpeaking}
+                  isUserSpeaking={isUserSpeaking}
+                  interimTranscript={interimTranscript}
+                  isGenerating={isGenerating}
+                  isInitialTTSLoading={isInitialTTSLoading}
+                  interviewer={interviewer}
                 />
-              </div>
-              
-              {/* Natural Speech Toggle */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">Natural Speech Patterns</div>
-                  <div className="text-xs text-gray-500">Enable more human-like pauses and intonation</div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                  <p className="text-gray-300 mb-6">
+                    This interview will last approximately {interview.duration} minutes.
+                  </p>
                 </div>
-                <Switch checked={useNaturalSpeech} onCheckedChange={setUseNaturalSpeech} />
-              </div>
-              
-              {/* Background Noise Filtering */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">Background Noise Filtering</div>
-                  <div className="text-xs text-gray-500">Reduces background noise in voice recognition</div>
+              )}
+            </Card>
+
+            {/* Bottom controls - compact row */}
+            <div className="flex flex-wrap gap-4 items-center justify-between bg-gray-800 p-4 rounded-lg">
+              <div className="flex items-center gap-4">
+                {/* Voice speed control */}
+                <div className="flex items-center gap-2">
+                  <Volume2 className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm whitespace-nowrap">Speed: {voiceSpeed}x</span>
+                  <Slider
+                    min={0.5}
+                    max={2}
+                    step={0.1}
+                    value={[voiceSpeed]}
+                    onValueChange={(value) => setVoiceSpeed(value[0])}
+                    disabled={isInterviewActive}
+                    className="w-24 cursor-pointer"
+                  />
                 </div>
-                <Switch checked={true} onCheckedChange={() => {}} />
+
+                {/* Natural speech toggle */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm whitespace-nowrap">Human-like pauses</span>
+                  <Switch
+                    id="natural-speech-toggle"
+                    checked={useNaturalSpeech}
+                    onCheckedChange={setUseNaturalSpeech}
+                    disabled={isInterviewActive}
+                  />
+                </div>
+
+                {/* Microphone status */}
+                <div className="text-sm text-gray-300">
+                  {isMicMuted && <span className="bg-gray-700 px-2 py-1 rounded text-xs">Microphone disabled until interview starts</span>}
+                </div>
               </div>
-              
-              {/* Audio Visualizer - Shows voice input */}
-              <div className="mt-2">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="font-medium">Voice Input</div>
-                  <div className="flex items-center justify-between gap-2">
+
+              {/* Main interview controls */}
+              <div className="flex gap-4">
+                {isInterviewActive ? (
+                  <>
                     <Button
                       onClick={toggleMicrophone}
-                      variant={isMicMuted ? "destructive" : "default"}
-                      className="flex items-center gap-1"
-                      disabled={isAISpeaking || isInitialTTSLoading || (isGenerating && !isAISpeaking) || (!isInterviewActive && isMicMuted)}
+                      className={`flex items-center justify-center gap-2 ${
+                        isMicMuted 
+                          ? "bg-red-600 hover:bg-red-700" 
+                          : "bg-blue-600 hover:bg-blue-700"
+                      } text-white`}
+                      disabled={!isInterviewActive}
                     >
                       {isMicMuted ? (
                         <>
-                          <MicOff className="w-4 h-4" /> {isInterviewActive ? "Unmute" : "Disabled until interview starts"}
+                          <MicOff className="h-5 w-5" />
+                          <span>Unmute</span>
                         </>
                       ) : (
                         <>
-                          <Mic className="w-4 h-4" /> {isListening ? "Mute" : "Disabled"}
+                          <Mic className="h-5 w-5" />
+                          <span>Mute</span>
                         </>
                       )}
                     </Button>
-                    
-                    {/* Clear indicator of mic status */}
-                    <div className="text-sm">
-                      {!isInterviewActive && isMicMuted ? (
-                        <span className="text-amber-500">Microphone disabled until interview starts</span>
-                      ) : isInitialTTSLoading ? (
-                        <span className="text-amber-500">Microphone disabled during interview loading</span>
-                      ) : isGenerating && !isAISpeaking ? (
-                        <span className="text-amber-500">Microphone disabled while loading voice</span>
-                      ) : isAISpeaking ? (
-                        <span className="text-amber-500">Microphone disabled while AI is speaking</span>
-                      ) : isListening ? (
-                        <span className="text-green-500">Microphone active - speak now</span>
-                      ) : (
-                        <span className="text-gray-500">Microphone inactive</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="h-16 bg-gray-100 rounded-md overflow-hidden">
-                  <AudioVisualizer 
-                    audioStream={cameraStream}
-                    isActive={isUserSpeaking && !isMicMuted}
-                    className="w-full h-full"
-                  />
-                  {debouncedInterimTranscript && (
-                    <div className="text-xs p-2 bg-gray-100 text-gray-700">
-                      {processTranscript(debouncedInterimTranscript, 0.8)}
-                    </div>
-                  )}
-                </div>
+                    <Button
+                      onClick={endInterview}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      End Interview
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={startInterview}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    disabled={isMediaLoading}
+                  >
+                    <Play className="h-5 w-5 mr-2" />
+                    Start Interview
+                  </Button>
+                )}
               </div>
             </div>
-          </div>
-          
-          {/* Right column: Camera feed */}
-          <div className="bg-white p-4 rounded-lg shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-medium">Camera Feed</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleCamera}
-                className="flex items-center gap-1"
-              >
-                {cameraEnabled ? "Disable Camera" : "Enable Camera"}
-              </Button>
-            </div>
-            
-            <div className="aspect-video bg-gray-900 rounded-md overflow-hidden relative">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-              
-              {/* Camera Overlay - Show when camera is disabled or not available */}
-              {(!cameraEnabled || !cameraStream || (cameraStream && cameraStream.getVideoTracks().length === 0)) && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black bg-opacity-80">
-                  <div className="text-center p-4">
-                    <VideoOff className="mx-auto w-16 h-16 mb-4" />
-                    <p className="text-lg font-medium">Camera is {cameraEnabled ? "unavailable" : "disabled"}</p>
-                    {cameraEnabled && (
-                      <Button 
-                        className="mt-4" 
-                        variant="secondary"
-                        onClick={initializeMedia}
-                      >
-                        Retry Camera Access
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Conversation display - scrollable area below fixed controls */}
-      <ConversationDisplayWithAutoScroll 
-        conversation={conversation} 
-        isAISpeaking={isAISpeaking} 
-        isUserSpeaking={isUserSpeaking}
-        interimTranscript={debouncedInterimTranscript}
-        isGenerating={isGenerating}
-        isInitialTTSLoading={isInitialTTSLoading}
-        interviewer={interviewer}
-      />
-
-      {/* Show loading or error messages if present */}
-      {(isMediaLoading || isAnalyzing || mediaError || engineError) && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
-            {isMediaLoading && (
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-lg font-medium">Initializing media devices...</p>
-              </div>
-            )}
-            
-            {isAnalyzing && (
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-lg font-medium">Analyzing interview responses...</p>
-              </div>
-            )}
-            
-            {(mediaError || engineError) && (
-              <div className="text-center">
-                <div className="text-red-500 mb-4">
-                  <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <p className="text-lg font-medium text-red-700 mb-2">Error</p>
-                <p className="text-gray-700">
-                  {/* Safely extract error message from Error objects */}
-                  {mediaError ? (typeof mediaError === 'object' ? 
-                    (mediaError?.message || 'Unknown media error') : mediaError) : ''}
-                  {engineError ? (typeof engineError === 'object' ? 
-                    (engineError?.message || 'Unknown engine error') : engineError) : ''}
-                </p>
-                <Button 
-                  className="mt-4" 
-                  onClick={() => {
-                    setMediaError(null);
-                    setError(null);
-                  }}
-                >
-                  Dismiss
-                </Button>
-              </div>
-            )}
           </div>
         </div>
       )}
+
+      {/* Status banners */}
+      <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2 pointer-events-none">
+        {isUserSpeaking && shouldUnmute && isMicMuted && (
+          <div className="bg-red-900 text-white px-4 py-2 rounded-md flex items-center">
+            <MicOff className="h-4 w-4 mr-2" />
+            <span>Audio detected but microphone is muted</span>
+          </div>
+        )}
+
+        {engineError && (
+          <div className="bg-red-900 text-white px-4 py-2 rounded-md flex items-center">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            <span>{engineError.message}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -603,78 +607,127 @@ function ConversationDisplayWithAutoScroll({
   isInitialTTSLoading,
   interviewer
 }) {
-  const scrollContainerRef = useRef(null);
+  const containerRef = useRef(null);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const previousScrollHeightRef = useRef(0);
   
-  // Auto-scroll to bottom when conversation changes
+  // Reset auto-scroll when conversation changes
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      const scrollContainer = scrollContainerRef.current;
-      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    setAutoScroll(true);
+  }, [conversation.length]);
+
+  // Auto-scroll logic
+  useEffect(() => {
+    if (containerRef.current && autoScroll) {
+      const { scrollHeight, clientHeight } = containerRef.current;
+      
+      // Check if content has changed since last scroll
+      if (scrollHeight > previousScrollHeightRef.current) {
+        containerRef.current.scrollTop = scrollHeight - clientHeight;
+        previousScrollHeightRef.current = scrollHeight;
+      }
     }
-  }, [conversation, interimTranscript]);
-  
+  }, [conversation, interimTranscript, isAISpeaking, isGenerating, autoScroll]);
+
+  // Detect manual scroll to disable auto-scrolling
+  const handleScroll = () => {
+    if (containerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+      const isScrolledUp = scrollHeight - clientHeight - scrollTop > 50;
+      
+      if (isScrolledUp && autoScroll) {
+        setAutoScroll(false);
+      } else if (!isScrolledUp && !autoScroll) {
+        setAutoScroll(true);
+      }
+    }
+  };
+
+  // Current interim transcript
+  const currentInterim = interimTranscript && !isAISpeaking ? interimTranscript : "";
+
   return (
-    <div 
-      ref={scrollContainerRef} 
-      className="flex-grow bg-white rounded-lg shadow-sm overflow-y-auto"
-      style={{ maxHeight: 'calc(100vh - 350px)' }}
-    >
-      <div className="p-4">
-        {/* Display interviewer info at the beginning when no conversation yet */}
-        {interviewer && conversation.length === 0 && !isAISpeaking && !isInitialTTSLoading && (
-          <div className="mb-4 p-4 rounded-lg bg-blue-50">
-            <div className="font-medium mb-1">Your Interviewer</div>
-            <p className="text-sm text-blue-800">
-              {interviewer.name}, {interviewer.title} at {interviewer.company}
+    <div className="h-full overflow-hidden flex flex-col">
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+        onScroll={handleScroll}
+      >
+        {conversation.length === 0 && isInitialTTSLoading ? (
+          <div className="flex flex-col items-center justify-center h-full text-center p-6">
+            <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-gray-300">
+              Preparing your interview session...
             </p>
           </div>
-        )}
-        
-        {/* If we're loading TTS and there's no conversation yet, show loading indicator */}
-        {isInitialTTSLoading && conversation.length === 0 && (
-          <div className="text-center p-8">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-lg font-medium">Loading interview...</p>
-          </div>
-        )}
-        
-        {/* Display conversation items */}
-        {conversation.map((item, index) => (
-          <div 
-            key={index} 
-            className={`mb-4 p-4 rounded-lg ${
-              item.role === 'ai' ? 'bg-blue-50' : 'bg-gray-100'
-            }`}
-          >
-            <div className="font-medium mb-1">
-              {item.role === 'ai' ? 'Interviewer' : 'You'}
-              {item.role === 'ai' && isAISpeaking && index === conversation.length - 1 && (
-                <span className="ml-2 text-blue-500 text-sm animate-pulse">Speaking...</span>
-              )}
-            </div>
-            <div>{item.text}</div>
-          </div>
-        ))}
-        
-        {/* Show "Loading voice..." when generating but not yet speaking */}
-        {isGenerating && !isAISpeaking && !isInitialTTSLoading && (
-          <div className="mb-4 p-4 rounded-lg bg-blue-50">
-            <div className="font-medium mb-1">
-              Interviewer <span className="ml-2 text-amber-500 text-sm animate-pulse">Loading voice...</span>
-            </div>
-          </div>
-        )}
-        
-        {/* Show interim transcript when user is speaking */}
-        {isUserSpeaking && interimTranscript && (
-          <div className="mb-4 p-4 rounded-lg bg-gray-100 border border-gray-300 border-dashed">
-            <div className="font-medium mb-1">
-              You <span className="ml-2 text-blue-500 text-sm animate-pulse">Speaking...</span>
-            </div>
-            <div className="text-gray-600">{interimTranscript}</div>
-          </div>
+        ) : (
+          <>
+            {conversation.map((message, index) => (
+              <div 
+                key={index} 
+                className="group"
+              >
+                <div className={`p-3 rounded-lg max-w-[85%] ${
+                  message.role === 'ai' 
+                    ? 'bg-gray-800 text-white ml-0 mr-auto' 
+                    : 'bg-blue-900 text-white ml-auto mr-0'
+                }`}>
+                  <div className="font-medium mb-1 flex items-center">
+                    {message.role === 'ai' ? (
+                      <>
+                        <span className="mr-2">
+                          {interviewer?.name || 'Interviewer'}
+                        </span>
+                        {isAISpeaking && conversation[index] === conversation[conversation.length - 1] && (
+                          <span className="text-blue-400 text-xs animate-pulse">Speaking...</span>
+                        )}
+                      </>
+                    ) : (
+                      'You'
+                    )}
+                  </div>
+                  <div>{message.text}</div>
+                </div>
+              </div>
+            ))}
+            
+            {/* Show interim transcript */}
+            {currentInterim && (
+              <div className="p-3 bg-blue-900 text-white rounded-lg max-w-[85%] ml-auto mr-0 opacity-80">
+                <div className="font-medium mb-1">You</div>
+                <div>
+                  <span className="italic text-gray-300">{currentInterim}</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Loading indicator for AI response */}
+            {isGenerating && (
+              <div className="p-3 bg-gray-800 text-white rounded-lg max-w-[85%] ml-0 mr-auto flex items-center">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
+      
+      {/* Auto-scroll indicator */}
+      {!autoScroll && (
+        <button 
+          onClick={() => {
+            setAutoScroll(true);
+          }}
+          className="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full shadow-lg transition-all"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
