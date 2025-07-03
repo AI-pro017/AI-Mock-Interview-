@@ -4,14 +4,14 @@ import Sidebar from './_components/Sidebar'
 
 function DashboardLayout({children}) {
   return (
-    <div>
+    <div className="bg-gray-50">
       <Sidebar />
       <div className="ml-64">
         <Header />
-        <main className="p-8 bg-gray-50 min-h-screen">
-        {children}
+        <main className="p-6 min-h-screen">
+          {children}
         </main>
-        </div>
+      </div>
     </div>
   )
 }

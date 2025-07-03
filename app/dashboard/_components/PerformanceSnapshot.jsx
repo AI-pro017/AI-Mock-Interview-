@@ -11,32 +11,37 @@ function PerformanceSnapshot() {
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm">
       <h2 className="text-xl font-semibold mb-4 text-gray-800">Performance Snapshot</h2>
-      <div className="space-y-4">
+      
+      <div className="space-y-5">
         <div className="flex items-center gap-4">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <BarChart className="h-6 w-6 text-blue-600" />
+          <div className="p-2 bg-blue-100 rounded-md">
+            <BarChart className="h-5 w-5 text-blue-600" />
           </div>
           <div>
-            <p className="text-sm text-gray-500">Average Score</p>
-            <p className="text-xl font-bold text-gray-800">{performanceData.averageScore}%</p>
+            <p className="text-xs text-gray-500 mb-1">Average Score</p>
+            <div className="flex items-baseline gap-1">
+              <p className="text-lg font-bold text-gray-800">{performanceData.averageScore}%</p>
+            </div>
           </div>
         </div>
+        
         <div className="flex items-center gap-4">
-          <div className="p-2 bg-green-100 rounded-lg">
-            <TrendingUp className="h-6 w-6 text-green-600" />
+          <div className="p-2 bg-green-100 rounded-md">
+            <TrendingUp className="h-5 w-5 text-green-600" />
           </div>
           <div>
-            <p className="text-sm text-gray-500">Confidence Trend</p>
-            <p className="text-lg font-semibold text-green-600 capitalize">Improving</p>
+            <p className="text-xs text-gray-500 mb-1">Confidence Trend</p>
+            <p className="text-base font-medium text-green-600">Improving</p>
           </div>
         </div>
+        
         <div className="flex items-center gap-4">
-          <div className="p-2 bg-yellow-100 rounded-lg">
-            <Star className="h-6 w-6 text-yellow-600" />
+          <div className="p-2 bg-yellow-100 rounded-md">
+            <Star className="h-5 w-5 text-yellow-600" />
           </div>
           <div>
-            <p className="text-sm text-gray-500">Top Skill</p>
-            <p className="text-lg font-semibold text-gray-800">{performanceData.topSkill}</p>
+            <p className="text-xs text-gray-500 mb-1">Top Skill</p>
+            <p className="text-base font-medium text-gray-800">{performanceData.topSkill}</p>
           </div>
         </div>
       </div>

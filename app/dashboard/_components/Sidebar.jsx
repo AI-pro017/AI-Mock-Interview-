@@ -25,7 +25,7 @@ const Sidebar = () => {
       id: 2,
       name: 'New Interview',
       icon: PlusSquare,
-      path: '/dashboard/interview', // Changed to a more general path
+      path: '/dashboard/interview',
     },
     {
       id: 3,
@@ -48,19 +48,26 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="h-screen w-64 bg-white border-r shadow-sm fixed">
-      <div className="p-4 flex justify-center items-center border-b">
+    <div className="h-screen w-64 bg-[#111827] fixed left-0 top-0 text-white">
+      <div className="p-4 flex justify-center items-center border-b border-gray-700">
         <Link href="/">
-          <Image src="/logo.svg" alt="logo" width={120} height={80} />
+          <div className="flex items-center gap-2">
+            <div className="bg-blue-600 rounded-md p-1">
+              <Image src="/logo.svg" alt="logo" width={28} height={28} />
+            </div>
+            <span className="font-bold text-lg">Logoipsum</span>
+          </div>
         </Link>
       </div>
       <div className="p-4">
         {menuList.map((item) => (
           <Link href={item.path} key={item.id}>
             <div
-              className={`flex items-center gap-3 p-3 mb-2 rounded-lg cursor-pointer hover:bg-primary hover:text-white transition-all
-              ${pathname === item.path ? 'bg-primary text-white' : 'text-gray-600'}
-            `}
+              className={`flex items-center gap-3 p-3 mb-2 rounded-lg cursor-pointer transition-all
+              ${pathname === item.path 
+                ? 'bg-gray-700 text-white' 
+                : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+              }`}
             >
               <item.icon className="h-5 w-5" />
               <span className="font-medium">{item.name}</span>

@@ -1,12 +1,11 @@
 'use client'; // This component is now explicitly a client component
 
 import React from 'react'
-import AddNewInterview from './_components/AddNewInterview'
+import StartInterviewButton from './_components/StartInterviewButton'
 import InterviewList from './_components/InterviewList'
 import ProfileCompletion from './_components/ProfileCompletion'
 import PerformanceSnapshot from './_components/PerformanceSnapshot'
 import UpgradeTeaser from './_components/UpgradeTeaser'
-import Link from 'next/link'
 
 function DashboardClient({ user, interviews }) { // Receive user data as a prop
 
@@ -17,15 +16,15 @@ function DashboardClient({ user, interviews }) { // Receive user data as a prop
       <h1 className="text-3xl font-bold text-gray-800">
         Welcome back, {user?.name?.split(' ')[0] || 'User'}!
       </h1>
-      <p className="text-gray-500 mt-1">
+      <p className="text-gray-500 mt-1 mb-8">
         Ready to ace your next interview? Let's get started.
       </p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content (Left Column) */}
         <div className="lg:col-span-2 flex flex-col gap-8">
-          {/* Main call to action */}
-          <AddNewInterview />
+          {/* Main call to action - New clean button */}
+          <StartInterviewButton />
           
           {/* Recent Interview History */}
           <div className="bg-white p-6 rounded-xl shadow-sm">
