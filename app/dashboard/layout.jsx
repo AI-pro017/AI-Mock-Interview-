@@ -3,6 +3,8 @@ import React from 'react'
 import Header from './_components/Header'
 import Sidebar from './_components/Sidebar'
 import { usePathname } from 'next/navigation'
+import { SessionProvider } from "next-auth/react"
+import { Toaster } from "@/components/ui/toaster"
 
 function DashboardLayout({ children }) {
     const pathname = usePathname();
@@ -22,18 +24,21 @@ function DashboardLayout({ children }) {
     };
     
     return (
-        <div className="min-h-screen bg-[#0d1526]">
-            {/* Unified top header bar */}
-            <Header pageTitle={getPageTitle()} />
-            
-            {/* Content area with sidebar */}
-            <div className="flex">
-                <Sidebar />
-                <div className={`w-full md:ml-64 ${isInterviewHistoryPage() ? 'bg-[#0d1526]' : ''}`}>
-                    {children}
+        <SessionProvider>
+            <div className="min-h-screen bg-[#0d1526]">
+                {/* Unified top header bar */}
+                <Header pageTitle={getPageTitle()} />
+                
+                {/* Content area with sidebar */}
+                <div className="flex">
+                    <Sidebar />
+                    <div className={`w-full md:ml-64 ${isInterviewHistoryPage() ? 'bg-[#0d1526]' : ''}`}>
+                        {children}
+                    </div>
                 </div>
+                <Toaster />
             </div>
-        </div>
+        </SessionProvider>
     );
 }
 

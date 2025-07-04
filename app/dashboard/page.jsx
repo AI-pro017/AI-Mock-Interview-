@@ -1,44 +1,52 @@
 // app/dashboard/page.jsx
-import { auth } from "@/auth"
-import { db } from "@/utils/db";
-import { users, MockInterview, InterviewReport } from "@/utils/schema";
-import { eq, desc } from "drizzle-orm";
-import { redirect } from 'next/navigation';
+"use client";
+
+import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import DashboardClient from "./DashboardClient";
 
-async function DashboardPage() {
-    const session = await auth();
-    if (!session?.user) {
-        redirect('/api/auth/signin');
+export default function Dashboard() {
+    const { data: session, status } = useSession();
+    const [interviews, setInterviews] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchInterviews() {
+            if (status === 'authenticated') {
+                try {
+                    // Fetch interviews from the correct API endpoint
+                    const response = await fetch('/api/interview-history');
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        // Sort interviews by createdAt in descending order (newest first)
+                        const sortedData = [...data].sort((a, b) => {
+                            // Parse dates and compare
+                            const dateA = new Date(a.createdAt);
+                            const dateB = new Date(b.createdAt);
+                            return dateB - dateA;
+                        });
+                        
+                        setInterviews(sortedData || []);
+                    }
+                } catch (error) {
+                    console.error("Error fetching interviews:", error);
+                    setInterviews([]);
+                } finally {
+                    setIsLoading(false);
+                }
+            } else if (status !== 'loading') {
+                setIsLoading(false);
+            }
+        }
+
+        fetchInterviews();
+    }, [status]);
+
+    if (status === 'loading' || isLoading) {
+        return <div className="p-8 text-center">Loading your dashboard...</div>;
     }
 
-    // Fetch user details
-    const userResult = await db.select().from(users).where(eq(users.id, session.user.id));
-    const user = userResult[0];
-
-    if (!user) {
-        console.error("User from session not found in DB, redirecting to sign-in.");
-        redirect('/api/auth/signin');
-    }
-
-    // Fetch interviews and join with reports to get scores
-    const interviewsWithScores = await db.select({
-        interview: MockInterview,
-        report: InterviewReport
-      })
-      .from(MockInterview)
-      .leftJoin(InterviewReport, eq(MockInterview.mockId, InterviewReport.mockIdRef))
-      .where(eq(MockInterview.createdBy, session.user.email))
-      .orderBy(desc(MockInterview.id));
-
-    const interviews = interviewsWithScores.map(result => ({
-        ...result.interview,
-        overallScore: result.report?.overallScore
-    }));
-
-  return (
-        <DashboardClient user={user} interviews={interviews} />
-    )
+    // Just pass the DashboardClient component with user and interviews data
+    return <DashboardClient user={session?.user} interviews={interviews} />;
 }
-
-export default DashboardPage;

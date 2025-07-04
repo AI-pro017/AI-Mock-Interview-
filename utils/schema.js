@@ -1,4 +1,3 @@
-// AI-Mock-Interview-/utils/schema.js
 // Add Users table for authentication
 
 import {
@@ -11,6 +10,7 @@ import {
   serial,
   boolean,
 } from "drizzle-orm/pg-core"
+import { relations } from 'drizzle-orm'
 
 // Existing tables
 export const MockInterview = pgTable('mockInterview', {
@@ -137,3 +137,56 @@ export const InterviewReport = pgTable('interviewReport', {
     
     createdAt: timestamp('createdAt').defaultNow(),
 });
+
+// Main User Profile Table (One-to-One data)
+export const UserProfile = pgTable('user_profiles', {
+  id: serial('id').primaryKey(),
+  email: varchar('email', { length: 255 }).notNull().unique(), // Link to the auth user
+  fullName: varchar('full_name', { length: 255 }),
+  phoneNumber: varchar('phone_number', { length: 50 }),
+  professionalTitle: varchar('professional_title', { length: 255 }),
+  locationCity: varchar('location_city', { length: 100 }),
+  locationCountry: varchar('location_country', { length: 100 }),
+  yearsOfExperience: integer('years_of_experience'),
+  professionalSummary: text('professional_summary'),
+  skills: text('skills'), // Store skills as a single text field
+  hobbiesInterests: text('hobbies_interests'), // Add this field
+});
+
+// One-to-Many table for Work History
+export const WorkHistory = pgTable('work_history', {
+  id: serial('id').primaryKey(),
+  userProfileId: integer('user_profile_id').notNull().references(() => UserProfile.id, { onDelete: 'cascade' }),
+  jobTitle: varchar('job_title', { length: 255 }),
+  companyName: varchar('company_name', { length: 255 }),
+  startDate: varchar('start_date', { length: 50 }),
+  endDate: varchar('end_date', { length: 50 }),
+  description: text('description'),
+});
+
+// One-to-Many table for Education
+export const Education = pgTable('education', {
+  id: serial('id').primaryKey(),
+  userProfileId: integer('user_profile_id').notNull().references(() => UserProfile.id, { onDelete: 'cascade' }),
+  institutionName: varchar('institution_name', { length: 255 }),
+  degreeType: varchar('degree_type', { length: 255 }),
+  fieldOfStudy: varchar('field_of_study', { length: 255 }),
+  graduationYear: varchar('graduation_year', { length: 50 }),
+  gpa: varchar('gpa', { length: 10 }),
+});
+
+// One-to-Many table for Certifications
+export const Certifications = pgTable('certifications', {
+    id: serial('id').primaryKey(),
+    userProfileId: integer('user_profile_id').notNull().references(() => UserProfile.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 255 }),
+    issuingOrg: varchar('issuing_org', { length: 255 }),
+    date: varchar('date', { length: 50 }),
+});
+
+// Optional: Define relations for easier querying later
+export const userProfileRelations = relations(UserProfile, ({ many }) => ({
+	workHistory: many(WorkHistory),
+	education: many(Education),
+    certifications: many(Certifications),
+}));

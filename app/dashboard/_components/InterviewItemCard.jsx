@@ -27,16 +27,25 @@ function InterviewItemCard({ interview }) {
     }
     
     const duration = interview?.duration || 15; // Default to 15 minutes if not specified
+    
+    // Check if there's a valid score (not null, undefined, or zero)
+    const hasValidScore = interview?.report && 
+                          interview.report.overallScore !== null && 
+                          typeof interview.report.overallScore !== 'undefined' && 
+                          parseInt(interview.report.overallScore) > 0;
+    
+    // Get the score if valid
+    const score = hasValidScore ? interview.report.overallScore : null;
 
     return (
         <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden hover:border-slate-500 transition-colors duration-300 flex flex-col justify-between">
             <div className="p-5">
                 <div className="flex justify-between items-start mb-3">
                     <h3 className="font-semibold text-base text-white">{interview?.jobPosition}</h3>
-                    {interview.overallScore !== null && typeof interview.overallScore !== 'undefined' ? (
+                    {hasValidScore ? (
                         <div className="flex items-center gap-1.5 bg-sky-500/10 text-sky-300 px-2 py-1 rounded-full text-xs font-medium">
                             <Star className='h-3 w-3' />
-                            <span>{interview.overallScore}/100</span>
+                            <span>{score}/100</span>
                         </div>
                     ) : (
                         <span className={`text-xs font-medium px-2 py-1 rounded-full bg-slate-700 text-slate-400`}>
