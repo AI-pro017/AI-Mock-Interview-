@@ -5,6 +5,9 @@ import { eq, desc, inArray } from 'drizzle-orm';
 import { auth } from '@/auth';
 import OpenAI from 'openai';
 
+// Tell Next.js this is a dynamic route that shouldn't be statically optimized
+export const dynamic = 'force-dynamic';
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });

@@ -1,6 +1,5 @@
 "use client";
 import { useState } from 'react';
-import { extractTextFromFile } from '@/utils/resumeParser';
 import { Button } from '@/components/ui/button';
 import { Upload, Loader2 } from 'lucide-react';
 
@@ -16,6 +15,9 @@ export default function ResumeUploader({ onDataExtracted, onCompletionChange }) 
     setError(null);
 
     try {
+      // Dynamically import the parser only when needed
+      const { extractTextFromFile } = await import('@/utils/resumeParser');
+      
       // Step 1: Extract text from file
       const text = await extractTextFromFile(file);
       

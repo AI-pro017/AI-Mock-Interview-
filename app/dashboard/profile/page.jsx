@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import ProfileForm from './_components/ProfileForm';
 import ProfileCompletion from './_components/ProfileCompletion';
-import ResumeUploader from './_components/ResumeUploader';
+import dynamic from 'next/dynamic';
 import { db } from '@/utils/db';
 import { UserProfile, WorkHistory, Education, Certifications } from '@/utils/schema';
 import { eq } from 'drizzle-orm';
@@ -52,6 +52,12 @@ async function fetchUserProfile(email) {
   }
   return response.json();
 }
+
+// Dynamically import ResumeUploader with SSR disabled
+const ResumeUploader = dynamic(
+  () => import('./_components/ResumeUploader'),
+  { ssr: false }
+);
 
 function ProfilePage() {
   const { data: session, status } = useSession();
@@ -144,9 +150,9 @@ function ProfilePage() {
   
   if (status === 'unauthenticated') {
       return <div>You must be signed in to view this page.</div>
-  }
+    }
 
-  return (
+    return (
     <div className="p-4 md:p-10">
       <h2 className="font-bold text-3xl">Complete Your Profile</h2>
       <p className="text-slate-400">
@@ -160,13 +166,13 @@ function ProfilePage() {
                 initialData={profileData} 
                 onProfileUpdate={setProfileData}
             />
-        </div>
+                </div>
         <div>
           <ProfileCompletionStatic percentage={calculateCompletion(profileData)} />
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
-}
+    );
+} 
 
 export default ProfilePage; 
