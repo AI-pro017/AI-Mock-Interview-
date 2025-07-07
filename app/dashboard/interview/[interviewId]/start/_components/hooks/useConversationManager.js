@@ -255,28 +255,75 @@ export function useConversationManager(interview, isMicMuted, getInterviewerFn =
   
   // Start interview with greeting
   const startConversation = async (audioStream, selectedInterviewer = null) => {
+    console.log("==== START CONVERSATION FLOW ====");
+    console.log("1. Initial interviewer state:", interviewer ? interviewer.name : "null");
+    
     // If a specific interviewer is passed, use it; otherwise keep the existing one
+    let interviewerToUse = interviewer;
     if (selectedInterviewer) {
-      console.log("Setting interviewer from selection:", selectedInterviewer.name);
+      console.log("2. Selected interviewer provided:", selectedInterviewer.name);
+      console.log("3. Setting interviewer state with:", selectedInterviewer.name);
       setInterviewer(selectedInterviewer);
+      interviewerToUse = selectedInterviewer; // Use this directly rather than relying on state update
+    } else {
+      console.log("2. No selected interviewer, using current state:", interviewerToUse.name);
     }
     
     // Start continuous speech recognition
+    console.log("4. Starting speech recognition");
     startSpeechRecognition(audioStream);
     
-    // Use a small timeout to ensure interviewer state is updated
-    setTimeout(async () => {
-      // Generate initial AI greeting
-      const prompt = createPromptFromConversation([], 'greeting');
-      const aiResponse = await generateAndSpeak(prompt, interview, selectedInterviewer || interviewer);
+    console.log("5. Preparing greeting with interviewer:", interviewerToUse.name);
+    
+    // Instead of generating the greeting here, explicitly use the selected interviewer
+    // and pass it to the useAIResponse hook
+    
+    try {
+      // Log the exact interviewer object we're using for the greeting
+      console.log("6. Interviewer object for greeting:", JSON.stringify({
+        name: interviewerToUse.name,
+        title: interviewerToUse.title,
+        company: interviewerToUse.company
+      }));
       
+      // Generate greeting with explicit interviewer identity
+      const greeting = `You are conducting a job interview for a ${interview.jobPosition} position. 
+              The candidate has ${interview.jobExperience} years of experience. 
+              ${interview.jobDesc ? `Job Description: ${interview.jobDesc}` : ''}
+              
+              IMPORTANT: Your name is ${interviewerToUse.name} and you are a ${interviewerToUse.title} at ${interviewerToUse.company} ${interviewerToUse.background}.
+              Your interview style is ${interviewerToUse.style}.
+              
+              Start by introducing yourself as ${interviewerToUse.name} from ${interviewerToUse.company}.
+              Give a warm, professional welcome and then ask your first question.
+              
+              If this role is technical, your first question should assess their general technical background.
+              If this role is non-technical, your first question should be about their relevant experience.
+              
+              Keep it natural and conversational, as if you're speaking to them in person.
+              This is a real-time conversation where the candidate might interrupt you,
+              so keep your responses relatively brief and engaging.
+              
+              CRITICAL REQUIREMENT: You MUST introduce yourself as ${interviewerToUse.name} and mention your role as ${interviewerToUse.title} at ${interviewerToUse.company}. 
+              DO NOT use any other name or company. DO NOT invent a different identity.`;
+      
+      console.log("7. Calling generateAndSpeak with explicit interviewer");
+      const aiResponse = await generateAndSpeak(greeting, interview, interviewerToUse);
+      
+      console.log("8. AI response received, length:", aiResponse ? aiResponse.length : 0);
       if (aiResponse) {
+        // Log the first 100 characters of the response to verify the interviewer name
+        console.log("9. First part of response:", aiResponse.substring(0, 100));
         setConversation([{ role: 'ai', text: aiResponse }]);
         if (aiResponse.includes('?')) {
           setQuestionCounter(1); // Initialize with first question
         }
       }
-    }, 50);
+    } catch (error) {
+      console.error("ERROR in startConversation:", error);
+    }
+    
+    console.log("==== END CONVERSATION FLOW ====");
   };
   
   // Set up speech recognition with callbacks

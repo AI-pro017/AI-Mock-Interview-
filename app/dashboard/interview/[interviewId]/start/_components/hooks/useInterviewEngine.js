@@ -227,10 +227,15 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
   initializeSpeechRecognitionRef.current = initializeSpeechRecognition;
 
   // --- AI RESPONSE & SPEECH ---
-  const generateAIResponse = useCallback(async (prompt) => {
+  const generateAIResponse = useCallback(async (prompt, customInterviewer = null) => {
     setIsGenerating(true);
     setError(null);
     try {
+      // Use the provided interviewer if available, otherwise fall back to state
+      const interviewerToUse = customInterviewer || interviewer;
+      
+      console.log("Generating AI response using interviewer:", interviewerToUse.name);
+      
       const response = await fetch('/api/generate-response', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -239,7 +244,7 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
           role: interview.jobPosition, 
           interviewStyle: interview.interviewStyle, 
           focus: interview.focus,
-          interviewer: interviewer // Use the interviewer state
+          interviewer: interviewerToUse // Use the explicit interviewer
         }),
       });
       
@@ -253,7 +258,7 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     } finally {
       setIsGenerating(false);
     }
-  }, [interview, interviewer]); // Include interviewer in dependencies
+  }, [interview, interviewer]); // Keep the same dependencies
   
   const speakText = useCallback(async (text, gender = null, isFirstUtterance = false) => {
     if (!text || text.trim() === "") return;
@@ -393,15 +398,23 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
     }
   }, [voiceSpeed, useNaturalSpeech, isUserSpeaking, interviewer, selectedVoiceId]);
 
-  const createPrompt = useCallback((convHistory, type) => {
+  const createPrompt = useCallback((convHistory, type, customInterviewer = null) => {
+    const interviewerToUse = customInterviewer || interviewer;
+    
     if (type === 'greeting') {
       return `You are an expert interviewer starting an interview for a ${interview.jobPosition} role. 
       The candidate has ${interview.jobExperience} years of experience. 
       
-      Start by introducing yourself as the interviewer for this role.
+      IMPORTANT: Your name is ${interviewerToUse.name} and you are a ${interviewerToUse.title} at ${interviewerToUse.company} ${interviewerToUse.background || ''}.
+      Your interview style is ${interviewerToUse.style}.
+      
+      Start by introducing yourself as ${interviewerToUse.name} from ${interviewerToUse.company}.
       Greet them warmly and then ask your first question about their background or experience.
       
-      Keep your response conversational and relatively brief (2-3 sentences).`;
+      Keep your response conversational and relatively brief (2-3 sentences).
+      
+      CRITICAL REQUIREMENT: You MUST introduce yourself as ${interviewerToUse.name} and mention your role at ${interviewerToUse.company}. 
+      DO NOT use any other name or company. DO NOT invent a different identity.`;
     }
     
     // Analyze the conversation to extract topics and guide the AI
@@ -887,27 +900,26 @@ export function useInterviewEngine(interview, isMicMuted, voiceSpeed = 1.0, useN
       shutdownSpeechRecognitionRef.current();
     }
     
-    // Update interviewer state
-    if (selectedInterviewer) {
-      console.log("Setting interviewer from selection:", selectedInterviewer.name);
-      setInterviewer(selectedInterviewer);
-    } else if (getInterviewerFn) {
-      const newInterviewer = getInterviewerFn();
-      console.log("Setting random interviewer:", newInterviewer.name);
-      setInterviewer(newInterviewer);
-    }
+    // Store the current interviewer to use throughout this function
+    const interviewerToUse = selectedInterviewer || (getInterviewerFn ? getInterviewerFn() : interviewer);
     
-    // Generate initial AI greeting
-    const prompt = createPrompt([], 'greeting');
-    const currentInterviewer = selectedInterviewer || interviewer;
-    const aiResponse = await generateAIResponse(prompt);
+    console.log("Starting interview with interviewer:", interviewerToUse.name);
+    
+    // Update interviewer state for future responses
+    setInterviewer(interviewerToUse);
+    
+    // Generate initial AI greeting - pass interviewer directly
+    const prompt = createPrompt([], 'greeting', interviewerToUse);
+    
+    // Pass the interviewer directly to generateAIResponse
+    const aiResponse = await generateAIResponse(prompt, interviewerToUse);
     
     if (aiResponse) {
       // Update conversation state
       setConversation([{ role: 'ai', text: aiResponse }]);
       
       // For the first utterance, get a voice ID back
-      const gender = currentInterviewer?.gender || 'female';
+      const gender = interviewerToUse?.gender || 'female';
       const voiceIdResponse = await speakText(aiResponse, gender, true);
       
       // Save voice ID if returned

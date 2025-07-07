@@ -34,17 +34,19 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const timerRef = useRef(null);
   const videoRef = useRef(null);
 
-  const getAppropriateInterviewer = () => {
+  const [selectedInterviewer, setSelectedInterviewer] = useState(() => {
+    // Select interviewer and make sure it's fixed for the entire session
+    let interviewer;
     if (interviewerIndustry !== "random") {
-      return getInterviewerByIndustry(interviewerIndustry);
+      interviewer = getInterviewerByIndustry(interviewerIndustry);
+    } else if (interviewerGender !== "random") {
+      interviewer = getInterviewerByGender(interviewerGender);
+    } else {
+      interviewer = getRandomInterviewer();
     }
-    
-    if (interviewerGender !== "random") {
-      return getInterviewerByGender(interviewerGender);
-    }
-    
-    return getRandomInterviewer();
-  };
+    console.log("Selected interviewer:", interviewer.name);
+    return interviewer;
+  });
 
   const {
     conversation,
@@ -59,9 +61,9 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     forceProcessResponse,
     isGenerating,
     isInitialTTSLoading,
-    interviewer,
+    interviewer: engineInterviewer,
     shouldUnmute
-  } = useInterviewEngine(interview, isMicMuted, voiceSpeed, useNaturalSpeech, getAppropriateInterviewer, setIsMicMuted);
+  } = useInterviewEngine(interview, isMicMuted, voiceSpeed, useNaturalSpeech, () => selectedInterviewer, setIsMicMuted);
 
   // Initialize media with proper camera control
   const initializeMedia = async () => {
@@ -137,8 +139,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   };
 
   const startInterview = async () => {
-    // Get the interviewer before starting
-    const selectedInterviewer = getAppropriateInterviewer();
+    // Use the consistent interviewer instead of generating a new one
     console.log("Starting interview with interviewer:", selectedInterviewer.name);
     
     const mediaStream = await initializeMedia();
@@ -154,7 +155,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
         });
       }
       
-      // Pass the selected interviewer directly
+      // Explicitly pass the selectedInterviewer to ensure consistency
       startConversation(mediaStream, selectedInterviewer);
     }
   };
@@ -375,6 +376,22 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     console.log("Microphone state changed:", isMicMuted ? "muted" : "unmuted");
   }, [isMicMuted]);
 
+  // Then update the interviewer selection logic
+  useEffect(() => {
+    if (!isInterviewActive) {
+      // Only allow changing interviewer before interview starts
+      let newInterviewer;
+      if (interviewerIndustry !== "random") {
+        newInterviewer = getInterviewerByIndustry(interviewerIndustry);
+      } else if (interviewerGender !== "random") {
+        newInterviewer = getInterviewerByGender(interviewerGender);
+      } else {
+        newInterviewer = getRandomInterviewer();
+      }
+      setSelectedInterviewer(newInterviewer);
+    }
+  }, [interviewerGender, interviewerIndustry, isInterviewActive]);
+
   return (
     <div className="bg-gray-900 text-white">
       {isAnalyzing ? (
@@ -463,8 +480,8 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
               {/* Interviewer information */}
               <div className="flex flex-col items-center justify-center bg-gray-800 rounded-lg p-4">
                 <p className="text-sm text-gray-400 mb-2">Interviewer</p>
-                <h3 className="text-xl font-semibold mb-1">{interviewer?.name || "Priya Patel"}</h3>
-                <p className="text-gray-400 mb-4">{interviewer?.title || "Talent Acquisition Specialist"}</p>
+                <h3 className="text-xl font-semibold mb-1">{selectedInterviewer?.name || "Priya Patel"}</h3>
+                <p className="text-gray-400 mb-4">{selectedInterviewer?.title || "Talent Acquisition Specialist"}</p>
                 
                 <p className="text-center text-sm text-gray-300 max-w-md">
                   Your interview will begin when you click the "Start Interview" button.
@@ -483,7 +500,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
                   interimTranscript={interimTranscript}
                   isGenerating={isGenerating}
                   isInitialTTSLoading={isInitialTTSLoading}
-                  interviewer={interviewer}
+                  interviewer={selectedInterviewer}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center p-6">

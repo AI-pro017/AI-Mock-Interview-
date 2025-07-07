@@ -13,7 +13,7 @@ export function useAIResponse() {
   const abortControllerRef = useRef(null);
   
   // Generate AI response based on conversation context
-  const generateResponse = async (prompt, interviewDetails) => {
+  const generateResponse = async (prompt, interviewDetails, interviewer = null) => {
     try {
       setIsGenerating(true);
       setError(null);
@@ -21,6 +21,8 @@ export function useAIResponse() {
       // Create an abort controller to allow cancellation
       abortControllerRef.current = new AbortController();
       const signal = abortControllerRef.current.signal;
+      
+      console.log("Generating response with interviewer:", interviewer ? interviewer.name : "default");
       
       const response = await fetch('/api/generate-response', {
         method: 'POST',
@@ -30,6 +32,14 @@ export function useAIResponse() {
           role: interviewDetails.jobPosition,
           interviewStyle: interviewDetails.interviewStyle,
           focus: interviewDetails.focus,
+          // Pass the interviewer information
+          interviewer: interviewer ? {
+            name: interviewer.name,
+            title: interviewer.title,
+            company: interviewer.company,
+            background: interviewer.background,
+            style: interviewer.style
+          } : null,
           // Additional context for the AI to make better decisions
           conversationContext: {
             jobExperience: interviewDetails.jobExperience,
@@ -131,8 +141,8 @@ export function useAIResponse() {
   };
   
   // Combined function to generate response and speak it
-  const generateAndSpeak = async (prompt, interviewDetails) => {
-    const aiResponse = await generateResponse(prompt, interviewDetails);
+  const generateAndSpeak = async (prompt, interviewDetails, interviewer = null) => {
+    const aiResponse = await generateResponse(prompt, interviewDetails, interviewer);
     if (aiResponse) {
       await speakText(aiResponse);
       return aiResponse;
