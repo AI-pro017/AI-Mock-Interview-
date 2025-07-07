@@ -8,6 +8,7 @@ import {
   History,
   User,
   Shield,
+  Bot,
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -34,12 +35,18 @@ const Sidebar = () => {
     },
     {
       id: 4,
+      name: 'Realtime Interview Copilot',
+      icon: Bot,
+      path: '/dashboard/copilot',
+    },
+    {
+      id: 5,
       name: 'My Profile',
       icon: User,
       path: '/dashboard/profile',
     },
     {
-      id: 5,
+      id: 6,
       name: 'Upgrade',
       icon: Shield,
       path: '/dashboard/upgrade',
