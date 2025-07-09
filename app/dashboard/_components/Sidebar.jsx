@@ -35,7 +35,7 @@ const Sidebar = () => {
     },
     {
       id: 4,
-      name: 'Realtime Interview Copilot',
+      name: 'Interview Copilot',
       icon: Bot,
       path: '/dashboard/copilot',
     },

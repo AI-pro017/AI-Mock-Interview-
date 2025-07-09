@@ -19,10 +19,11 @@ export async function POST(req) {
 
         const systemPrompt = `You are an expert interview coach providing real-time, concise advice. A user is in a live interview.
         You will be given the conversation history and the latest question from the interviewer.
-        Your task is to provide two brief, actionable suggestions.
+        Your task is to provide three brief, actionable suggestions.
 
-        1.  **Key Point to Mention**: A core idea, skill, or experience the user should include in their answer. Start with "Focus on...".
-        2.  **Smart Question to Ask**: A thoughtful follow-up question the user could ask to show engagement or clarify the interviewer's question. Start with "Consider asking...".
+        1. **Key Point to Mention**: A core idea, skill, or experience the user should include in their answer. Start with "Focus on...".
+        2. **Smart Question to Ask**: A thoughtful follow-up question the user could ask to show engagement or clarify the interviewer's question. Start with "Consider asking...".
+        3. **Direct Answer Hints**: A specific, direct response or phrase the user could use to start their answer. Start with "You could say..." or "Try starting with...".
         
         Keep your suggestions extremely brief (10-15 words max). The user needs to glance at them during a live conversation.
         Base your suggestions on the provided conversation history to avoid being generic.`;
@@ -44,17 +45,45 @@ export async function POST(req) {
                 { role: 'user', content: userPrompt }
             ],
             temperature: 0.6,
-            max_tokens: 150,
+            max_tokens: 200,
         });
 
         const aiResponse = response.choices[0].message.content.trim();
         
         const suggestions = aiResponse.split('\n').map(line => {
-            if (line.toLowerCase().includes('focus on')) {
-                return { type: 'Key Point to Mention', content: line };
+            const cleanLine = line.trim();
+            if (!cleanLine) return null;
+
+            if (cleanLine.toLowerCase().includes('focus on')) {
+                // Remove any numbering, asterisks, and "Key Point to Mention" labels
+                const content = cleanLine
+                    .replace(/^\d+\.\s*/, '') // Remove numbering like "1. "
+                    .replace(/\*\*Key Point to Mention\*\*:?\s*/i, '') // Remove "**Key Point to Mention**:"
+                    .replace(/Key Point to Mention:?\s*/i, '') // Remove "Key Point to Mention:"
+                    .replace(/^\*+/, '') // Remove leading asterisks
+                    .replace(/\*+$/, '') // Remove trailing asterisks
+                    .trim();
+                return { type: 'Key Point to Mention', content };
             }
-            if (line.toLowerCase().includes('consider asking')) {
-                return { type: 'Smart Question to Ask', content: line };
+            if (cleanLine.toLowerCase().includes('consider asking')) {
+                const content = cleanLine
+                    .replace(/^\d+\.\s*/, '')
+                    .replace(/\*\*Smart Question to Ask\*\*:?\s*/i, '')
+                    .replace(/Smart Question to Ask:?\s*/i, '')
+                    .replace(/^\*+/, '')
+                    .replace(/\*+$/, '')
+                    .trim();
+                return { type: 'Smart Question to Ask', content };
+            }
+            if (cleanLine.toLowerCase().includes('you could say') || cleanLine.toLowerCase().includes('try starting with')) {
+                const content = cleanLine
+                    .replace(/^\d+\.\s*/, '')
+                    .replace(/\*\*Direct Answer Hints\*\*:?\s*/i, '')
+                    .replace(/Direct Answer Hints:?\s*/i, '')
+                    .replace(/^\*+/, '')
+                    .replace(/\*+$/, '')
+                    .trim();
+                return { type: 'Direct Answer Hints', content };
             }
             return null;
         }).filter(Boolean);

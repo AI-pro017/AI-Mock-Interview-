@@ -32,5 +32,11 @@ export const useAI = () => {
         }
     }, []);
 
-    return { suggestions, isLoading, error, generateSuggestions };
+    const clearSuggestions = useCallback(() => {
+        setSuggestions([]);
+        setError(null);
+        setIsLoading(false);
+    }, []);
+
+    return { suggestions, isLoading, error, generateSuggestions, clearSuggestions };
 }; 

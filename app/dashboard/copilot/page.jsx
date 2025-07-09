@@ -26,7 +26,7 @@ const InterviewCopilotPage = () => {
     const { transcript: tabTranscript } = useDeepgram(tabStream, deepgramToken, 'client');
     
     const { transcripts, processTranscript, clearTranscripts, getSpeakerLabel } = useTranscriptManager();
-    const { suggestions, isLoading: isLoadingSuggestions, generateSuggestions } = useAI();
+    const { suggestions, isLoading: isLoadingSuggestions, generateSuggestions, clearSuggestions } = useAI();
 
     useEffect(() => {
         const fetchToken = async () => {
@@ -46,11 +46,13 @@ const InterviewCopilotPage = () => {
         if (isCapturing) {
             stopCapture();
             clearTranscripts();
+            clearSuggestions(); // Clear AI suggestions when stopping
         } else {
             clearTranscripts();
+            clearSuggestions(); // Clear AI suggestions when starting
             await startCapture();
         }
-    }, [isCapturing, stopCapture, clearTranscripts, startCapture]);
+    }, [isCapturing, stopCapture, clearTranscripts, clearSuggestions, startCapture]);
 
     useEffect(() => {
         if (tabStream && videoRef.current) {

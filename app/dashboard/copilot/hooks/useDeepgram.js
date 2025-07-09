@@ -39,15 +39,38 @@ export const useDeepgram = (stream, token, speakerIdentifier) => {
         socket.onopen = () => {
             setIsConnected(true);
 
-            if (stream.getAudioTracks().length > 0) {
-                const recorder = new MediaRecorder(stream);
-                recorder.ondataavailable = (event) => {
-                    if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
-                        socket.send(event.data);
+            // Check if stream is still active and has audio tracks
+            if (stream && stream.getAudioTracks().length > 0) {
+                // Check if any audio tracks are still active
+                const activeAudioTracks = stream.getAudioTracks().filter(track => track.readyState === 'live');
+                
+                if (activeAudioTracks.length > 0) {
+                    try {
+                        const recorder = new MediaRecorder(stream);
+                        recorder.ondataavailable = (event) => {
+                            if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
+                                socket.send(event.data);
+                            }
+                        };
+                        
+                        recorder.onerror = (error) => {
+                            console.error(`[${speakerIdentifier}] MediaRecorder error:`, error);
+                            disconnect();
+                        };
+                        
+                        mediaRecorderRef.current = recorder;
+                        recorder.start(100);
+                    } catch (error) {
+                        console.error(`[${speakerIdentifier}] Failed to start MediaRecorder:`, error);
+                        disconnect();
                     }
-                };
-                mediaRecorderRef.current = recorder;
-                recorder.start(100);
+                } else {
+                    console.warn(`[${speakerIdentifier}] No active audio tracks available`);
+                    disconnect();
+                }
+            } else {
+                console.warn(`[${speakerIdentifier}] Stream is not available or has no audio tracks`);
+                disconnect();
             }
         };
 
