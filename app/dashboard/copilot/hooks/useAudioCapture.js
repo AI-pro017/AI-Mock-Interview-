@@ -9,12 +9,14 @@ export const useAudioCapture = () => {
     const [isCapturing, setIsCapturing] = useState(false);
 
     const startCapture = useCallback(async () => {
+        let microphoneStream = null;
+        
         try {
             setError(null);
             setIsCapturing(true);
 
             // Step 1: Get microphone stream (for user audio)
-            const microphoneStream = await navigator.mediaDevices.getUserMedia({
+            microphoneStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
@@ -30,12 +32,16 @@ export const useAudioCapture = () => {
                     noiseSuppression: true,
                     sampleRate: 16000,
                 },
-                video: true
+                video: {
+                    mediaSource: 'tab'
+                }
             });
 
             // Check if audio is actually captured from the tab
             const audioTracks = displayStream.getAudioTracks();
             if (audioTracks.length === 0) {
+                // Clean up microphone stream if tab audio failed
+                microphoneStream.getTracks().forEach(track => track.stop());
                 throw new Error("No audio track found in the selected tab. Please make sure to select a tab with audio and check 'Share tab audio' when prompted.");
             }
 
@@ -43,23 +49,48 @@ export const useAudioCapture = () => {
             setTabStream(displayStream);
 
             // Handle stream end events
-            displayStream.getVideoTracks()[0].onended = () => {
-                stopCapture();
-            };
+            const videoTrack = displayStream.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.onended = () => {
+                    console.log("Display stream ended");
+                    stopCapture();
+                };
+            }
 
             return { micStream: microphoneStream, tabStream: displayStream };
         } catch (err) {
-            console.error("Error capturing audio:", err);
-            setIsCapturing(false);
+            // Clean up microphone stream if it was created
+            if (microphoneStream) {
+                microphoneStream.getTracks().forEach(track => track.stop());
+                microphoneStream = null;
+            }
             
-            if (err.name === 'NotAllowedError') {
-                setError({ message: "Permission denied. Please allow access to microphone and screen sharing." });
-            } else if (err.name === 'NotFoundError') {
-                setError({ message: "No microphone found. Please check your audio devices." });
-            } else if (err.message.includes('audio track')) {
-                setError({ message: err.message });
+            // Reset state
+            setIsCapturing(false);
+            setMicStream(null);
+            setTabStream(null);
+            
+            // Handle different error types
+            if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
+                // User cancelled the screen sharing dialog - don't log or show error
+                // Just silently reset and let user try again
+                setError(null);
+                return null;
             } else {
-                setError({ message: "Failed to start audio capture. Please try again." });
+                // Log only actual errors, not user cancellations
+                console.error("Error capturing audio:", err);
+                
+                if (err.name === 'NotFoundError') {
+                    setError({ message: "No microphone found. Please check your audio devices." });
+                } else if (err.name === 'InvalidStateError') {
+                    setError({ message: "Cannot start capture. Please try again." });
+                } else if (err.name === 'NotSupportedError') {
+                    setError({ message: "Screen sharing is not supported in this browser." });
+                } else if (err.message.includes('audio track')) {
+                    setError({ message: err.message });
+                } else {
+                    setError({ message: "Failed to start audio capture. Please try again." });
+                }
             }
             return null;
         }

@@ -13,6 +13,7 @@ function DashboardLayout({ children }) {
     const getPageTitle = () => {
         if (pathname.includes('/profile')) return 'My Profile';
         if (pathname.includes('/interview-history')) return 'Interview History';
+        if (pathname.includes('/copilot')) return 'Interview Copilot';
         if (pathname.includes('/interview')) return 'New Interview';
         if (pathname.includes('/upgrade')) return 'Upgrade';
         return 'Dashboard';
