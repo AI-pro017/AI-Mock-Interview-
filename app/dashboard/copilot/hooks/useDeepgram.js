@@ -2,102 +2,86 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export const useDeepgram = (stream, apiKey) => {
+export const useDeepgram = (stream, token, speakerIdentifier) => {
     const [transcript, setTranscript] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
     const socketRef = useRef(null);
-    const processorRef = useRef(null);
-    const audioContextRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
 
-    const connect = useCallback(() => {
-        if (!apiKey) {
-            console.error("Deepgram API key is required.");
-            return;
+    const disconnect = useCallback(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current = null;
         }
-        
-        const url = 'wss://api.deepgram.com/v1/listen?' + 
-            'encoding=linear16&sample_rate=16000&channels=1' +
-            '&diarize=true&punctuate=true&utterances=true' +
-            '&model=nova-2&language=en';
+        if (socketRef.current) {
+            socketRef.current.close();
+            socketRef.current = null;
+        }
+        setIsConnected(false);
+    }, []);
+    
+    const connect = useCallback(() => {
+        if (!token || !stream) return;
 
-        const socket = new WebSocket(url, {
-            headers: { Authorization: `Token ${apiKey}` }
-        });
+        disconnect();
+
+        const queryParams = [
+            "model=nova-2",
+            "interim_results=true",
+            "smart_format=true",
+            "diarize=true",
+            "utterance_end_ms=3000",
+            "vad_turnoff=500"
+        ].join('&');
+        
+        const socket = new WebSocket(`wss://api.deepgram.com/v1/listen?${queryParams}`, ['token', token]);
 
         socket.onopen = () => {
-            console.log("Deepgram connected");
             setIsConnected(true);
-        };
 
-        socket.onmessage = (message) => {
-            const data = JSON.parse(message.data);
-            if (data.type === 'Results' && data.is_final) {
-                const transcriptText = data.channel.alternatives[0].transcript;
-                const speaker = data.channel.alternatives[0].words[0]?.speaker || 0;
-                if (transcriptText) {
-                    setTranscript({
-                        text: transcriptText,
-                        speaker: `Speaker ${speaker}`,
-                        timestamp: Date.now(),
-                    });
-                }
+            if (stream.getAudioTracks().length > 0) {
+                const recorder = new MediaRecorder(stream);
+                recorder.ondataavailable = (event) => {
+                    if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
+                        socket.send(event.data);
+                    }
+                };
+                mediaRecorderRef.current = recorder;
+                recorder.start(100);
             }
         };
-        
-        socket.onclose = () => {
-            console.log("Deepgram disconnected");
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.channel?.alternatives?.[0]?.transcript) {
+                setTranscript({ ...data, speakerIdentifier });
+            }
+        };
+
+        socket.onclose = (event) => {
             setIsConnected(false);
         };
-        
+
         socket.onerror = (error) => {
-            console.error("Deepgram error:", error);
+            console.error(`[${speakerIdentifier}] Deepgram error:`, error);
         };
 
         socketRef.current = socket;
-    }, [apiKey]);
-    
-    const disconnect = useCallback(() => {
-        if (socketRef.current) {
-            socketRef.current.close();
-        }
-        if (processorRef.current) {
-            processorRef.current.disconnect();
-        }
-        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-            audioContextRef.current.close();
-        }
-    }, []);
+
+    }, [stream, token, speakerIdentifier, disconnect]);
 
     useEffect(() => {
-        if (stream && isConnected) {
-            audioContextRef.current = new AudioContext({ sampleRate: 16000 });
-            const source = audioContextRef.current.createMediaStreamSource(stream);
-            const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
-
-            processor.onaudioprocess = (e) => {
-                const inputData = e.inputBuffer.getChannelData(0);
-                const int16Data = new Int16Array(inputData.length);
-                for (let i = 0; i < inputData.length; i++) {
-                    int16Data[i] = Math.min(1, inputData[i]) * 0x7FFF;
-                }
-                if (socketRef.current?.readyState === WebSocket.OPEN) {
-                    socketRef.current.send(int16Data.buffer);
-                }
-            };
-
-            source.connect(processor);
-            processor.connect(audioContextRef.current.destination);
-            
-            processorRef.current = processor;
+        if (stream && token) {
+            connect();
+        } else {
+            disconnect();
         }
 
         return () => {
-            if (processorRef.current) {
-                processorRef.current.disconnect();
-                processorRef.current = null;
-            }
+            disconnect();
         };
-    }, [stream, isConnected]);
+    }, [stream, token, connect, disconnect]);
 
-    return { transcript, connect, disconnect, isConnected };
-}; 
+    return { transcript, isConnected };
+};
