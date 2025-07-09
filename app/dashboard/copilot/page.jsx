@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Bot, BrainCircuit, User as UserIcon, Loader, Monitor, MonitorOff } from 'lucide-react';
+import { Bot, BrainCircuit, User as UserIcon, Loader, Monitor, MonitorOff, AlertTriangle } from 'lucide-react';
 import { useAudioCapture } from './hooks/useAudioCapture';
 import { useDeepgram } from './hooks/useDeepgram';
 import { useTranscriptManager } from './hooks/useTranscriptManager';
@@ -12,6 +12,7 @@ const InterviewCopilotPage = () => {
     const [deepgramToken, setDeepgramToken] = useState('');
     const videoRef = useRef(null);
     const transcriptEndRef = useRef(null);
+    const lastProcessedTranscriptRef = useRef(null);
 
     const {
         micStream,
@@ -26,7 +27,7 @@ const InterviewCopilotPage = () => {
     const { transcript: tabTranscript } = useDeepgram(tabStream, deepgramToken, 'client');
     
     const { transcripts, processTranscript, clearTranscripts, getSpeakerLabel } = useTranscriptManager();
-    const { suggestions, isLoading: isLoadingSuggestions, generateSuggestions, clearSuggestions } = useAI();
+    const { suggestions, isLoading: isLoadingSuggestions, error: aiError, generateSuggestions, clearSuggestions } = useAI();
 
     useEffect(() => {
         const fetchToken = async () => {
@@ -46,10 +47,12 @@ const InterviewCopilotPage = () => {
         if (isCapturing) {
             stopCapture();
             clearTranscripts();
-            clearSuggestions(); // Clear AI suggestions when stopping
+            clearSuggestions();
+            lastProcessedTranscriptRef.current = null;
         } else {
             clearTranscripts();
-            clearSuggestions(); // Clear AI suggestions when starting
+            clearSuggestions();
+            lastProcessedTranscriptRef.current = null;
             await startCapture();
         }
     }, [isCapturing, stopCapture, clearTranscripts, clearSuggestions, startCapture]);
@@ -74,10 +77,23 @@ const InterviewCopilotPage = () => {
         transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }, [transcripts]);
     
+    // Simplified logic: Only trigger when client speaks (not "You")
     useEffect(() => {
-        const lastFinalBlock = transcripts.findLast(b => b.speaker !== 'You');
-        if (lastFinalBlock) {
-             generateSuggestions(lastFinalBlock.text, transcripts.slice(-5));
+        // Find the most recent client message (not "You")
+        const lastClientBlock = transcripts.findLast(block => block.speaker !== 'You');
+        
+        if (lastClientBlock) {
+            // Create a unique key for this transcript state
+            const transcriptKey = `${lastClientBlock.id}-${lastClientBlock.text}-${transcripts.length}`;
+            
+            // Only generate suggestions if this is a new state we haven't processed yet
+            if (lastProcessedTranscriptRef.current !== transcriptKey) {
+                console.log('New client message detected:', lastClientBlock.text);
+                lastProcessedTranscriptRef.current = transcriptKey;
+                
+                // Let OpenAI analyze the full conversation and determine what to respond to
+                generateSuggestions(lastClientBlock.text, transcripts.slice(-10));
+            }
         }
     }, [transcripts, generateSuggestions]);
 
@@ -145,10 +161,34 @@ const InterviewCopilotPage = () => {
                             <h2 className="text-xl font-semibold text-green-300">AI Suggestions</h2>
                         </div>
                         <div className="flex-grow p-4 space-y-4 overflow-y-auto">
-                            {isLoadingSuggestions && <div className="flex items-center text-gray-400"><Loader className="w-5 h-5 mr-2 animate-spin" />Generating...</div>}
+                            {isLoadingSuggestions && (
+                                <div className="flex items-center text-gray-400">
+                                    <Loader className="w-5 h-5 mr-2 animate-spin" />
+                                    Generating suggestions...
+                                </div>
+                            )}
+                            
+                            {aiError && (
+                                <div className="bg-red-900/50 border border-red-800 p-3 rounded-lg">
+                                    <div className="flex items-center text-red-300">
+                                        <AlertTriangle className="w-4 h-4 mr-2" />
+                                        <span className="text-sm">{aiError}</span>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {suggestions.length === 0 && !isLoadingSuggestions && !aiError && (
+                                <div className="text-gray-400 text-center py-8">
+                                    AI suggestions will appear here when the interviewer speaks.
+                                </div>
+                            )}
+                            
                             {suggestions.map((s, i) => (
                                 <div key={i} className="bg-gray-700 p-4 rounded-lg">
-                                    <h4 className="font-bold text-lg flex items-center mb-2"><BrainCircuit className="w-5 h-5 mr-2 text-green-400" />{s.type}</h4>
+                                    <h4 className="font-bold text-lg flex items-center mb-2">
+                                        <BrainCircuit className="w-5 h-5 mr-2 text-green-400" />
+                                        {s.type}
+                                    </h4>
                                     <p className="text-gray-300">{s.content}</p>
                                 </div>
                             ))}

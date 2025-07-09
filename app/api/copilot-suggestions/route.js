@@ -9,6 +9,38 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Rate limiting and retry configuration
+const RATE_LIMIT_CONFIG = {
+    maxRetries: 3,
+    baseDelay: 1000,
+    maxDelay: 10000,
+};
+
+// Helper function to wait for a specified time
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper function to calculate exponential backoff delay
+const calculateBackoffDelay = (attempt, baseDelay, maxDelay) => {
+    const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
+    return delay + Math.random() * 1000;
+};
+
+// Helper function to extract retry delay from OpenAI error
+const getRetryDelay = (error) => {
+    if (error.status === 429) {
+        const retryAfter = error.headers?.['retry-after'];
+        if (retryAfter) {
+            return parseInt(retryAfter) * 1000;
+        }
+        
+        const match = error.message.match(/try again in (\d+\.?\d*)s/);
+        if (match) {
+            return Math.ceil(parseFloat(match[1]) * 1000);
+        }
+    }
+    return null;
+};
+
 // Helper function to fetch user profile
 async function fetchUserProfile(userEmail) {
     try {
@@ -20,13 +52,8 @@ async function fetchUserProfile(userEmail) {
         
         const userProfile = userProfiles[0];
         
-        // Find work history
         const workHistory = await db.select().from(WorkHistory).where(eq(WorkHistory.userProfileId, userProfile.id));
-        
-        // Find education
         const education = await db.select().from(Education).where(eq(Education.userProfileId, userProfile.id));
-        
-        // Find certifications
         const certifications = await db.select().from(Certifications).where(eq(Certifications.userProfileId, userProfile.id));
         
         return {
@@ -47,7 +74,6 @@ function formatProfileForAI(profile) {
     
     let profileText = '';
     
-    // Basic info - using correct field names from schema
     if (profile.fullName) profileText += `Name: ${profile.fullName}\n`;
     if (profile.professionalTitle) profileText += `Current Role: ${profile.professionalTitle}\n`;
     if (profile.yearsOfExperience) profileText += `Years of Experience: ${profile.yearsOfExperience}\n`;
@@ -56,7 +82,6 @@ function formatProfileForAI(profile) {
     if (profile.professionalSummary) profileText += `Professional Summary: ${profile.professionalSummary}\n`;
     if (profile.hobbiesInterests) profileText += `Hobbies & Interests: ${profile.hobbiesInterests}\n`;
     
-    // Work history - using correct field names from schema
     if (profile.workHistory && profile.workHistory.length > 0) {
         profileText += '\nWork History:\n';
         profile.workHistory.forEach(work => {
@@ -65,7 +90,6 @@ function formatProfileForAI(profile) {
         });
     }
     
-    // Education - using correct field names from schema
     if (profile.education && profile.education.length > 0) {
         profileText += '\nEducation:\n';
         profile.education.forEach(edu => {
@@ -74,7 +98,6 @@ function formatProfileForAI(profile) {
         });
     }
     
-    // Certifications - using correct field names from schema
     if (profile.certifications && profile.certifications.length > 0) {
         profileText += '\nCertifications:\n';
         profile.certifications.forEach(cert => {
@@ -85,6 +108,52 @@ function formatProfileForAI(profile) {
     return profileText;
 }
 
+// Helper function to make OpenAI API call with retry logic
+async function makeOpenAICallWithRetry(systemPrompt, userPrompt, maxRetries = RATE_LIMIT_CONFIG.maxRetries) {
+    let lastError;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                temperature: 0.6,
+                max_tokens: 200,
+            });
+
+            return response.choices[0].message.content.trim();
+        } catch (error) {
+            lastError = error;
+            
+            if (error.status !== 429) {
+                throw error;
+            }
+            
+            if (attempt === maxRetries) {
+                throw error;
+            }
+            
+            let delayMs;
+            const retryDelay = getRetryDelay(error);
+            
+            // Fixed bug: was checking delayMs instead of retryDelay
+            if (retryDelay) {
+                delayMs = retryDelay;
+            } else {
+                delayMs = calculateBackoffDelay(attempt, RATE_LIMIT_CONFIG.baseDelay, RATE_LIMIT_CONFIG.maxDelay);
+            }
+            
+            console.log(`Rate limit hit, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
+            await sleep(delayMs);
+        }
+    }
+    
+    throw lastError;
+}
+
 export async function POST(req) {
     try {
         const { question, history } = await req.json();
@@ -92,13 +161,9 @@ export async function POST(req) {
         if (!question) {
             return NextResponse.json({ error: 'Question is required' }, { status: 400 });
         }
-        console.log('question', question);
-        console.log('history', history);
 
-        // Get user session
         const session = await auth();
         
-        // Fetch user profile if authenticated
         let userProfile = null;
         if (session?.user?.email) {
             userProfile = await fetchUserProfile(session.user.email);
@@ -110,83 +175,111 @@ export async function POST(req) {
 
         const profileContext = formatProfileForAI(userProfile);
 
-        const systemPrompt = `You are an expert interview coach providing real-time, concise advice. A user is in a live interview.
-        You will be given the conversation history, the latest question from the interviewer, and the user's profile information.
-        Your task is to provide three brief, actionable suggestions based on the user's background and experience.
+        const systemPrompt = `You are an expert interview coach providing real-time assistance during a live interview. 
 
-        1. **Key Point to Mention**: A core idea, skill, or experience from their profile that the user should include in their answer. Start with "Focus on...".
-        2. **Smart Question to Ask**: A thoughtful follow-up question the user could ask to show engagement or clarify the interviewer's question. Start with "Consider asking...".
-        3. **Direct Answer Hints**: A specific, direct response or phrase the user could use to start their answer, leveraging their background. Start with "You could say..." or "Try starting with...".
+CRITICAL INSTRUCTIONS:
+1. ANALYZE the full conversation history to understand the context and flow
+2. IDENTIFY the most recent meaningful question, request, or topic the interviewer introduced
+3. IGNORE filler words, pleasantries, and casual conversation 
+4. FOCUS on what the interviewer actually wants to know or discuss
+
+RESPONSE FORMAT - You MUST respond in exactly this format:
+
+KEY_POINT: Focus on [specific advice about what to mention from their background]
+QUESTION: Consider asking [specific question they should ask the interviewer]  
+ANSWER: Try starting with [specific way to begin their response]
+
+EXAMPLE:
+KEY_POINT: Focus on your experience with React and Node.js development
+QUESTION: Consider asking about the team's current tech stack preferences
+ANSWER: Try starting with "In my previous role, I worked extensively with..."
+
+Make each suggestion 10-15 words and highly relevant to what the interviewer is asking.
+
+${profileContext ? 'USER PROFILE:\n' + profileContext : 'No user profile available - provide generic but helpful suggestions.'}`;
+
+        const userPrompt = `FULL CONVERSATION HISTORY:
+${formattedHistory}
+
+INSTRUCTIONS: 
+Analyze the conversation above. Find the most recent meaningful question or topic the interviewer wants to discuss. Ignore filler words and casual conversation. Focus on what they actually want to know.
+
+Provide three targeted suggestions in the exact format specified:`;
+
+        // Make the OpenAI API call - let errors propagate
+        const aiResponse = await makeOpenAICallWithRetry(systemPrompt, userPrompt);
         
-        Keep your suggestions extremely brief (10-15 words max). The user needs to glance at them during a live conversation.
-        Base your suggestions on the provided conversation history and user profile to make them personalized and relevant.
+        console.log('AI Response:', aiResponse); // Debug log
         
-        ${profileContext ? 'USER PROFILE:\n' + profileContext : 'No user profile available - provide generic but helpful suggestions.'}`;
-
-        const userPrompt = `
-        CONVERSATION HISTORY:
-        ${formattedHistory}
-
-        LATEST QUESTION FROM INTERVIEWER:
-        "${question}"
-
-        Your concise, personalized suggestions:
-        `;
-
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-            ],
-            temperature: 0.6,
-            max_tokens: 200,
-        });
-
-        const aiResponse = response.choices[0].message.content.trim();
+        // Parse the structured response
+        const suggestions = [];
+        const lines = aiResponse.split('\n').filter(line => line.trim());
         
-        const suggestions = aiResponse.split('\n').map(line => {
+        for (const line of lines) {
             const cleanLine = line.trim();
-            if (!cleanLine) return null;
+            
+            if (cleanLine.startsWith('KEY_POINT:')) {
+                const content = cleanLine.replace('KEY_POINT:', '').trim();
+                suggestions.push({ type: 'Key Point to Mention', content });
+            } else if (cleanLine.startsWith('QUESTION:')) {
+                const content = cleanLine.replace('QUESTION:', '').trim();
+                suggestions.push({ type: 'Smart Question to Ask', content });
+            } else if (cleanLine.startsWith('ANSWER:')) {
+                const content = cleanLine.replace('ANSWER:', '').trim();
+                suggestions.push({ type: 'Direct Answer Hints', content });
+            }
+        }
 
-            if (cleanLine.toLowerCase().includes('focus on')) {
-                // Remove any numbering, asterisks, and "Key Point to Mention" labels
-                const content = cleanLine
-                    .replace(/^\d+\.\s*/, '') // Remove numbering like "1. "
-                    .replace(/\*\*Key Point to Mention\*\*:?\s*/i, '') // Remove "**Key Point to Mention**:"
-                    .replace(/Key Point to Mention:?\s*/i, '') // Remove "Key Point to Mention:"
-                    .replace(/^\*+/, '') // Remove leading asterisks
-                    .replace(/\*+$/, '') // Remove trailing asterisks
-                    .trim();
-                return { type: 'Key Point to Mention', content };
+        console.log('Parsed suggestions:', suggestions); // Debug log
+
+        // If we don't have all 3 suggestions, create a proper fallback
+        if (suggestions.length < 3) {
+            console.log('Fallback parsing needed, creating generic suggestions...');
+            
+            // Create generic suggestions based on the conversation
+            const fallbackSuggestions = [
+                { type: 'Key Point to Mention', content: 'Focus on your most relevant experience and specific examples' },
+                { type: 'Smart Question to Ask', content: 'Consider asking about team dynamics or growth opportunities' },
+                { type: 'Direct Answer Hints', content: 'Try starting with "In my experience..." or "I\'ve found that..."' }
+            ];
+            
+            // If we have some parsed suggestions, use them and fill the rest
+            if (suggestions.length > 0) {
+                const combined = [...suggestions];
+                while (combined.length < 3) {
+                    const fallback = fallbackSuggestions[combined.length];
+                    combined.push(fallback);
+                }
+                console.log('Using combined suggestions:', combined);
+                return NextResponse.json({ suggestions: combined });
+            } else {
+                console.log('Using fallback suggestions:', fallbackSuggestions);
+                return NextResponse.json({ suggestions: fallbackSuggestions });
             }
-            if (cleanLine.toLowerCase().includes('consider asking')) {
-                const content = cleanLine
-                    .replace(/^\d+\.\s*/, '')
-                    .replace(/\*\*Smart Question to Ask\*\*:?\s*/i, '')
-                    .replace(/Smart Question to Ask:?\s*/i, '')
-                    .replace(/^\*+/, '')
-                    .replace(/\*+$/, '')
-                    .trim();
-                return { type: 'Smart Question to Ask', content };
-            }
-            if (cleanLine.toLowerCase().includes('you could say') || cleanLine.toLowerCase().includes('try starting with')) {
-                const content = cleanLine
-                    .replace(/^\d+\.\s*/, '')
-                    .replace(/\*\*Direct Answer Hints\*\*:?\s*/i, '')
-                    .replace(/Direct Answer Hints:?\s*/i, '')
-                    .replace(/^\*+/, '')
-                    .replace(/\*+$/, '')
-                    .trim();
-                return { type: 'Direct Answer Hints', content };
-            }
-            return null;
-        }).filter(Boolean);
+        }
 
         return NextResponse.json({ suggestions });
 
     } catch (error) {
         console.error("Error in copilot suggestions:", error);
-        return NextResponse.json({ error: 'Failed to generate suggestions' }, { status: 500 });
+        
+        // Return specific error messages based on error type
+        if (error.status === 429) {
+            return NextResponse.json({ 
+                error: 'Rate limit exceeded. Please wait a moment before trying again.' 
+            }, { status: 429 });
+        } else if (error.status >= 500) {
+            return NextResponse.json({ 
+                error: 'OpenAI service temporarily unavailable. Please try again.' 
+            }, { status: 502 });
+        } else if (error.status === 401) {
+            return NextResponse.json({ 
+                error: 'Authentication error with AI service.' 
+            }, { status: 500 });
+        } else {
+            return NextResponse.json({ 
+                error: 'Failed to generate AI suggestions. Please try again.' 
+            }, { status: 500 });
+        }
     }
 } 
