@@ -7,6 +7,7 @@ import { useAudioCapture } from './hooks/useAudioCapture';
 import { useDeepgram } from './hooks/useDeepgram';
 import { useTranscriptManager } from './hooks/useTranscriptManager';
 import { useAI } from './hooks/useAI';
+import CodeHighlighter from './components/CodeHighlighter';
 
 const InterviewCopilotPage = () => {
     const [deepgramToken, setDeepgramToken] = useState('');
@@ -400,8 +401,8 @@ const InterviewCopilotPage = () => {
                                         <BrainCircuit className="w-5 h-5 mr-2 text-green-400" />
                                         {s.type}
                                     </h4>
-                                    <div className="max-h-48 overflow-y-auto">
-                                        <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">{s.content}</p>
+                                    <div className="max-h-96 overflow-y-auto">
+                                        <CodeHighlighter content={s.content} />
                                     </div>
                                 </div>
                             ))}

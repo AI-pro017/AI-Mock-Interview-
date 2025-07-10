@@ -174,39 +174,73 @@ export async function POST(req) {
 
         const profileContext = formatProfileForAI(userProfile);
 
-        const systemPrompt = `You are an interview assistant. Respond ONLY with JSON in this exact format:
+        const systemPrompt = `You are an interview assistant. Your job is to interpret unclear/poorly worded questions and provide structured responses.
+
+FIRST: Interpret the real intent behind the question, even if it has poor grammar or unclear wording.
+SECOND: Determine the best response structure from these options:
+- Describe → Explain → Highlight Achievements (for experience questions)
+- Define → Compare → Demonstrate with Code (for comparison questions)
+- Define → Explain → Show with Code (for concept/technical questions)
+- Context → Action → Results (for behavioral questions)
+- Problem → Solution → Impact (for problem-solving questions)
+
+THIRD: Respond ONLY with JSON in this exact format:
 
 {
   "suggestions": [
     {
       "type": "Key Points to Mention",
-      "content": "[Ultra-concise, 7-15 words max. Quick highlights they should mention]"
+      "content": "[7-15 words max. Quick highlights they should mention]"
     },
     {
-      "type": "Structured Response Approach", 
-      "content": "[2-4 bullet points, each extremely short (5-8 words). Easy to follow structure]"
-    },
-    {
-      "type": "Specific Examples to Use",
-      "content": "[COMPLETE, ready-to-use example with full details: situation, actions taken, technologies used, specific numbers/results, timeline. User should be able to speak this example directly. Generate realistic scenarios with specific details if user profile lacks examples. Make it comprehensive and actionable - include company context, team size, challenges faced, solutions implemented, and measurable outcomes.]"
-    },
-    {
-      "type": "Follow-up Questions",
-      "content": "[1-2 engaging questions that capture main ideas and attract interviewer attention. Not too long, not too short]"
+      "type": "💬 Sample Response",
+      "content": "[COMPLETE, ready-to-speak response following your internally chosen structure. For technical questions, ALWAYS include relevant code examples. Start with interpretation if the question was unclear (e.g., 'I believe you're asking about...'). Include specific examples, technologies, numbers, timeline, and outcomes. User should be able to speak this response directly.]"
     }
   ]
 }
 
 FORMATTING RULES:
 - Key Points: Maximum 15 words, focus on what to highlight
-- Structured Approach: Use bullet points (•), each point 5-8 words max
-- Specific Examples: CRITICAL - Provide COMPLETE, ready-to-speak examples with full context, numbers, timeline, and outcomes. Never use templates like "In my role, I..." - give the ENTIRE example with specific details
-- Follow-up Questions: Engaging questions that show genuine interest
+- Sample Response: CRITICAL - 
+  * Internally choose the best structure (Define → Compare → Demonstrate, etc.) but don't show it in output
+  * Start with question interpretation if unclear (e.g., "I believe you're asking about...")
+  * Follow your chosen structure exactly in the response organization
+  * For technical questions, ALWAYS include working code examples
+  * Include specific scenarios with context, numbers, timeline, and outcomes
+  * Make it conversational and ready-to-speak
+
+QUESTION INTERPRETATION EXAMPLES:
+- "What's the difference between dictionary and the listers in Python?" → "What's the difference between dictionaries and lists in Python?"
+- "What do you what are, like, classes in Python?" → "Can you explain what classes are in Python?"
+- "Can you tell us about your ex experience on Azure Databricks?" → "Can you tell us about your past experience with Azure Databricks?"
+
+EXAMPLE OUTPUT FORMAT:
+
+For experience questions like "Can you tell us about your ex experience on Azure Databricks?":
+- Key Points: "Role using Databricks, data workflows, Delta Lake, optimization techniques"
+- Sample Response: Use "Describe → Explain → Highlight Achievements" structure internally. Complete answer with specific project details, technologies, and measurable results
+
+For comparison questions like "What's the difference between dictionary and the listers in Python?":
+- Key Points: "List ordered index-based, dictionary key-value mapping, performance differences"  
+- Sample Response: Use "Define → Compare → Demonstrate with Code" structure internally. Define both concepts, compare differences, include working code examples
+
+For concept questions like "What do you what are, like, classes in Python?":
+- Key Points: "Class blueprint for objects, encapsulation, reusable logic modeling"
+- Sample Response: Use "Define → Explain → Show with Code" structure internally. Define classes, explain concepts, provide complete code examples with class definition and usage
+
+STRUCTURE SELECTION GUIDE:
+- Experience questions ("Tell me about your experience with...") → Describe → Explain → Highlight Achievements
+- Comparison questions ("What's the difference between X and Y?") → Define → Compare → Demonstrate with Code
+- Concept questions ("What are classes in Python?") → Define → Explain → Show with Code
+- Behavioral questions ("Tell me about a time when...") → Context → Action → Results
+- Problem-solving questions ("How would you solve...?") → Problem → Solution → Impact
 
 IMPORTANT: 
+- Always interpret the question's real intent first
+- Choose the most appropriate structure from the options above
+- For technical questions, include working code examples in the sample response
 - Make suggestions immediately actionable during live interview
 - Tailor to the specific question type and user profile
-- Focus on practical, quick-to-digest advice
 
 ${profileContext ? 'USER PROFILE:\n' + profileContext : 'No user profile available - provide generic but helpful suggestions.'}`;
 
@@ -245,16 +279,8 @@ Generate interview suggestions in the exact JSON format specified. Focus on the 
                         content: 'Relevant experience, quantifiable achievements, specific skills' 
                     },
                     { 
-                        type: 'Structured Response Approach', 
-                        content: '• Start with context\n• Describe your actions\n• Highlight the results\n• Connect to role requirements' 
-                    },
-                    { 
-                        type: 'Specific Examples to Use', 
+                        type: '💬 Sample Response', 
                         content: 'At TechCorp, I led a 6-month e-commerce platform overhaul as Senior Developer. Our legacy system had 8-second load times causing 40% cart abandonment. I assembled a 4-person team, chose React/Node.js architecture, and implemented microservices. We migrated 75,000 products using automated scripts, integrated Stripe payments, and deployed with zero downtime using blue-green deployment. Results: 60% faster load times (8s to 3.2s), 25% higher conversion rates, $2M additional quarterly revenue. Challenges included data consistency during migration and real-time inventory sync, solved with Redis caching and event-driven architecture.' 
-                    },
-                    { 
-                        type: 'Follow-up Questions', 
-                        content: 'What technologies does your team currently use? How do you measure success in this role?' 
                     }
                 ];
                 return NextResponse.json({ suggestions: fallbackSuggestions });
@@ -271,16 +297,8 @@ Generate interview suggestions in the exact JSON format specified. Focus on the 
                         content: 'Relevant experience, quantifiable achievements, specific skills' 
                     },
                     { 
-                        type: 'Structured Response Approach', 
-                        content: '• Start with context\n• Describe your actions\n• Highlight the results\n• Connect to role requirements' 
-                    },
-                    { 
-                        type: 'Specific Examples to Use', 
+                        type: '💬 Sample Response', 
                         content: 'At TechCorp, I led a 6-month e-commerce platform overhaul as Senior Developer. Our legacy system had 8-second load times causing 40% cart abandonment. I assembled a 4-person team, chose React/Node.js architecture, and implemented microservices. We migrated 75,000 products using automated scripts, integrated Stripe payments, and deployed with zero downtime using blue-green deployment. Results: 60% faster load times (8s to 3.2s), 25% higher conversion rates, $2M additional quarterly revenue. Challenges included data consistency during migration and real-time inventory sync, solved with Redis caching and event-driven architecture.' 
-                    },
-                    { 
-                        type: 'Follow-up Questions', 
-                        content: 'What technologies does your team currently use? How do you measure success in this role?' 
                     }
                 ]
             };
