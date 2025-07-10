@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Bot, BrainCircuit, User as UserIcon, Loader, Monitor, MonitorOff, AlertTriangle, Send, MessageSquare, X, Volume2, VolumeX } from 'lucide-react';
+import { Bot, BrainCircuit, User as UserIcon, Loader, Monitor, MonitorOff, AlertTriangle, Send, MessageSquare, X, Volume2, VolumeX, HelpCircle, Info } from 'lucide-react';
 import { useAudioCapture } from './hooks/useAudioCapture';
 import { useDeepgram } from './hooks/useDeepgram';
 import { useTranscriptManager } from './hooks/useTranscriptManager';
@@ -12,6 +12,7 @@ const InterviewCopilotPage = () => {
     const [deepgramToken, setDeepgramToken] = useState('');
     const [userInput, setUserInput] = useState('');
     const [userOverride, setUserOverride] = useState(null);
+    const [showHelpModal, setShowHelpModal] = useState(false);
     const videoRef = useRef(null);
     const transcriptEndRef = useRef(null);
     const lastProcessedTranscriptRef = useRef(null);
@@ -132,13 +133,118 @@ const InterviewCopilotPage = () => {
                     <Bot className="w-8 h-8 mr-3" />
                     Realtime Interview Copilot
                 </h1>
-                <Button onClick={toggleCapture} variant={isCapturing ? "destructive" : "default"} className="w-[160px]">
-                    {isCapturing ? <MonitorOff className="w-5 h-5 mr-2" /> : <Monitor className="w-5 h-5 mr-2" />}
-                    {isCapturing ? 'Stop Capture' : 'Start Capture'}
-                </Button>
+                <div className="flex items-center gap-3">
+                    <Button 
+                        onClick={() => setShowHelpModal(true)} 
+                        variant="outline" 
+                        size="sm"
+                        className="flex items-center gap-2"
+                    >
+                        <HelpCircle className="w-4 h-4" />
+                        Help
+                    </Button>
+                    <Button onClick={toggleCapture} variant={isCapturing ? "destructive" : "default"} className="w-[160px]">
+                        {isCapturing ? <MonitorOff className="w-5 h-5 mr-2" /> : <Monitor className="w-5 h-5 mr-2" />}
+                        {isCapturing ? 'Stop Capture' : 'Start Capture'}
+                    </Button>
+                </div>
             </header>
 
-            {captureError && <div className="text-red-400 bg-red-900/50 border border-red-800 p-4 rounded-lg mb-4 text-center">{captureError.message}</div>}
+            {/* Help Modal */}
+            {showHelpModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold text-white">How to Use Interview Copilot</h2>
+                            <button 
+                                onClick={() => setShowHelpModal(false)}
+                                className="text-gray-400 hover:text-white"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4 text-gray-300">
+                            <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
+                                <h3 className="text-green-300 font-semibold mb-2">✅ How to Use (Required Steps)</h3>
+                                <ol className="list-decimal list-inside space-y-1 text-sm">
+                                    <li>Open your meeting in a Chrome browser tab</li>
+                                    <li>Click "Start Capture" button</li>
+                                    <li>Select the <strong>meeting tab</strong> (not window or screen)</li>
+                                    <li>Make sure to check "Share tab audio" when prompted</li>
+                                    <li>The copilot will transcribe and provide AI suggestions</li>
+                                </ol>
+                            </div>
+
+                            <div className="bg-red-900/30 border border-red-700 rounded-lg p-4">
+                                <h3 className="text-red-300 font-semibold mb-2">❌ Not Supported</h3>
+                                <ul className="list-disc list-inside space-y-1 text-sm">
+                                    <li>Window sharing (will be blocked)</li>
+                                    <li>Entire screen sharing (will be blocked)</li>
+                                    <li>Tabs without audio</li>
+                                    <li>Browsers other than Chrome for meetings</li>
+                                </ul>
+                            </div>
+
+                            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
+                                <h3 className="text-blue-300 font-semibold mb-2">💡 Troubleshooting</h3>
+                                <ul className="list-disc list-inside space-y-1 text-sm">
+                                    <li>If you get "Window/screen sharing not supported" - select a tab instead</li>
+                                    <li>If you see "No audio detected" - make sure the tab has audio</li>
+                                    <li>Check "Share tab audio" checkbox when prompted</li>
+                                    <li>Make sure your meeting has participants speaking</li>
+                                    <li>Check browser permissions for microphone and screen sharing</li>
+                                    <li>Use the manual input field if audio transcription fails</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div className="mt-6 flex justify-end">
+                            <Button onClick={() => setShowHelpModal(false)}>
+                                Got it!
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {captureError && (
+                <div className={`p-4 rounded-lg mb-4 text-center ${
+                    captureError.type === 'warning' 
+                        ? 'text-yellow-300 bg-yellow-900/50 border border-yellow-700' 
+                        : 'text-red-400 bg-red-900/50 border border-red-800'
+                }`}>
+                    <div className="flex items-center justify-center gap-2">
+                        {captureError.type === 'warning' ? (
+                            <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                        ) : (
+                            <AlertTriangle className="w-5 h-5 text-red-400" />
+                        )}
+                        <span>{captureError.message}</span>
+                    </div>
+                    <div className="mt-3 flex justify-center gap-2">
+                        <Button 
+                            onClick={async () => {
+                                stopCapture();
+                                setTimeout(() => startCapture(), 500);
+                            }}
+                            size="sm"
+                            variant="outline"
+                            className="text-blue-300 border-blue-600 hover:bg-blue-900/50"
+                        >
+                            Try Again
+                        </Button>
+                        <Button 
+                            onClick={() => setShowHelpModal(true)}
+                            size="sm"
+                            variant="outline"
+                            className="text-blue-300 border-blue-600 hover:bg-blue-900/50"
+                        >
+                            Show Help
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
                 <div className="lg:col-span-1 bg-gray-800 rounded-lg shadow-lg flex flex-col h-[calc(100vh-80px)]">
@@ -225,8 +331,16 @@ const InterviewCopilotPage = () => {
                         {!isCapturing && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-gray-500 p-4">
                                 <Monitor size={64} className="mb-4" />
-                                <h3 className="text-xl font-semibold text-gray-300">Interview Copilot</h3>
-                                <p>Click 'Start Capture' to select your meeting tab.</p>
+                                <h3 className="text-xl font-semibold text-gray-300 mb-2">Interview Copilot</h3>
+                                <p className="text-sm mb-4">Click 'Start Capture' to select your meeting tab.</p>
+                                <div className="bg-blue-900/50 border border-blue-700 rounded-lg p-4 max-w-md">
+                                    <h4 className="text-blue-300 font-semibold mb-2">📋 Selection Requirements:</h4>
+                                    <ul className="text-xs text-blue-200 space-y-1 text-left">
+                                        <li>✅ <strong>Required:</strong> Select a Chrome meeting tab</li>
+                                        <li>✅ Check "Share tab audio" when prompted</li>
+                                        <li>❌ <strong>Not supported:</strong> Window or screen sharing</li>
+                                    </ul>
+                                </div>
                             </div>
                         )}
                     </div>
