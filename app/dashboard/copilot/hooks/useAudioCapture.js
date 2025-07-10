@@ -55,19 +55,16 @@ export const useAudioCapture = () => {
                 }
             }
 
-            // Audio is required for both tab and screen sharing
+            // Audio is optional - if no audio, system will work without transcription
+            // We'll just log a warning but continue with capture
             if (audioTracks.length === 0) {
-                // Clean up streams
-                microphoneStream.getTracks().forEach(track => track.stop());
-                displayStream.getTracks().forEach(track => track.stop());
-                
                 const videoTrack = videoTracks[0];
                 const settings = videoTrack?.getSettings();
                 
                 if (settings?.displaySurface === 'browser') {
-                    throw new Error("NO_TAB_AUDIO");
+                    console.warn("No audio detected from tab - transcription will be disabled");
                 } else {
-                    throw new Error("NO_SCREEN_AUDIO");
+                    console.warn("No audio detected from screen - transcription will be disabled");
                 }
             }
 
