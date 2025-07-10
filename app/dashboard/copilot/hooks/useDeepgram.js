@@ -70,7 +70,15 @@ export const useDeepgram = (stream, token, speakerIdentifier) => {
                 }
             } else {
                 console.warn(`[${speakerIdentifier}] Stream is not available or has no audio tracks`);
-                disconnect();
+                // Don't disconnect immediately - just log the warning
+                // This allows video to still be captured even without audio
+                if (speakerIdentifier === 'client') {
+                    // For client stream (tab/window), we might not have audio
+                    // Close the socket gracefully since we can't transcribe without audio
+                    socket.close();
+                } else {
+                    disconnect();
+                }
             }
         };
 

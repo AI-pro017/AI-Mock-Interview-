@@ -37,12 +37,31 @@ export const useAudioCapture = () => {
                 }
             });
 
-            // Check if audio is actually captured from the tab
+            // Check what type of sharing was selected
             const audioTracks = displayStream.getAudioTracks();
+            const videoTracks = displayStream.getVideoTracks();
+            
+            if (videoTracks.length > 0) {
+                const videoTrack = videoTracks[0];
+                const settings = videoTrack.getSettings();
+                
+                // Block window and screen sharing completely
+                if (settings.displaySurface === 'window' || settings.displaySurface === 'monitor') {
+                    // Clean up streams
+                    microphoneStream.getTracks().forEach(track => track.stop());
+                    displayStream.getTracks().forEach(track => track.stop());
+                    
+                    throw new Error("WINDOW_OR_SCREEN_SHARING_NOT_ALLOWED");
+                }
+            }
+
+            // Check if audio is actually captured from the tab
             if (audioTracks.length === 0) {
-                // Clean up microphone stream if tab audio failed
+                // Clean up streams
                 microphoneStream.getTracks().forEach(track => track.stop());
-                throw new Error("No audio track found in the selected tab. Please make sure to select a tab with audio and check 'Share tab audio' when prompted.");
+                displayStream.getTracks().forEach(track => track.stop());
+                
+                throw new Error("NO_TAB_AUDIO");
             }
 
             setMicStream(microphoneStream);
@@ -76,20 +95,28 @@ export const useAudioCapture = () => {
                 // Just silently reset and let user try again
                 setError(null);
                 return null;
+            } else if (err.message === 'WINDOW_OR_SCREEN_SHARING_NOT_ALLOWED') {
+                setError({ 
+                    message: "❌ Window and screen sharing are not supported. Please select a Chrome meeting tab instead.", 
+                    type: "error" 
+                });
+            } else if (err.message === 'NO_TAB_AUDIO') {
+                setError({ 
+                    message: "❌ No audio detected from the selected tab. Please select a tab with audio (like a meeting) and check 'Share tab audio' when prompted.", 
+                    type: "error" 
+                });
             } else {
                 // Log only actual errors, not user cancellations
                 console.error("Error capturing audio:", err);
                 
                 if (err.name === 'NotFoundError') {
-                    setError({ message: "No microphone found. Please check your audio devices." });
+                    setError({ message: "No microphone found. Please check your audio devices.", type: "error" });
                 } else if (err.name === 'InvalidStateError') {
-                    setError({ message: "Cannot start capture. Please try again." });
+                    setError({ message: "Cannot start capture. Please try again.", type: "error" });
                 } else if (err.name === 'NotSupportedError') {
-                    setError({ message: "Screen sharing is not supported in this browser." });
-                } else if (err.message.includes('audio track')) {
-                    setError({ message: err.message });
+                    setError({ message: "Screen sharing is not supported in this browser.", type: "error" });
                 } else {
-                    setError({ message: "Failed to start audio capture. Please try again." });
+                    setError({ message: "Failed to start capture. Please try again.", type: "error" });
                 }
             }
             return null;
@@ -113,7 +140,7 @@ export const useAudioCapture = () => {
         micStream, 
         tabStream, 
         error, 
-        isCapturing, 
+        isCapturing,
         startCapture, 
         stopCapture 
     };
