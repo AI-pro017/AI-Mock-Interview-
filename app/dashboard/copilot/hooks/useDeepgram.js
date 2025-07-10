@@ -18,6 +18,7 @@ export const useDeepgram = (stream, token, speakerIdentifier) => {
             socketRef.current = null;
         }
         setIsConnected(false);
+        setTranscript(null); // Clear transcript when disconnecting
     }, []);
     
     const connect = useCallback(() => {

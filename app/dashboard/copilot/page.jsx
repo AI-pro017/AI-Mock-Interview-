@@ -53,6 +53,8 @@ const InterviewCopilotPage = () => {
 
     const toggleCapture = useCallback(async () => {
         if (isCapturing) {
+            console.log("Manual stop capture - clearing all data");
+            manualStopRef.current = true; // Mark as manual stop
             stopCapture();
             clearTranscripts();
             clearSuggestions();
@@ -60,6 +62,7 @@ const InterviewCopilotPage = () => {
             setUserOverride(null);
             setUserInput('');
         } else {
+            console.log("Manual start capture - clearing previous data");
             clearTranscripts();
             clearSuggestions();
             lastProcessedTranscriptRef.current = null;
@@ -95,16 +98,35 @@ const InterviewCopilotPage = () => {
     }, [tabStream]);
 
     useEffect(() => {
-        if (micTranscript) processTranscript(micTranscript);
-    }, [micTranscript, processTranscript]);
+        if (micTranscript && isCapturing) processTranscript(micTranscript);
+    }, [micTranscript, processTranscript, isCapturing]);
 
     useEffect(() => {
-        if (tabTranscript) processTranscript(tabTranscript);
-    }, [tabTranscript, processTranscript]);
+        if (tabTranscript && isCapturing) processTranscript(tabTranscript);
+    }, [tabTranscript, processTranscript, isCapturing]);
 
     useEffect(() => {
         transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }, [transcripts]);
+    
+    // Clean up when capture stops due to system stopping screen sharing
+    const prevIsCapturingRef = useRef(isCapturing);
+    const manualStopRef = useRef(false);
+    
+    useEffect(() => {
+        // Only clear when transitioning from capturing to not capturing AND it wasn't a manual stop
+        if (prevIsCapturingRef.current && !isCapturing && !manualStopRef.current) {
+            console.log("System stopped sharing - cleaning up UI state");
+            clearTranscripts();
+            clearSuggestions();
+            lastProcessedTranscriptRef.current = null;
+            setUserOverride(null);
+            setUserInput('');
+        }
+        prevIsCapturingRef.current = isCapturing;
+        // Reset manual stop flag after processing
+        manualStopRef.current = false;
+    }, [isCapturing, clearTranscripts, clearSuggestions]);
     
     // Enhanced logic: Respect user overrides, otherwise trigger when client speaks
     useEffect(() => {

@@ -13,7 +13,7 @@ export const useAudioCapture = () => {
         
         try {
             setError(null);
-            setIsCapturing(true);
+            // Don't set isCapturing to true yet - wait until streams are established
 
             // Step 1: Get microphone stream (for user audio)
             microphoneStream = await navigator.mediaDevices.getUserMedia({
@@ -68,17 +68,31 @@ export const useAudioCapture = () => {
                 }
             }
 
+            // Set streams first
             setMicStream(microphoneStream);
             setTabStream(displayStream);
 
-            // Handle stream end events
+            // Handle stream end events - when display sharing stops, stop everything
             const videoTrack = displayStream.getVideoTracks()[0];
             if (videoTrack) {
                 videoTrack.onended = () => {
-                    console.log("Display stream ended");
+                    console.log("Display stream ended - stopping entire capture session");
                     stopCapture();
                 };
             }
+            
+            // Also handle audio track end events
+            const audioTrack = displayStream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.onended = () => {
+                    console.log("Display audio stream ended - stopping entire capture session");
+                    stopCapture();
+                };
+            }
+
+            // Only set isCapturing to true after everything is successfully set up
+            console.log("Capture setup complete - setting isCapturing to true");
+            setIsCapturing(true);
 
             return { micStream: microphoneStream, tabStream: displayStream };
         } catch (err) {
@@ -88,7 +102,8 @@ export const useAudioCapture = () => {
                 microphoneStream = null;
             }
             
-            // Reset state
+            // Reset state - ensure isCapturing is false
+            console.log("Error during capture setup - resetting state");
             setIsCapturing(false);
             setMicStream(null);
             setTabStream(null);
@@ -133,11 +148,14 @@ export const useAudioCapture = () => {
     }, []);
 
     const stopCapture = useCallback(() => {
+        console.log("stopCapture called - cleaning up all streams");
         if (micStream) {
+            console.log("Stopping microphone stream");
             micStream.getTracks().forEach(track => track.stop());
             setMicStream(null);
         }
         if (tabStream) {
+            console.log("Stopping tab/display stream");
             tabStream.getTracks().forEach(track => track.stop());
             setTabStream(null);
         }
