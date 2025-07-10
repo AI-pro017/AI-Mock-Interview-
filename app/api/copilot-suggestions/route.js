@@ -121,7 +121,8 @@ async function makeOpenAICallWithRetry(systemPrompt, userPrompt, maxRetries = RA
                     { role: 'user', content: userPrompt }
                 ],
                 temperature: 0.6,
-                max_tokens: 200,
+                max_tokens: 1000,
+                response_format: { type: "json_object" }
             });
 
             return response.choices[0].message.content.trim();
@@ -139,14 +140,12 @@ async function makeOpenAICallWithRetry(systemPrompt, userPrompt, maxRetries = RA
             let delayMs;
             const retryDelay = getRetryDelay(error);
             
-            // Fixed bug: was checking delayMs instead of retryDelay
             if (retryDelay) {
                 delayMs = retryDelay;
             } else {
                 delayMs = calculateBackoffDelay(attempt, RATE_LIMIT_CONFIG.baseDelay, RATE_LIMIT_CONFIG.maxDelay);
             }
             
-            console.log(`Rate limit hit, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
             await sleep(delayMs);
         }
     }
@@ -175,95 +174,123 @@ export async function POST(req) {
 
         const profileContext = formatProfileForAI(userProfile);
 
-        const systemPrompt = `You are an expert interview coach providing real-time assistance during a live interview. 
+        const systemPrompt = `You are an interview assistant. Respond ONLY with JSON in this exact format:
 
-CRITICAL INSTRUCTIONS:
-1. ANALYZE the full conversation history to understand the context and flow
-2. IDENTIFY the most recent meaningful question, request, or topic the interviewer introduced
-3. IGNORE filler words, pleasantries, and casual conversation 
-4. FOCUS on what the interviewer actually wants to know or discuss
+{
+  "suggestions": [
+    {
+      "type": "Key Points to Mention",
+      "content": "[Ultra-concise, 7-15 words max. Quick highlights they should mention]"
+    },
+    {
+      "type": "Structured Response Approach", 
+      "content": "[2-4 bullet points, each extremely short (5-8 words). Easy to follow structure]"
+    },
+    {
+      "type": "Specific Examples to Use",
+      "content": "[COMPLETE, ready-to-use example with full details: situation, actions taken, technologies used, specific numbers/results, timeline. User should be able to speak this example directly. Generate realistic scenarios with specific details if user profile lacks examples. Make it comprehensive and actionable - include company context, team size, challenges faced, solutions implemented, and measurable outcomes.]"
+    },
+    {
+      "type": "Follow-up Questions",
+      "content": "[1-2 engaging questions that capture main ideas and attract interviewer attention. Not too long, not too short]"
+    }
+  ]
+}
 
-RESPONSE FORMAT - You MUST respond in exactly this format:
+FORMATTING RULES:
+- Key Points: Maximum 15 words, focus on what to highlight
+- Structured Approach: Use bullet points (•), each point 5-8 words max
+- Specific Examples: CRITICAL - Provide COMPLETE, ready-to-speak examples with full context, numbers, timeline, and outcomes. Never use templates like "In my role, I..." - give the ENTIRE example with specific details
+- Follow-up Questions: Engaging questions that show genuine interest
 
-KEY_POINT: Focus on [specific advice about what to mention from their background]
-QUESTION: Consider asking [specific question they should ask the interviewer]  
-ANSWER: Try starting with [specific way to begin their response]
-
-EXAMPLE:
-KEY_POINT: Focus on your experience with React and Node.js development
-QUESTION: Consider asking about the team's current tech stack preferences
-ANSWER: Try starting with "In my previous role, I worked extensively with..."
-
-Make each suggestion 10-15 words and highly relevant to what the interviewer is asking.
+IMPORTANT: 
+- Make suggestions immediately actionable during live interview
+- Tailor to the specific question type and user profile
+- Focus on practical, quick-to-digest advice
 
 ${profileContext ? 'USER PROFILE:\n' + profileContext : 'No user profile available - provide generic but helpful suggestions.'}`;
 
-        const userPrompt = `FULL CONVERSATION HISTORY:
-${formattedHistory}
+        const userPrompt = `Question: ${question}
 
-INSTRUCTIONS: 
-Analyze the conversation above. Find the most recent meaningful question or topic the interviewer wants to discuss. Ignore filler words and casual conversation. Focus on what they actually want to know.
+Conversation: ${formattedHistory}
 
-Provide three targeted suggestions in the exact format specified:`;
+Generate interview suggestions in the exact JSON format specified. Focus on the most recent question.`;
 
-        // Make the OpenAI API call - let errors propagate
         const aiResponse = await makeOpenAICallWithRetry(systemPrompt, userPrompt);
         
-        console.log('AI Response:', aiResponse); // Debug log
-        
-        // Parse the structured response
-        const suggestions = [];
-        const lines = aiResponse.split('\n').filter(line => line.trim());
-        
-        for (const line of lines) {
-            const cleanLine = line.trim();
-            
-            if (cleanLine.startsWith('KEY_POINT:')) {
-                const content = cleanLine.replace('KEY_POINT:', '').trim();
-                suggestions.push({ type: 'Key Point to Mention', content });
-            } else if (cleanLine.startsWith('QUESTION:')) {
-                const content = cleanLine.replace('QUESTION:', '').trim();
-                suggestions.push({ type: 'Smart Question to Ask', content });
-            } else if (cleanLine.startsWith('ANSWER:')) {
-                const content = cleanLine.replace('ANSWER:', '').trim();
-                suggestions.push({ type: 'Direct Answer Hints', content });
-            }
-        }
-
-        console.log('Parsed suggestions:', suggestions); // Debug log
-
-        // If we don't have all 3 suggestions, create a proper fallback
-        if (suggestions.length < 3) {
-            console.log('Fallback parsing needed, creating generic suggestions...');
-            
-            // Create generic suggestions based on the conversation
-            const fallbackSuggestions = [
-                { type: 'Key Point to Mention', content: 'Focus on your most relevant experience and specific examples' },
-                { type: 'Smart Question to Ask', content: 'Consider asking about team dynamics or growth opportunities' },
-                { type: 'Direct Answer Hints', content: 'Try starting with "In my experience..." or "I\'ve found that..."' }
-            ];
-            
-            // If we have some parsed suggestions, use them and fill the rest
-            if (suggestions.length > 0) {
-                const combined = [...suggestions];
-                while (combined.length < 3) {
-                    const fallback = fallbackSuggestions[combined.length];
-                    combined.push(fallback);
+        // Parse the JSON response with multiple fallback strategies
+        let parsedResponse;
+        try {
+            // First try direct parsing
+            parsedResponse = JSON.parse(aiResponse);
+        } catch (parseError) {
+            // Try to clean and extract JSON
+            try {
+                // Remove any text before first { and after last }
+                let cleanedResponse = aiResponse.trim();
+                const firstBrace = cleanedResponse.indexOf('{');
+                const lastBrace = cleanedResponse.lastIndexOf('}');
+                
+                if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                    cleanedResponse = cleanedResponse.substring(firstBrace, lastBrace + 1);
+                    parsedResponse = JSON.parse(cleanedResponse);
+                } else {
+                    throw new Error("No valid JSON structure found");
                 }
-                console.log('Using combined suggestions:', combined);
-                return NextResponse.json({ suggestions: combined });
-            } else {
-                console.log('Using fallback suggestions:', fallbackSuggestions);
+            } catch (extractError) {
+                // Fallback to properly formatted suggestions
+                const fallbackSuggestions = [
+                    { 
+                        type: 'Key Points to Mention', 
+                        content: 'Relevant experience, quantifiable achievements, specific skills' 
+                    },
+                    { 
+                        type: 'Structured Response Approach', 
+                        content: '• Start with context\n• Describe your actions\n• Highlight the results\n• Connect to role requirements' 
+                    },
+                    { 
+                        type: 'Specific Examples to Use', 
+                        content: 'At TechCorp, I led a 6-month e-commerce platform overhaul as Senior Developer. Our legacy system had 8-second load times causing 40% cart abandonment. I assembled a 4-person team, chose React/Node.js architecture, and implemented microservices. We migrated 75,000 products using automated scripts, integrated Stripe payments, and deployed with zero downtime using blue-green deployment. Results: 60% faster load times (8s to 3.2s), 25% higher conversion rates, $2M additional quarterly revenue. Challenges included data consistency during migration and real-time inventory sync, solved with Redis caching and event-driven architecture.' 
+                    },
+                    { 
+                        type: 'Follow-up Questions', 
+                        content: 'What technologies does your team currently use? How do you measure success in this role?' 
+                    }
+                ];
                 return NextResponse.json({ suggestions: fallbackSuggestions });
             }
         }
 
-        return NextResponse.json({ suggestions });
+        // Validate the parsed response structure
+        if (!parsedResponse || !parsedResponse.suggestions || !Array.isArray(parsedResponse.suggestions)) {
+            // Use fallback suggestions
+            parsedResponse = {
+                suggestions: [
+                    { 
+                        type: 'Key Points to Mention', 
+                        content: 'Relevant experience, quantifiable achievements, specific skills' 
+                    },
+                    { 
+                        type: 'Structured Response Approach', 
+                        content: '• Start with context\n• Describe your actions\n• Highlight the results\n• Connect to role requirements' 
+                    },
+                    { 
+                        type: 'Specific Examples to Use', 
+                        content: 'At TechCorp, I led a 6-month e-commerce platform overhaul as Senior Developer. Our legacy system had 8-second load times causing 40% cart abandonment. I assembled a 4-person team, chose React/Node.js architecture, and implemented microservices. We migrated 75,000 products using automated scripts, integrated Stripe payments, and deployed with zero downtime using blue-green deployment. Results: 60% faster load times (8s to 3.2s), 25% higher conversion rates, $2M additional quarterly revenue. Challenges included data consistency during migration and real-time inventory sync, solved with Redis caching and event-driven architecture.' 
+                    },
+                    { 
+                        type: 'Follow-up Questions', 
+                        content: 'What technologies does your team currently use? How do you measure success in this role?' 
+                    }
+                ]
+            };
+        }
+
+        return NextResponse.json({ suggestions: parsedResponse.suggestions });
 
     } catch (error) {
         console.error("Error in copilot suggestions:", error);
         
-        // Return specific error messages based on error type
         if (error.status === 429) {
             return NextResponse.json({ 
                 error: 'Rate limit exceeded. Please wait a moment before trying again.' 

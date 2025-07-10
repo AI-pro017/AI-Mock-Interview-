@@ -11,18 +11,14 @@ const openai = new OpenAI({
 });
 
 export async function POST(req) {
-    console.log("\n--- [DIAGNOSTIC] /api/interview START ---");
 
     try {
         const session = await auth();
         if (!session?.user?.id) {
-            console.error("[DIAGNOSTIC] ERROR: Unauthorized access attempt.");
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-        console.log(`[DIAGNOSTIC] User: ${session.user.email}`);
 
         const body = await req.json();
-        console.log("[DIAGNOSTIC] Received request body.");
 
         const { 
             jobRole, jobDescription, jobExperience, industry, skills, 
@@ -30,7 +26,6 @@ export async function POST(req) {
         } = body;
 
         if (!jobRole || !jobExperience) {
-            console.error("[DIAGNOSTIC] ERROR: Validation failed - Job role or experience missing.");
             return NextResponse.json({ error: 'Job role and experience are required' }, { status: 400 });
         }
 
@@ -62,7 +57,6 @@ export async function POST(req) {
         const prompt = `Generate 5 interview questions for a ${jobRole} with ${jobExperience} years of experience.
 ${jobDescription ? `Job Description: ${jobDescription}` : ''}
 The questions should focus on ${focus} aspects and be at a ${difficulty} difficulty level.`;
-        console.log("[DIAGNOSTIC] Calling OpenAI with simplified prompt...");
 
         const response = await openai.chat.completions.create({
             model: "gpt-4o",
@@ -71,7 +65,6 @@ The questions should focus on ${focus} aspects and be at a ${difficulty} difficu
             tool_choice: { type: "function", function: { name: "generate_interview_questions" } },
         });
         
-        console.log("[DIAGNOSTIC] Received OpenAI response.");
         
         const toolCall = response.choices[0].message.tool_calls[0];
         if (!toolCall) {
@@ -79,13 +72,11 @@ The questions should focus on ${focus} aspects and be at a ${difficulty} difficu
         }
 
         const functionArguments = toolCall.function.arguments;
-        console.log("[DIAGNOSTIC] Parsing function arguments...");
         const parsedResult = JSON.parse(functionArguments);
 
         if (!parsedResult.questions || parsedResult.questions.length === 0) {
              throw new Error("[DIAGNOSTIC] CRITICAL: AI tool call succeeded but generated no questions.");
         }
-        console.log(`[DIAGNOSTIC] Successfully generated ${parsedResult.questions.length} questions.`);
 
         const jsonMockResponse = JSON.stringify(parsedResult.questions);
         const interviewId = uuidv4();
@@ -106,15 +97,10 @@ The questions should focus on ${focus} aspects and be at a ${difficulty} difficu
             createdAt: new Date().toISOString(),
         });
         
-        console.log("[DIAGNOSTIC] Database insert successful. Interview ID:", interviewId);
-        console.log("--- [DIAGNOSTIC] /api/interview END ---\n");
         return NextResponse.json({ success: true, interviewId });
 
     } catch (error) {
-        console.error("\n--- [DIAGNOSTIC] CATCH BLOCK: A CRITICAL ERROR OCCURRED ---");
-        // Log the full error object for maximum detail
         console.error(error);
-        console.error("--- [DIAGNOSTIC] END OF ERROR ---\n");
         return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
     }
 }

@@ -6,15 +6,12 @@ import { UserAnswer, InterviewReport, MockInterview } from '@/utils/schema';
 import { eq } from 'drizzle-orm';
 import OpenAI from 'openai';
 
-console.log("API ROUTE LOADED: /api/interview-analysis");
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
-console.log("OpenAI client initialized");
 
 export async function POST(req) {
-    console.log("### FEEDBACK ANALYSIS: API endpoint called ###");
     
     // Authentication check - make this optional since we might need to generate feedback
     // even if the user's session has expired
@@ -23,27 +20,21 @@ export async function POST(req) {
         const session = await auth();
         if (session?.user?.id) {
             userId = session.user.id;
-            console.log("### FEEDBACK ANALYSIS: Authentication successful ###");
-        } else {
-            console.log("### FEEDBACK ANALYSIS: No user session, proceeding as guest ###");
         }
     } catch (authError) {
-        console.log("### FEEDBACK ANALYSIS: Auth error, proceeding as guest ###", authError);
+        console.log(authError);
     }
 
     try {
         // Parse request body
         const body = await req.json();
         const { mockId } = body;
-        console.log(`### FEEDBACK ANALYSIS: Processing mockId: ${mockId} ###`);
 
         if (!mockId) {
-            console.log("### FEEDBACK ANALYSIS: Missing mockId in request ###");
             return NextResponse.json({ error: 'Mock ID is required' }, { status: 400 });
         }
 
         // Check for existing report with retry mechanism
-        console.log("### FEEDBACK ANALYSIS: Checking for existing report ###");
         let existingReport = [];
         let retries = 0;
         const maxRetries = 3;
@@ -53,7 +44,6 @@ export async function POST(req) {
                 existingReport = await db.select().from(InterviewReport).where(eq(InterviewReport.mockIdRef, mockId));
                 break; // Exit the retry loop if successful
             } catch (dbError) {
-                console.log(`### FEEDBACK ANALYSIS: DB error on attempt ${retries + 1}/${maxRetries} ###`, dbError);
                 retries++;
                 if (retries >= maxRetries) throw dbError;
                 // Wait with exponential backoff
@@ -62,7 +52,6 @@ export async function POST(req) {
         }
         
         if (existingReport.length > 0) {
-            console.log("### FEEDBACK ANALYSIS: Report already exists, returning success ###");
             return NextResponse.json({ 
                 message: 'Report already exists.',
                 success: true,
@@ -71,7 +60,6 @@ export async function POST(req) {
         }
 
         // Fetch answers with retry
-        console.log("### FEEDBACK ANALYSIS: Fetching user answers ###");
         let userAnswers = [];
         retries = 0;
         
@@ -82,18 +70,15 @@ export async function POST(req) {
                     .where(eq(UserAnswer.mockIdRef, mockId));
                 break; // Exit the retry loop if successful
             } catch (dbError) {
-                console.log(`### FEEDBACK ANALYSIS: DB error on answers fetch attempt ${retries + 1}/${maxRetries} ###`, dbError);
                 retries++;
                 if (retries >= maxRetries) throw dbError;
                 await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries - 1)));
             }
         }
         
-        console.log(`### FEEDBACK ANALYSIS: Found ${userAnswers.length} answers ###`);
         
         // Handle case when no answers are found
         if (userAnswers.length === 0) {
-            console.log("### FEEDBACK ANALYSIS: No answers found, creating a default report ###");
             
             try {
                 // Create a default report with placeholder values
@@ -106,20 +91,17 @@ export async function POST(req) {
                     improvementPlan: "To get personalized feedback, please complete an interview by answering the questions provided.",
                 }).returning({ id: InterviewReport.id });
                 
-                console.log("### FEEDBACK ANALYSIS: Default report created successfully ###");
                 return NextResponse.json({ 
                     message: 'Default report created because no answers were found.',
                     success: true,
                     reportId: insertResult[0]?.id
                 });
             } catch (reportError) {
-                console.log("### FEEDBACK ANALYSIS: Error creating default report ###", reportError);
                 return NextResponse.json({ error: 'Failed to create default report' }, { status: 500 });
             }
         }
 
         // Continue with normal analysis if answers exist
-        console.log("### FEEDBACK ANALYSIS: Generating analysis for answers ###");
         const analysisPrompt = createAnalysisPrompt(userAnswers);
         
         try {
@@ -148,18 +130,12 @@ export async function POST(req) {
             // Race the promises to implement the timeout
             const response = await Promise.race([openaiPromise, timeoutPromise]);
 
-            console.log("### FEEDBACK ANALYSIS: OpenAI response received ###");
             
             // Parse response
             let analysisResult;
             try {
                 analysisResult = JSON.parse(response.choices[0].message.content);
-                console.log("### FEEDBACK ANALYSIS: Response successfully parsed ###");
             } catch (parseError) {
-                console.log(`### FEEDBACK ANALYSIS: Error parsing response: ${parseError.message} ###`);
-                console.log("### FEEDBACK ANALYSIS: Raw response preview ###", 
-                    response.choices[0].message.content.substring(0, 200) + "...");
-                
                 // Create a fallback analysis
                 analysisResult = createFallbackAnalysis(userAnswers);
             }
@@ -167,17 +143,14 @@ export async function POST(req) {
             // Validate response or use fallback
             if (!analysisResult.detailedAnalysis || !Array.isArray(analysisResult.detailedAnalysis) || 
                 !analysisResult.overallSummary) {
-                console.log("### FEEDBACK ANALYSIS: Invalid response structure, using fallback ###");
                 analysisResult = createFallbackAnalysis(userAnswers);
             }
 
             // Update answers with feedback
-            console.log(`### FEEDBACK ANALYSIS: Updating ${analysisResult.detailedAnalysis.length} answers with feedback ###`);
             
             for (const item of analysisResult.detailedAnalysis) {
                 try {
                     if (!item.userAnswerId) {
-                        console.log("### FEEDBACK ANALYSIS: Missing userAnswerId in item ###");
                         continue;
                     }
                     
@@ -194,13 +167,11 @@ export async function POST(req) {
                         })
                         .where(eq(UserAnswer.id, item.userAnswerId));
                 } catch (updateError) {
-                    console.log(`### FEEDBACK ANALYSIS: Error updating answer ${item.userAnswerId} ###`, updateError);
                     // Continue with other updates despite error
                 }
             }
 
             // Create report
-            console.log("### FEEDBACK ANALYSIS: Creating interview report ###");
             const insertResult = await db.insert(InterviewReport).values({
                 mockIdRef: mockId,
                 userId: userId,
@@ -210,7 +181,6 @@ export async function POST(req) {
                 improvementPlan: analysisResult.overallSummary.improvementPlan || "Focus on improving your interview skills.",
             }).returning({ id: InterviewReport.id });
 
-            console.log("### FEEDBACK ANALYSIS: Analysis complete and successful ###");
             return NextResponse.json({ 
                 message: 'Analysis complete and feedback stored.',
                 success: true,
@@ -218,11 +188,9 @@ export async function POST(req) {
             });
             
         } catch (openaiError) {
-            console.log(`### FEEDBACK ANALYSIS: OpenAI API error: ${openaiError.message} ###`);
             
             // Create fallback report in case of OpenAI failure
             try {
-                console.log("### FEEDBACK ANALYSIS: Creating fallback report ###");
                 const fallbackAnalysis = createFallbackAnalysis(userAnswers);
                 
                 // Update answers with fallback feedback
@@ -255,7 +223,6 @@ export async function POST(req) {
                     improvementPlan: fallbackAnalysis.overallSummary.improvementPlan,
                 }).returning({ id: InterviewReport.id });
                 
-                console.log("### FEEDBACK ANALYSIS: Fallback report created successfully ###");
                 return NextResponse.json({ 
                     message: 'Fallback analysis created due to AI service issues.',
                     success: true,
@@ -263,18 +230,15 @@ export async function POST(req) {
                     fallback: true
                 });
             } catch (fallbackError) {
-                console.log("### FEEDBACK ANALYSIS: Error creating fallback report ###", fallbackError);
                 return NextResponse.json({ error: 'Failed to create any report' }, { status: 500 });
             }
         }
     } catch (error) {
-        console.log(`### FEEDBACK ANALYSIS: Unhandled error: ${error.message} ###`);
         return NextResponse.json({ error: 'Internal Server Error: ' + error.message }, { status: 500 });
     }
 }
 
 function createAnalysisPrompt(userAnswers) {
-    console.log("### FEEDBACK ANALYSIS: Creating analysis prompt ###");
     
     const questionsAndAnswers = userAnswers.map(ua => ({
         userAnswerId: ua.id,
@@ -282,7 +246,6 @@ function createAnalysisPrompt(userAnswers) {
         userAnswer: ua.userAns,
     }));
     
-    console.log(`### FEEDBACK ANALYSIS: Mapped ${questionsAndAnswers.length} Q&A pairs ###`);
 
     return `
         Please analyze the following interview questions and answers. For each answer, provide:
@@ -310,7 +273,6 @@ function createAnalysisPrompt(userAnswers) {
 
 // Create fallback analysis for when OpenAI fails
 function createFallbackAnalysis(userAnswers) {
-    console.log("### FEEDBACK ANALYSIS: Creating fallback analysis ###");
     
     const detailedAnalysis = userAnswers.map(answer => ({
         userAnswerId: answer.id,

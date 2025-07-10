@@ -44,7 +44,6 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     } else {
       interviewer = getRandomInterviewer();
     }
-    console.log("Selected interviewer:", interviewer.name);
     return interviewer;
   });
 
@@ -69,8 +68,6 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const initializeMedia = async () => {
     setIsMediaLoading(true);
     setMediaError(null);
-    
-    console.log("Initializing media, camera enabled:", cameraEnabled);
     
     // Close any existing streams first
     if (cameraStream) {
@@ -100,15 +97,12 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
         } : false
       };
       
-      console.log("Requesting media with constraints:", JSON.stringify(constraints));
-      
       // Request media access
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       // Log what we got
       const videoTracks = stream.getVideoTracks();
       const audioTracks = stream.getAudioTracks();
-      console.log(`Acquired stream with ${videoTracks.length} video tracks and ${audioTracks.length} audio tracks`);
       
       // Store the stream
       setCameraStream(stream);
@@ -140,7 +134,6 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
 
   const startInterview = async () => {
     // Use the consistent interviewer instead of generating a new one
-    console.log("Starting interview with interviewer:", selectedInterviewer.name);
     
     const mediaStream = await initializeMedia();
     if (mediaStream) {
@@ -161,7 +154,6 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   };
 
   const endInterview = async () => {
-    console.log("Ending interview");
     setIsInterviewActive(false);
     
     if (timerRef.current) {
@@ -179,7 +171,6 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       }
       
       // Process Q&A pairs
-      console.log("Conversation data at end:", conversation.length, "items");
       
       // Save the conversation data first
       let savedCount = 0;
@@ -206,7 +197,6 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
         }
       }
       
-      console.log(`Saved ${savedCount} Q&A pairs to database`);
       
       // Show loading while triggering analysis
       setIsAnalyzing(true);

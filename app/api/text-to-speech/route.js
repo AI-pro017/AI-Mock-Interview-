@@ -34,7 +34,6 @@ const VOICE_IDS = {
 };
 
 export async function POST(req) {
-  console.log("Text-to-speech API called");
   
   try {
     // Parse the request body
@@ -48,20 +47,13 @@ export async function POST(req) {
       selectNewVoice = false
     } = body;
     
-    console.log("Text to convert:", text?.substring(0, 50) + "...");
-    console.log("Voice speed:", speed || "default (1.0)");
-    console.log("Natural speech:", naturalSpeech ? "enabled" : "disabled");
-    console.log("Gender requested:", gender);
-
     if (!text) {
-      console.log("No text provided");
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
 
     // Check if we have the API key
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) {
-      console.error("ELEVENLABS_API_KEY is missing");
       return NextResponse.json({ 
         error: 'ElevenLabs API key is not configured',
         envVars: Object.keys(process.env).filter(key => !key.includes('SECRET') && !key.includes('KEY')).join(', ')
@@ -79,9 +71,6 @@ export async function POST(req) {
         const randomIndex = Math.floor(Math.random() * VOICE_IDS.female.length);
         selectedVoiceId = VOICE_IDS.female[randomIndex];
       }
-      console.log("Selected new voice ID:", selectedVoiceId);
-    } else {
-      console.log("Using provided voice ID:", selectedVoiceId);
     }
     
     // Process text for natural speech patterns if enabled
@@ -90,8 +79,6 @@ export async function POST(req) {
       processedText = addNaturalSpeechPatterns(text);
     }
 
-    console.log("Making direct request to ElevenLabs API");
-    
     // Call the ElevenLabs API
     const elevenLabsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`, {
       method: 'POST',

@@ -21,9 +21,7 @@ const fieldWeights = {
 };
 
 function calculateCompletion(data) {
-    let total = 0;
-    if (data.fullName) total += fieldWeights.fullName;
-    if (data.email) total += fieldWeights.email;
+    let total = 10;
     if (data.phoneNumber) total += fieldWeights.phoneNumber;
     if (data.locationCity || data.locationCountry) total += fieldWeights.location;
     if (data.professionalTitle) total += fieldWeights.professionalTitle;
@@ -58,8 +56,11 @@ export async function GET(req) {
             .where(eq(UserProfile.email, userEmail));
         
         if (!userProfiles.length) {
-            // If no profile found, return a default value
-            return NextResponse.json({ completionPercentage: 95 });
+            // If no profile found, return 0% completion (not 95%)
+            return NextResponse.json({ 
+                completion: 10,
+                completionPercentage: 10 
+            });
         }
         
         const userProfile = userProfiles[0];
@@ -88,10 +89,16 @@ export async function GET(req) {
         // Calculate completion
         const completionPercentage = calculateCompletion(completeProfile);
         
-        return NextResponse.json({ completionPercentage });
+        return NextResponse.json({ 
+            completion: completionPercentage,
+            completionPercentage: completionPercentage 
+        });
     } catch (error) {
         console.error('Error fetching profile completion:', error);
-        // Return default value on error
-        return NextResponse.json({ completionPercentage: 95 }, { status: 500 });
+        // Return 0% on error (not 95%)
+        return NextResponse.json({ 
+            completion: 0,
+            completionPercentage: 0 
+        }, { status: 500 });
     }
 } 

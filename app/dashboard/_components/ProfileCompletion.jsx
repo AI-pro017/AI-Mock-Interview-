@@ -1,14 +1,33 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserCircle } from 'lucide-react';
 
 function ProfileCompletion({ user }) {
   const router = useRouter();
+  const [completionPercentage, setCompletionPercentage] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Use the correct percentage of 95% instead of calculating
-  const completionPercentage = 95;
+  useEffect(() => {
+    // Fetch the actual profile completion percentage
+    fetch('/api/profile-completion')
+      .then(response => {
+        if (response.ok) {
+          return response.json();
+        }
+        throw new Error('Failed to fetch profile completion');
+      })
+      .then(data => {
+        setCompletionPercentage(data.completionPercentage || data.completion || 0);
+        setIsLoading(false);
+      })
+      .catch(error => {
+        console.error('Error fetching profile completion:', error);
+        setCompletionPercentage(0); // Default to 0% on error
+        setIsLoading(false);
+      });
+  }, []);
   
   return (
     <div className="bg-slate-800/50 rounded-xl p-6 ring-1 ring-white/10">
@@ -20,13 +39,19 @@ function ProfileCompletion({ user }) {
       <div className="mb-4">
         <div className="flex justify-between items-center mb-2">
           <span className="text-sm text-slate-400">Progress</span>
-          <span className="text-sm font-medium text-white">{completionPercentage}% Complete</span>
+          <span className="text-sm font-medium text-white">
+            {isLoading ? '...' : `${completionPercentage}%`} Complete
+          </span>
         </div>
         <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-sky-400 rounded-full" 
-            style={{ width: `${completionPercentage}%` }}
-          ></div>
+          {isLoading ? (
+            <div className="h-full bg-slate-600 rounded-full animate-pulse"></div>
+          ) : (
+            <div 
+              className="h-full bg-sky-400 rounded-full transition-all duration-500 ease-in-out" 
+              style={{ width: `${completionPercentage}%` }}
+            ></div>
+          )}
         </div>
       </div>
       

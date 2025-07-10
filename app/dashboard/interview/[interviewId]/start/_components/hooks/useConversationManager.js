@@ -12,13 +12,13 @@ export function useConversationManager(interview, isMicMuted, getInterviewerFn =
   const [currentUserResponse, setCurrentUserResponse] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
-  const [questionCounter, setQuestionCounter] = useState(0); // Track question count
-  const [questionTopics, setQuestionTopics] = useState([]); // Track covered topics
+  const [questionCounter, setQuestionCounter] = useState(0);
+  const [questionTopics, setQuestionTopics] = useState([]);
   const [interviewer, setInterviewer] = useState(() => getInterviewerFn());
   
   const userResponseBufferRef = useRef('');
   const silenceTimerRef = useRef(null);
-  const processUserResponseRef = useRef(null); // Add this ref to break the circular dependency
+  const processUserResponseRef = useRef(null);
   
   // Set up AI response generation
   const { 
@@ -30,7 +30,6 @@ export function useConversationManager(interview, isMicMuted, getInterviewerFn =
   
   // Handle user speech start
   const handleSpeechStart = useCallback(() => {
-    console.log("SPEECH FLOW: Speech started");
     clearTimeout(silenceTimerRef.current);
     setIsUserSpeaking(true);
     if (isAISpeaking) {
@@ -40,28 +39,23 @@ export function useConversationManager(interview, isMicMuted, getInterviewerFn =
   
   // Handle user speech end
   const handleSpeechEnd = useCallback(() => {
-    console.log("SPEECH FLOW: Speech ended");
     silenceTimerRef.current = setTimeout(() => {
-      console.log("SPEECH FLOW: Silence timeout - buffer:", userResponseBufferRef.current.length > 0 ? "HAS CONTENT" : "EMPTY");
       if (userResponseBufferRef.current.trim() && processUserResponseRef.current) {
-        processUserResponseRef.current(); // Use the ref instead of direct function call
+        processUserResponseRef.current();
       } else {
         setIsUserSpeaking(false);
       }
     }, 1500);
-  }, []);  // Remove processUserResponse from dependencies
+  }, []);
   
   // Handle transcript updates
   const handleTranscriptUpdate = useCallback((transcript, isFinal) => {
-    console.log(`SPEECH FLOW: Transcript update, isFinal: ${isFinal}, length: ${transcript.length}`);
-    
     if (isAISpeaking) {
       stopSpeaking();
     }
     
     if (isFinal) {
       userResponseBufferRef.current += transcript + ' ';
-      console.log("SPEECH FLOW: Updated buffer:", userResponseBufferRef.current.substring(0, 50));
       setCurrentUserResponse(userResponseBufferRef.current.trim());
       setInterimTranscript('');
     } else {
@@ -71,21 +65,15 @@ export function useConversationManager(interview, isMicMuted, getInterviewerFn =
   
   // Extract potential topics from the conversation
   const extractTopics = useCallback((text) => {
-    // Simple implementation to extract potential keywords/topics
-    // In a real implementation, this could use NLP to extract entities
     const words = text.toLowerCase().split(/\s+/);
     const commonWords = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'with', 'about', 'from']);
     return words
-      .filter(word => word.length > 4 && !commonWords.has(word)) // Simple filter for potential keywords
-      .slice(0, 5); // Take up to 5 potential topics
+      .filter(word => word.length > 4 && !commonWords.has(word))
+      .slice(0, 5);
   }, []);
   
   // Process completed user response
   const processUserResponse = useCallback(async () => {
-    console.log("CONVERSATION FLOW: processUserResponse called");
-    console.log("CONVERSATION FLOW: Current conversation length:", conversation.length);
-    console.log("CONVERSATION FLOW: User response:", userResponseBufferRef.current.trim().substring(0, 50));
-
     const userResponse = userResponseBufferRef.current.trim();
     if (!userResponse) {
       setIsUserSpeaking(false);
@@ -108,48 +96,18 @@ export function useConversationManager(interview, isMicMuted, getInterviewerFn =
       }
     }
     
-    console.log("CONVERSATION FLOW: Last question found:", lastQuestion ? "YES" : "NO");
-    if (lastQuestion) {
-      console.log("CONVERSATION FLOW: Last question:", lastQuestion.substring(0, 50));
-    }
-    
     // Save answer to the database
     if (lastQuestion) {
       try {
-        console.log("Saving answer to database:", {
-          question: lastQuestion.substring(0, 30) + "...",
-          answer: userResponse.substring(0, 30) + "..."
+        await db.insert(UserAnswer).values({
+          mockIdRef: interview.mockId,
+          question: lastQuestion,
+          userAns: userResponse,
+          userEmail: interview.createdBy || "",
+          createdAt: new Date().toISOString()
         });
-        
-        // Try the original save method
-        let saveSuccess = false;
-        try {
-          await db.insert(UserAnswer).values({
-            mockIdRef: interview.mockId,
-            question: lastQuestion,
-            userAns: userResponse,
-            userEmail: interview.createdBy || "",
-            createdAt: new Date().toISOString()
-          });
-          saveSuccess = true;
-          console.log("Answer saved successfully using direct DB insert");
-        } catch (dbError) {
-          console.error("Error with direct DB save:", dbError);
-        }
-        
-        // If direct save failed, try the debug function
-        if (!saveSuccess) {
-          const debugSuccess = await debugSaveAnswer(
-            interview.mockId, 
-            lastQuestion, 
-            userResponse, 
-            interview.createdBy || ""
-          );
-          console.log("Debug save result:", debugSuccess ? "Success" : "Failed");
-        }
-        
       } catch (error) {
-        console.error("Error saving answer to database:", error);
+        // Silently handle database errors
       }
     }
     
@@ -255,37 +213,17 @@ export function useConversationManager(interview, isMicMuted, getInterviewerFn =
   
   // Start interview with greeting
   const startConversation = async (audioStream, selectedInterviewer = null) => {
-    console.log("==== START CONVERSATION FLOW ====");
-    console.log("1. Initial interviewer state:", interviewer ? interviewer.name : "null");
-    
     // If a specific interviewer is passed, use it; otherwise keep the existing one
     let interviewerToUse = interviewer;
     if (selectedInterviewer) {
-      console.log("2. Selected interviewer provided:", selectedInterviewer.name);
-      console.log("3. Setting interviewer state with:", selectedInterviewer.name);
       setInterviewer(selectedInterviewer);
-      interviewerToUse = selectedInterviewer; // Use this directly rather than relying on state update
-    } else {
-      console.log("2. No selected interviewer, using current state:", interviewerToUse.name);
+      interviewerToUse = selectedInterviewer;
     }
     
     // Start continuous speech recognition
-    console.log("4. Starting speech recognition");
     startSpeechRecognition(audioStream);
     
-    console.log("5. Preparing greeting with interviewer:", interviewerToUse.name);
-    
-    // Instead of generating the greeting here, explicitly use the selected interviewer
-    // and pass it to the useAIResponse hook
-    
     try {
-      // Log the exact interviewer object we're using for the greeting
-      console.log("6. Interviewer object for greeting:", JSON.stringify({
-        name: interviewerToUse.name,
-        title: interviewerToUse.title,
-        company: interviewerToUse.company
-      }));
-      
       // Generate greeting with explicit interviewer identity
       const greeting = `You are conducting a job interview for a ${interview.jobPosition} position. 
               The candidate has ${interview.jobExperience} years of experience. 
@@ -307,23 +245,17 @@ export function useConversationManager(interview, isMicMuted, getInterviewerFn =
               CRITICAL REQUIREMENT: You MUST introduce yourself as ${interviewerToUse.name} and mention your role as ${interviewerToUse.title} at ${interviewerToUse.company}. 
               DO NOT use any other name or company. DO NOT invent a different identity.`;
       
-      console.log("7. Calling generateAndSpeak with explicit interviewer");
       const aiResponse = await generateAndSpeak(greeting, interview, interviewerToUse);
       
-      console.log("8. AI response received, length:", aiResponse ? aiResponse.length : 0);
       if (aiResponse) {
-        // Log the first 100 characters of the response to verify the interviewer name
-        console.log("9. First part of response:", aiResponse.substring(0, 100));
         setConversation([{ role: 'ai', text: aiResponse }]);
         if (aiResponse.includes('?')) {
-          setQuestionCounter(1); // Initialize with first question
+          setQuestionCounter(1);
         }
       }
     } catch (error) {
-      console.error("ERROR in startConversation:", error);
+      // Silently handle errors
     }
-    
-    console.log("==== END CONVERSATION FLOW ====");
   };
   
   // Set up speech recognition with callbacks
@@ -349,36 +281,9 @@ export function useConversationManager(interview, isMicMuted, getInterviewerFn =
     return conversation;
   };
   
-  const debugSaveAnswer = async (mockId, question, answer, userEmail) => {
-    try {
-      console.log("DEBUG: Saving answer to database");
-      console.log("- mockId:", mockId);
-      console.log("- question:", question?.substring(0, 50));
-      console.log("- answer:", answer?.substring(0, 50));
-      console.log("- userEmail:", userEmail);
-      
-      const result = await db.insert(UserAnswer).values({
-        mockIdRef: mockId,
-        question: question || "No question recorded",
-        userAns: answer || "No answer recorded",
-        userEmail: userEmail || "",
-        createdAt: new Date().toISOString()
-      });
-      
-      console.log("DEBUG: Save result:", result);
-      return true;
-    } catch (error) {
-      console.error("DEBUG: Error saving answer:", error);
-      return false;
-    }
-  };
-  
   const forceProcessResponse = () => {
-    console.log("MANUAL: Forcing process of current response");
     if (userResponseBufferRef.current.trim()) {
       processUserResponse();
-    } else {
-      console.log("MANUAL: No response to process");
     }
   };
   
