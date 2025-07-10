@@ -174,23 +174,7 @@ export async function POST(req) {
 
         const profileContext = formatProfileForAI(userProfile);
 
-        const systemPrompt = `You are an expert interview coach providing intelligent, context-aware assistance during a live interview. 
-
-CRITICAL INSTRUCTIONS:
-1. ANALYZE the full conversation history to understand the context and flow
-2. IDENTIFY the most recent meaningful question, request, or topic the interviewer introduced
-3. DETERMINE the complexity and type of question (behavioral, technical, situational, etc.)
-4. PROVIDE detailed, comprehensive responses tailored to the specific question
-5. IGNORE filler words, pleasantries, and casual conversation 
-6. FOCUS on what the interviewer actually wants to know or discuss
-
-RESPONSE STRATEGY:
-- For TECHNICAL questions: Provide detailed explanations with examples and best practices
-- For BEHAVIORAL questions: Structure using STAR method (Situation, Task, Action, Result)
-- For SITUATIONAL questions: Offer step-by-step approaches and considerations
-- For GENERAL questions: Provide comprehensive, thoughtful responses
-
-RESPONSE FORMAT - You MUST respond ONLY with valid JSON in exactly this format. Do not include any text before or after the JSON:
+        const systemPrompt = `You are an interview assistant. Respond ONLY with JSON in this exact format:
 
 {
   "suggestions": [
@@ -226,20 +210,11 @@ IMPORTANT:
 
 ${profileContext ? 'USER PROFILE:\n' + profileContext : 'No user profile available - provide generic but helpful suggestions.'}`;
 
-        const userPrompt = `FULL CONVERSATION HISTORY:
-${formattedHistory}
+        const userPrompt = `Question: ${question}
 
-INSTRUCTIONS: 
-Analyze the conversation above and identify the most recent meaningful question or topic the interviewer wants to discuss. Pay special attention to:
+Conversation: ${formattedHistory}
 
-1. QUESTION TYPE: Is this behavioral, technical, situational, or general?
-2. CONTEXT CLUES: What specific skills, experiences, or qualities are they probing?
-3. DEPTH REQUIRED: Does this need a brief answer or comprehensive explanation?
-4. FOLLOW-UP POTENTIAL: What related topics might they ask about next?
-
-Ignore filler words, pleasantries, and casual conversation. Focus on what they actually want to know and provide detailed, actionable suggestions that match the complexity and type of question being asked.
-
-CRITICAL: Respond ONLY with valid JSON. No explanations, no additional text, just the JSON object with the suggestions array.`;
+Generate interview suggestions in the exact JSON format specified. Focus on the most recent question.`;
 
         const aiResponse = await makeOpenAICallWithRetry(systemPrompt, userPrompt);
         
@@ -288,26 +263,27 @@ CRITICAL: Respond ONLY with valid JSON. No explanations, no additional text, jus
 
         // Validate the parsed response structure
         if (!parsedResponse || !parsedResponse.suggestions || !Array.isArray(parsedResponse.suggestions)) {
-            console.error("Invalid AI response structure:", parsedResponse);
-            const fallbackSuggestions = [
-                { 
-                    type: 'Key Points to Mention', 
-                    content: 'Relevant experience, quantifiable achievements, specific skills' 
-                },
-                { 
-                    type: 'Structured Response Approach', 
-                    content: '• Start with context\n• Describe your actions\n• Highlight the results\n• Connect to role requirements' 
-                },
-                { 
-                    type: 'Specific Examples to Use', 
-                    content: 'At TechCorp, I led a 6-month e-commerce platform overhaul as Senior Developer. Our legacy system had 8-second load times causing 40% cart abandonment. I assembled a 4-person team, chose React/Node.js architecture, and implemented microservices. We migrated 75,000 products using automated scripts, integrated Stripe payments, and deployed with zero downtime using blue-green deployment. Results: 60% faster load times (8s to 3.2s), 25% higher conversion rates, $2M additional quarterly revenue. Challenges included data consistency during migration and real-time inventory sync, solved with Redis caching and event-driven architecture.' 
-                },
-                { 
-                    type: 'Follow-up Questions', 
-                    content: 'What technologies does your team currently use? How do you measure success in this role?' 
-                }
-            ];
-            return NextResponse.json({ suggestions: fallbackSuggestions });
+            // Use fallback suggestions
+            parsedResponse = {
+                suggestions: [
+                    { 
+                        type: 'Key Points to Mention', 
+                        content: 'Relevant experience, quantifiable achievements, specific skills' 
+                    },
+                    { 
+                        type: 'Structured Response Approach', 
+                        content: '• Start with context\n• Describe your actions\n• Highlight the results\n• Connect to role requirements' 
+                    },
+                    { 
+                        type: 'Specific Examples to Use', 
+                        content: 'At TechCorp, I led a 6-month e-commerce platform overhaul as Senior Developer. Our legacy system had 8-second load times causing 40% cart abandonment. I assembled a 4-person team, chose React/Node.js architecture, and implemented microservices. We migrated 75,000 products using automated scripts, integrated Stripe payments, and deployed with zero downtime using blue-green deployment. Results: 60% faster load times (8s to 3.2s), 25% higher conversion rates, $2M additional quarterly revenue. Challenges included data consistency during migration and real-time inventory sync, solved with Redis caching and event-driven architecture.' 
+                    },
+                    { 
+                        type: 'Follow-up Questions', 
+                        content: 'What technologies does your team currently use? How do you measure success in this role?' 
+                    }
+                ]
+            };
         }
 
         return NextResponse.json({ suggestions: parsedResponse.suggestions });
