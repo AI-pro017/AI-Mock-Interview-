@@ -139,14 +139,12 @@ async function makeOpenAICallWithRetry(systemPrompt, userPrompt, maxRetries = RA
             let delayMs;
             const retryDelay = getRetryDelay(error);
             
-            // Fixed bug: was checking delayMs instead of retryDelay
             if (retryDelay) {
                 delayMs = retryDelay;
             } else {
                 delayMs = calculateBackoffDelay(attempt, RATE_LIMIT_CONFIG.baseDelay, RATE_LIMIT_CONFIG.maxDelay);
             }
             
-            console.log(`Rate limit hit, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
             await sleep(delayMs);
         }
     }
@@ -206,10 +204,7 @@ Analyze the conversation above. Find the most recent meaningful question or topi
 
 Provide three targeted suggestions in the exact format specified:`;
 
-        // Make the OpenAI API call - let errors propagate
         const aiResponse = await makeOpenAICallWithRetry(systemPrompt, userPrompt);
-        
-        console.log('AI Response:', aiResponse); // Debug log
         
         // Parse the structured response
         const suggestions = [];
@@ -230,30 +225,22 @@ Provide three targeted suggestions in the exact format specified:`;
             }
         }
 
-        console.log('Parsed suggestions:', suggestions); // Debug log
-
         // If we don't have all 3 suggestions, create a proper fallback
         if (suggestions.length < 3) {
-            console.log('Fallback parsing needed, creating generic suggestions...');
-            
-            // Create generic suggestions based on the conversation
             const fallbackSuggestions = [
                 { type: 'Key Point to Mention', content: 'Focus on your most relevant experience and specific examples' },
                 { type: 'Smart Question to Ask', content: 'Consider asking about team dynamics or growth opportunities' },
                 { type: 'Direct Answer Hints', content: 'Try starting with "In my experience..." or "I\'ve found that..."' }
             ];
             
-            // If we have some parsed suggestions, use them and fill the rest
             if (suggestions.length > 0) {
                 const combined = [...suggestions];
                 while (combined.length < 3) {
                     const fallback = fallbackSuggestions[combined.length];
                     combined.push(fallback);
                 }
-                console.log('Using combined suggestions:', combined);
                 return NextResponse.json({ suggestions: combined });
             } else {
-                console.log('Using fallback suggestions:', fallbackSuggestions);
                 return NextResponse.json({ suggestions: fallbackSuggestions });
             }
         }
@@ -263,7 +250,6 @@ Provide three targeted suggestions in the exact format specified:`;
     } catch (error) {
         console.error("Error in copilot suggestions:", error);
         
-        // Return specific error messages based on error type
         if (error.status === 429) {
             return NextResponse.json({ 
                 error: 'Rate limit exceeded. Please wait a moment before trying again.' 

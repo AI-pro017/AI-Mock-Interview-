@@ -88,7 +88,6 @@ const InterviewCopilotPage = () => {
             
             // Only generate suggestions if this is a new state we haven't processed yet
             if (lastProcessedTranscriptRef.current !== transcriptKey) {
-                console.log('New client message detected:', lastClientBlock.text);
                 lastProcessedTranscriptRef.current = transcriptKey;
                 
                 // Let OpenAI analyze the full conversation and determine what to respond to

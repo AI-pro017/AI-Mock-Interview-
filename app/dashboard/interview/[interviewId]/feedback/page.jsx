@@ -24,7 +24,6 @@ function Feedback({ params }) {
 
   // Create local fallback for generating report without API
   const generateLocalFeedback = async (mockId, answers) => {
-    console.log("Generating local feedback for mockId:", mockId);
     
     // Process each answer to calculate metrics based on content
     for (const answer of answers) {
@@ -119,7 +118,6 @@ function Feedback({ params }) {
         
         // If report exists, get the detailed feedback and return
         if (reportResult.length > 0) {
-          console.log("Report already exists, loading feedback");
           const answersResult = await db.select().from(UserAnswer)
             .where(eq(UserAnswer.mockIdRef, params.interviewId))
             .orderBy(UserAnswer.id);
@@ -136,7 +134,6 @@ function Feedback({ params }) {
           .orderBy(UserAnswer.id);
         
         // If we reach here, we need to generate the report - first try API
-        console.log("Report doesn't exist, triggering generation");
         try {
           const response = await fetch(`/api/interview-analysis`, {
             method: 'POST',

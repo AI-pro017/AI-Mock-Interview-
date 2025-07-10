@@ -22,29 +22,15 @@ export default function Page() {
   useEffect(() => {
     const debugAuth = async () => {
       try {
-        console.log("🔍 DEBUGGING AUTH CONFIGURATION");
-        
+
         const providersResponse = await fetch('/api/auth/providers');
         const providers = await providersResponse.json();
-        
-        console.log("📋 AVAILABLE PROVIDERS:", providers);
-        
-        if (providers.google) {
-          console.log("✅ GOOGLE PROVIDER FOUND:", {
-            id: providers.google.id,
-            name: providers.google.name,
-            type: providers.google.type,
-          });
-        } else {
-          console.log("❌ GOOGLE PROVIDER NOT CONFIGURED");
-        }
-        
+
         const csrfResponse = await fetch('/api/auth/csrf');
         const csrfData = await csrfResponse.json();
-        console.log("🔒 CSRF STATUS:", csrfData ? "Working" : "Failed");
-        
+
       } catch (error) {
-        console.error("🚨 AUTH DEBUGGING ERROR:", error);
+        console.error("AUTH DEBUGGING ERROR:", error);
       }
     };
     
@@ -71,10 +57,7 @@ export default function Page() {
 
   const handleGoogleSignIn = () => {
     try {
-      console.log("Starting Google Sign-In");
-      // Log environment variables from the client side
-      console.log("NEXT_PUBLIC_GOOGLE_CLIENT_ID:", process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "Not set in client");
-      
+
       signIn('google', { 
         callbackUrl,
         redirect: true
