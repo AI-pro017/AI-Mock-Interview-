@@ -168,10 +168,10 @@ const InterviewCopilotPage = () => {
                             <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
                                 <h3 className="text-green-300 font-semibold mb-2">✅ How to Use (Required Steps)</h3>
                                 <ol className="list-decimal list-inside space-y-1 text-sm">
-                                    <li>Open your meeting in a Chrome browser tab</li>
+                                    <li>Open your meeting in a browser tab</li>
                                     <li>Click "Start Capture" button</li>
-                                    <li>Select the <strong>meeting tab</strong> (not window or screen)</li>
-                                    <li>Make sure to check "Share tab audio" when prompted</li>
+                                    <li>Select the <strong>meeting tab</strong> or <strong>entire screen</strong> (not window)</li>
+                                    <li>Make sure to check "Share tab audio" (for tabs) or "Share system audio" (for screen) when prompted</li>
                                     <li>The copilot will transcribe and provide AI suggestions</li>
                                 </ol>
                             </div>
@@ -180,7 +180,6 @@ const InterviewCopilotPage = () => {
                                 <h3 className="text-red-300 font-semibold mb-2">❌ Not Supported</h3>
                                 <ul className="list-disc list-inside space-y-1 text-sm">
                                     <li>Window sharing (will be blocked)</li>
-                                    <li>Entire screen sharing (will be blocked)</li>
                                     <li>Tabs without audio</li>
                                     <li>Browsers other than Chrome for meetings</li>
                                 </ul>
@@ -189,9 +188,9 @@ const InterviewCopilotPage = () => {
                             <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
                                 <h3 className="text-blue-300 font-semibold mb-2">💡 Troubleshooting</h3>
                                 <ul className="list-disc list-inside space-y-1 text-sm">
-                                    <li>If you get "Window/screen sharing not supported" - select a tab instead</li>
-                                    <li>If you see "No audio detected" - make sure the tab has audio</li>
-                                    <li>Check "Share tab audio" checkbox when prompted</li>
+                                    <li>If you get "Window sharing not supported" - select a tab or entire screen instead</li>
+                                    <li>If you see "No audio detected" - make sure to check the audio sharing option</li>
+                                    <li>Check "Share tab audio" (for tabs) or "Share system audio" (for screen) when prompted</li>
                                     <li>Make sure your meeting has participants speaking</li>
                                     <li>Check browser permissions for microphone and screen sharing</li>
                                     <li>Use the manual input field if audio transcription fails</li>
@@ -255,6 +254,9 @@ const InterviewCopilotPage = () => {
                             {userOverride && (
                                 <span className="ml-2 text-green-400">• User override active</span>
                             )}
+                            {isCapturing && tabStream && tabStream.getAudioTracks().length === 0 && (
+                                <span className="ml-2 text-yellow-400">• No audio - transcription disabled</span>
+                            )}
                         </div>
                     </div>
                     <div className="flex-grow p-4 space-y-4 overflow-y-auto">
@@ -307,20 +309,28 @@ const InterviewCopilotPage = () => {
                                 type="text"
                                 value={userInput}
                                 onChange={(e) => setUserInput(e.target.value)}
-                                placeholder="Clarify or correct the question..."
-                                className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder={isCapturing ? "Clarify or correct the question..." : "Start capture first to use manual input"}
+                                disabled={!isCapturing}
+                                className={`flex-1 px-3 py-2 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                    isCapturing 
+                                        ? 'bg-gray-700 border-gray-600' 
+                                        : 'bg-gray-800 border-gray-700 cursor-not-allowed opacity-50'
+                                }`}
                             />
                             <Button 
                                 type="submit" 
                                 size="sm" 
-                                disabled={!userInput.trim()}
+                                disabled={!userInput.trim() || !isCapturing}
                                 className="px-3 py-2"
                             >
                                 <Send className="w-4 h-4" />
                             </Button>
                         </form>
                         <div className="text-xs text-gray-500 mt-2">
-                            Use this to clarify questions or provide corrections when audio processing fails
+                            {isCapturing 
+                                ? "Use this to clarify questions or provide corrections when audio processing fails"
+                                : "Manual input is available once you start capturing"
+                            }
                         </div>
                     </div>
                 </div>
@@ -336,9 +346,9 @@ const InterviewCopilotPage = () => {
                                 <div className="bg-blue-900/50 border border-blue-700 rounded-lg p-4 max-w-md">
                                     <h4 className="text-blue-300 font-semibold mb-2">📋 Selection Requirements:</h4>
                                     <ul className="text-xs text-blue-200 space-y-1 text-left">
-                                        <li>✅ <strong>Required:</strong> Select a Chrome meeting tab</li>
-                                        <li>✅ Check "Share tab audio" when prompted</li>
-                                        <li>❌ <strong>Not supported:</strong> Window or screen sharing</li>
+                                        <li>✅ <strong>Supported:</strong> meeting tab or entire screen</li>
+                                        <li>✅ Check "Share tab audio" (for tabs) or "Share system audio" (for screen)</li>
+                                        <li>❌ <strong>Not supported:</strong> Window sharing</li>
                                     </ul>
                                 </div>
                             </div>

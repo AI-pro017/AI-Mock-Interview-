@@ -45,23 +45,30 @@ export const useAudioCapture = () => {
                 const videoTrack = videoTracks[0];
                 const settings = videoTrack.getSettings();
                 
-                // Block window and screen sharing completely
-                if (settings.displaySurface === 'window' || settings.displaySurface === 'monitor') {
+                // Block only window sharing, allow tab and screen sharing
+                if (settings.displaySurface === 'window') {
                     // Clean up streams
                     microphoneStream.getTracks().forEach(track => track.stop());
                     displayStream.getTracks().forEach(track => track.stop());
                     
-                    throw new Error("WINDOW_OR_SCREEN_SHARING_NOT_ALLOWED");
+                    throw new Error("WINDOW_SHARING_NOT_ALLOWED");
                 }
             }
 
-            // Check if audio is actually captured from the tab
+            // Audio is required for both tab and screen sharing
             if (audioTracks.length === 0) {
                 // Clean up streams
                 microphoneStream.getTracks().forEach(track => track.stop());
                 displayStream.getTracks().forEach(track => track.stop());
                 
-                throw new Error("NO_TAB_AUDIO");
+                const videoTrack = videoTracks[0];
+                const settings = videoTrack?.getSettings();
+                
+                if (settings?.displaySurface === 'browser') {
+                    throw new Error("NO_TAB_AUDIO");
+                } else {
+                    throw new Error("NO_SCREEN_AUDIO");
+                }
             }
 
             setMicStream(microphoneStream);
@@ -95,14 +102,19 @@ export const useAudioCapture = () => {
                 // Just silently reset and let user try again
                 setError(null);
                 return null;
-            } else if (err.message === 'WINDOW_OR_SCREEN_SHARING_NOT_ALLOWED') {
+            } else if (err.message === 'WINDOW_SHARING_NOT_ALLOWED') {
                 setError({ 
-                    message: "❌ Window and screen sharing are not supported. Please select a Chrome meeting tab instead.", 
+                    message: "❌ Window sharing is not supported. Please select a meeting tab or entire screen instead.", 
                     type: "error" 
                 });
             } else if (err.message === 'NO_TAB_AUDIO') {
                 setError({ 
                     message: "❌ No audio detected from the selected tab. Please select a tab with audio (like a meeting) and check 'Share tab audio' when prompted.", 
+                    type: "error" 
+                });
+            } else if (err.message === 'NO_SCREEN_AUDIO') {
+                setError({ 
+                    message: "❌ No audio detected from screen sharing. Please check 'Share system audio' when prompted for screen sharing.", 
                     type: "error" 
                 });
             } else {
