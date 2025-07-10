@@ -29,7 +29,15 @@ export const useTranscriptManager = () => {
             return;
         }
 
-        const { is_final, speech_final, channel, speaker, speakerIdentifier, start, duration } = transcriptData;
+        const { 
+            is_final, 
+            speech_final, 
+            channel, 
+            speaker, 
+            speakerIdentifier, 
+            start, 
+            duration
+        } = transcriptData;
         const text = channel.alternatives[0].transcript;
         
         if (!text.trim()) return;
@@ -105,10 +113,10 @@ export const useTranscriptManager = () => {
             // Initialize segment data for this speaker
             segmentDataRef.current[uniqueSpeakerId] = {
                 segments: [{
-                    start,
-                    duration,
+                    start: start || 0,
+                    duration: duration || 0,
                     text,
-                    is_final
+                    is_final: is_final || false
                 }]
             };
             
