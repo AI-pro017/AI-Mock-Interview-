@@ -14,10 +14,13 @@ const InterviewCopilotPage = () => {
     const [userInput, setUserInput] = useState('');
     const [userOverride, setUserOverride] = useState(null);
     const [showHelpModal, setShowHelpModal] = useState(false);
+    const [leftPanelWidth, setLeftPanelWidth] = useState(45); // percentage
     const videoRef = useRef(null);
     const transcriptEndRef = useRef(null);
     const lastProcessedTranscriptRef = useRef(null);
     const inputRef = useRef(null);
+    const containerRef = useRef(null);
+    const isResizing = useRef(false);
 
     const {
         micStream,
@@ -126,6 +129,34 @@ const InterviewCopilotPage = () => {
             }
         }
     }, [transcripts, generateSuggestions, userOverride]);
+
+    // Resize functionality
+    const handleMouseDown = useCallback((e) => {
+        isResizing.current = true;
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    }, []);
+
+    const handleMouseMove = useCallback((e) => {
+        if (!isResizing.current || !containerRef.current) return;
+        
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+        
+        // Constrain between 20% and 80%
+        if (newLeftWidth >= 20 && newLeftWidth <= 80) {
+            setLeftPanelWidth(newLeftWidth);
+        }
+    }, []);
+
+    const handleMouseUp = useCallback(() => {
+        isResizing.current = false;
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.userSelect = '';
+    }, [handleMouseMove]);
 
     return (
         <div className="bg-gray-900 text-white min-h-screen flex flex-col p-4 lg:p-8">
@@ -247,8 +278,8 @@ const InterviewCopilotPage = () => {
                 </div>
             )}
 
-            <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
-                <div className="lg:col-span-1 bg-gray-800 rounded-lg shadow-lg flex flex-col h-[calc(100vh-80px)]">
+            <div ref={containerRef} className="flex-grow flex gap-6 min-h-0">
+                <div className="bg-gray-800 rounded-lg shadow-lg flex flex-col h-[calc(100vh-80px)]" style={{width: `${leftPanelWidth}%`}}>
                     <div className="p-4 border-b border-gray-700 flex-shrink-0">
                         <h2 className="text-xl font-semibold text-blue-300">Live Transcription</h2>
                         <div className="text-xs text-gray-400 mt-1">
@@ -326,7 +357,19 @@ const InterviewCopilotPage = () => {
                     </div>
                 </div>
 
-                <div className="lg:col-span-1 flex flex-col gap-6 min-h-0 h-[calc(100vh-80px)]">
+                {/* Resizable divider */}
+                <div 
+                    className="w-1 bg-gray-600 hover:bg-blue-500 cursor-col-resize transition-colors relative group" 
+                    onMouseDown={handleMouseDown}
+                    title="Drag to resize panels"
+                >
+                    <div className="absolute inset-y-0 -left-1 -right-1 group-hover:bg-blue-500/20 transition-colors"></div>
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="w-1 h-8 bg-blue-400 rounded-full"></div>
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-6 min-h-0 h-[calc(100vh-80px)]" style={{width: `${100 - leftPanelWidth - 1}%`}}>
                     <div className="h-[40%] bg-black rounded-lg overflow-hidden flex items-center justify-center relative min-h-0">
                         <video ref={videoRef} autoPlay muted className="w-full h-full object-contain" />
                         {!isCapturing && (
