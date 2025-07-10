@@ -194,7 +194,7 @@ THIRD: Respond ONLY with JSON in this exact format:
     },
     {
       "type": "💬 Sample Response",
-      "content": "[COMPLETE, ready-to-speak response following your internally chosen structure. For technical questions, ALWAYS include relevant code examples. Start with interpretation if the question was unclear (e.g., 'I believe you're asking about...'). Include specific examples, technologies, numbers, timeline, and outcomes. User should be able to speak this response directly.]"
+      "content": "[COMPLETE, ready-to-speak response following your internally chosen structure. For technical questions, ALWAYS include relevant code examples. Start directly with the answer - do NOT include question interpretation phrases like 'I believe you're asking about...'. Include specific examples, technologies, numbers, timeline, and outcomes. User should be able to speak this response directly.]"
     }
   ]
 }
@@ -203,7 +203,7 @@ FORMATTING RULES:
 - Key Points: Maximum 15 words, focus on what to highlight
 - Sample Response: CRITICAL - 
   * Internally choose the best structure (Define → Compare → Demonstrate, etc.) but don't show it in output
-  * Start with question interpretation if unclear (e.g., "I believe you're asking about...")
+  * Start directly with the answer - NEVER include interpretation phrases like "I believe you're asking about..."
   * Follow your chosen structure exactly in the response organization
   * For technical questions, ALWAYS include working code examples
   * Include specific scenarios with context, numbers, timeline, and outcomes
@@ -236,8 +236,9 @@ STRUCTURE SELECTION GUIDE:
 - Problem-solving questions ("How would you solve...?") → Problem → Solution → Impact
 
 IMPORTANT: 
-- Always interpret the question's real intent first
+- Always interpret the question's real intent internally (but don't mention this in the response)
 - Choose the most appropriate structure from the options above
+- Start sample responses directly with the answer, not with interpretation phrases
 - For technical questions, include working code examples in the sample response
 - Make suggestions immediately actionable during live interview
 - Tailor to the specific question type and user profile
