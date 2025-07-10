@@ -198,14 +198,21 @@ const InterviewCopilotPage = () => {
                         
                         <div className="space-y-4 text-gray-300">
                             <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
-                                <h3 className="text-green-300 font-semibold mb-2">✅ How to Use (Required Steps)</h3>
-                                <ol className="list-decimal list-inside space-y-1 text-sm">
-                                    <li>Open your meeting in a browser tab</li>
-                                    <li>Click "Start Capture" button</li>
-                                    <li>Select the <strong>meeting tab</strong> or <strong>entire screen</strong> (not window)</li>
-                                    <li>Make sure to check "Share tab audio" (for tabs) or "Share system audio" (for screen) when prompted</li>
-                                    <li>The copilot will transcribe and provide AI suggestions</li>
-                                </ol>
+                                                                    <h3 className="text-green-300 font-semibold mb-2">✅ How to Use (Required Steps)</h3>
+                                    <ol className="list-decimal list-inside space-y-1 text-sm">
+                                        <li>Open your meeting in a browser tab</li>
+                                        <li>Click "Start Capture" button</li>
+                                        <li>Select the <strong>meeting tab</strong> or <strong>entire screen</strong> (not window)</li>
+                                        <li>Make sure to check "Share tab audio" (for tabs) or "Share system audio" (for screen) when prompted</li>
+                                        <li>The copilot will transcribe and provide AI suggestions</li>
+                                    </ol>
+                                    <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-600 rounded-lg">
+                                        <h4 className="text-yellow-300 font-semibold text-sm mb-1">⚠️ Important Audio Limitation</h4>
+                                        <p className="text-yellow-200 text-xs">
+                                            <strong>Screen sharing</strong> only captures system audio (what others say), not your microphone input. 
+                                            For best results, use <strong>tab sharing</strong> which captures all meeting audio including your voice.
+                                        </p>
+                                    </div>
                             </div>
 
                             <div className="bg-red-900/30 border border-red-700 rounded-lg p-4">
@@ -223,6 +230,7 @@ const InterviewCopilotPage = () => {
                                     <li>If you get "Window sharing not supported" - select a tab or entire screen instead</li>
                                     <li>If you see "No audio detected" - make sure to check the audio sharing option</li>
                                     <li>Check "Share tab audio" (for tabs) or "Share system audio" (for screen) when prompted</li>
+                                    <li><strong>Missing your voice?</strong> Screen sharing only captures system audio, not your microphone. Use tab sharing instead.</li>
                                     <li>Make sure your meeting has participants speaking</li>
                                     <li>Check browser permissions for microphone and screen sharing</li>
                                     <li>Use the manual input field if audio transcription fails</li>
@@ -390,7 +398,8 @@ const InterviewCopilotPage = () => {
                                 <div className="bg-blue-900/50 border border-blue-700 rounded-lg p-4 max-w-md">
                                     <h4 className="text-blue-300 font-semibold mb-2">📋 Selection Requirements:</h4>
                                     <ul className="text-xs text-blue-200 space-y-1 text-left">
-                                        <li>✅ <strong>Supported:</strong> meeting tab or entire screen</li>
+                                        <li>✅ <strong>Best:</strong> meeting tab (captures all audio including your voice)</li>
+                                        <li>✅ <strong>Limited:</strong> entire screen (only captures system audio, not your mic)</li>
                                         <li>✅ Check "Share tab audio" (for tabs) or "Share system audio" (for screen)</li>
                                         <li>❌ <strong>Not supported:</strong> Window sharing</li>
                                     </ul>
