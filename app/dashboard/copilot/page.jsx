@@ -420,8 +420,7 @@ const InterviewCopilotPage = () => {
                                 <div className="bg-blue-900/50 border border-blue-700 rounded-lg p-4 max-w-md">
                                     <h4 className="text-blue-300 font-semibold mb-2">📋 Selection Requirements:</h4>
                                     <ul className="text-xs text-blue-200 space-y-1 text-left">
-                                        <li>✅ <strong>Best:</strong> meeting tab (captures all audio including your voice)</li>
-                                        <li>✅ <strong>Limited:</strong> entire screen (only captures system audio, not your mic)</li>
+                                        <li>✅ <strong>Select:</strong> meeting tab or screen(captures all audio including your voice)</li>
                                         <li>✅ Check "Share tab audio" (for tabs) or "Share system audio" (for screen)</li>
                                         <li>❌ <strong>Not supported:</strong> Window sharing</li>
                                     </ul>
