@@ -63,7 +63,7 @@ const CodeHighlighter = ({ content }) => {
     };
 
     return (
-        <div className="text-gray-300 leading-relaxed">
+        <div className="text-gray-300 leading-relaxed text-sm">
             {parseContent(content)}
         </div>
     );
