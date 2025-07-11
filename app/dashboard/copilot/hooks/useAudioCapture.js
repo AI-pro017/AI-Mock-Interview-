@@ -13,9 +13,8 @@ export const useAudioCapture = () => {
         
         try {
             setError(null);
-            // Don't set isCapturing to true yet - wait until streams are established
 
-            // Step 1: Get microphone stream (for user audio)
+            // Step 1: Get microphone stream
             microphoneStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
@@ -25,19 +24,18 @@ export const useAudioCapture = () => {
                 video: false
             });
 
-            // Step 2: Get display media stream (for tab audio + video)
+            // Step 2: Get display media stream with optimized settings
             const displayStream = await navigator.mediaDevices.getDisplayMedia({
                 audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    sampleRate: 16000,
+                    // OPTIMIZED: Better settings for screen sharing
+                    echoCancellation: false,  // Disable for system audio
+                    noiseSuppression: false,  // Disable for system audio
+                    autoGainControl: false,   // Disable for system audio
+                    sampleRate: 48000,        // Higher sample rate for screen audio
                 },
-                video: {
-                    mediaSource: 'tab'
-                }
+                video: true
             });
 
-            // Check what type of sharing was selected
             const audioTracks = displayStream.getAudioTracks();
             const videoTracks = displayStream.getVideoTracks();
             
@@ -45,73 +43,75 @@ export const useAudioCapture = () => {
                 const videoTrack = videoTracks[0];
                 const settings = videoTrack.getSettings();
                 
-                // Block only window sharing, allow tab and screen sharing
+                if (settings.displaySurface === 'monitor') {
+                    console.log(`🐌 Screen Sharing: System audio quality may be limited`);
+                    
+                    // Try to optimize audio track for screen sharing
+                    if (audioTracks.length > 0) {
+                        const audioTrack = audioTracks[0];
+                        try {
+                            await audioTrack.applyConstraints({
+                                sampleRate: 48000,
+                                channelCount: 2,
+                                echoCancellation: false,
+                                noiseSuppression: false,
+                                autoGainControl: false,
+                            });
+                            console.log(`🔧 Applied screen sharing audio optimizations`);
+                        } catch (constraintError) {
+                            console.warn(`⚠️ Could not apply audio constraints:`, constraintError);
+                        }
+                    }
+                } else if (settings.displaySurface === 'browser') {
+                    console.log(`🚀 Tab Sharing: High quality audio expected`);
+                }
+                
                 if (settings.displaySurface === 'window') {
-                    // Clean up streams
                     microphoneStream.getTracks().forEach(track => track.stop());
                     displayStream.getTracks().forEach(track => track.stop());
-                    
                     throw new Error("WINDOW_SHARING_NOT_ALLOWED");
                 }
             }
 
-            // Audio is optional - if no audio, system will work without transcription
-            // We'll just log a warning but continue with capture
+            // Check audio availability
             if (audioTracks.length === 0) {
-                const videoTrack = videoTracks[0];
-                const settings = videoTrack?.getSettings();
-                
-                if (settings?.displaySurface === 'browser') {
-                    console.warn("No audio detected from tab - transcription will be disabled");
-                } else {
-                    console.warn("No audio detected from screen - transcription will be disabled");
-                }
+                console.warn("⚠️ No audio track detected - client voice will not be transcribed");
+            } else {
+                console.log(`🔊 Audio track detected: ${audioTracks[0].getSettings().sampleRate}Hz`);
             }
 
-            // Set streams first
             setMicStream(microphoneStream);
             setTabStream(displayStream);
 
-            // Handle stream end events - when display sharing stops, stop everything
+            // Handle stream end events
             const videoTrack = displayStream.getVideoTracks()[0];
             if (videoTrack) {
                 videoTrack.onended = () => {
-                    console.log("Display stream ended - stopping entire capture session");
+                    console.log("Display stream ended");
                     stopCapture();
                 };
             }
-            
-            // Also handle audio track end events
+
             const audioTrack = displayStream.getAudioTracks()[0];
             if (audioTrack) {
                 audioTrack.onended = () => {
-                    console.log("Display audio stream ended - stopping entire capture session");
+                    console.log("Audio stream ended");
                     stopCapture();
                 };
             }
 
-            // Only set isCapturing to true after everything is successfully set up
-            console.log("Capture setup complete - setting isCapturing to true");
             setIsCapturing(true);
-
             return { micStream: microphoneStream, tabStream: displayStream };
         } catch (err) {
-            // Clean up microphone stream if it was created
             if (microphoneStream) {
                 microphoneStream.getTracks().forEach(track => track.stop());
-                microphoneStream = null;
             }
             
-            // Reset state - ensure isCapturing is false
-            console.log("Error during capture setup - resetting state");
             setIsCapturing(false);
             setMicStream(null);
             setTabStream(null);
             
-            // Handle different error types
             if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
-                // User cancelled the screen sharing dialog - don't log or show error
-                // Just silently reset and let user try again
                 setError(null);
                 return null;
             } else if (err.message === 'WINDOW_SHARING_NOT_ALLOWED') {
@@ -119,43 +119,20 @@ export const useAudioCapture = () => {
                     message: "❌ Window sharing is not supported. Please select a meeting tab or entire screen instead.", 
                     type: "error" 
                 });
-            } else if (err.message === 'NO_TAB_AUDIO') {
-                setError({ 
-                    message: "❌ No audio detected from the selected tab. Please select a tab with audio (like a meeting) and check 'Share tab audio' when prompted.", 
-                    type: "error" 
-                });
-            } else if (err.message === 'NO_SCREEN_AUDIO') {
-                setError({ 
-                    message: "❌ No audio detected from screen sharing. Please check 'Share system audio' when prompted for screen sharing.", 
-                    type: "error" 
-                });
             } else {
-                // Log only actual errors, not user cancellations
                 console.error("Error capturing audio:", err);
-                
-                if (err.name === 'NotFoundError') {
-                    setError({ message: "No microphone found. Please check your audio devices.", type: "error" });
-                } else if (err.name === 'InvalidStateError') {
-                    setError({ message: "Cannot start capture. Please try again.", type: "error" });
-                } else if (err.name === 'NotSupportedError') {
-                    setError({ message: "Screen sharing is not supported in this browser.", type: "error" });
-                } else {
-                    setError({ message: "Failed to start capture. Please try again.", type: "error" });
-                }
+                setError({ message: "Failed to start capture. Please try again.", type: "error" });
             }
             return null;
         }
     }, []);
 
     const stopCapture = useCallback(() => {
-        console.log("stopCapture called - cleaning up all streams");
         if (micStream) {
-            console.log("Stopping microphone stream");
             micStream.getTracks().forEach(track => track.stop());
             setMicStream(null);
         }
         if (tabStream) {
-            console.log("Stopping tab/display stream");
             tabStream.getTracks().forEach(track => track.stop());
             setTabStream(null);
         }

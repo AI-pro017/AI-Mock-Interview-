@@ -206,35 +206,50 @@ const InterviewCopilotPage = () => {
 
             {/* Help Modal */}
             {showHelpModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-gray-800 rounded-lg p-6 max-w-2xl max-h-[80vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-white">How to Use Interview Copilot</h2>
-                            <button 
-                                onClick={() => setShowHelpModal(false)}
-                                className="text-gray-400 hover:text-white"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
+                            <h2 className="text-xl font-semibold">How to Use Interview Copilot</h2>
+                            <Button onClick={() => setShowHelpModal(false)} variant="ghost" size="sm">
+                                <X className="w-4 h-4" />
+                            </Button>
                         </div>
                         
                         <div className="space-y-4 text-gray-300">
                             <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
-                                                                    <h3 className="text-green-300 font-semibold mb-2">✅ How to Use (Required Steps)</h3>
-                                    <ol className="list-decimal list-inside space-y-1 text-sm">
-                                        <li>Open your meeting in a browser tab</li>
-                                        <li>Click "Start Capture" button</li>
-                                        <li>Select the <strong>meeting tab</strong> or <strong>entire screen</strong> (not window)</li>
-                                        <li>Make sure to check "Share tab audio" (for tabs) or "Share system audio" (for screen) when prompted</li>
-                                        <li>The copilot will transcribe and provide AI suggestions</li>
-                                    </ol>
-                                    <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-600 rounded-lg">
-                                        <h4 className="text-yellow-300 font-semibold text-sm mb-1">⚠️ Important Audio Limitation</h4>
-                                        <p className="text-yellow-200 text-xs">
-                                            <strong>Screen sharing</strong> only captures system audio (what others say), not your microphone input. 
-                                            For best results, use <strong>tab sharing</strong> which captures all meeting audio including your voice.
-                                        </p>
+                                <h3 className="text-green-300 font-semibold mb-2">✅ How to Use (Required Steps)</h3>
+                                <ol className="list-decimal list-inside space-y-1 text-sm">
+                                    <li>Open your meeting in a browser tab</li>
+                                    <li>Click "Start Capture" button</li>
+                                    <li>Select the <strong>meeting tab</strong> or <strong>entire screen</strong></li>
+                                    <li>Make sure to check "Share tab audio" (for tabs) or "Share system audio" (for screen)</li>
+                                    <li>The copilot will transcribe and provide AI suggestions</li>
+                                </ol>
+                            </div>
+
+                            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
+                                <h3 className="text-blue-300 font-semibold mb-2">⚡ Audio Performance Comparison</h3>
+                                <div className="space-y-3 text-sm">
+                                    <div className="bg-green-800/30 border border-green-600 rounded p-3">
+                                        <h4 className="text-green-300 font-semibold mb-1">🚀 Tab Sharing (Recommended)</h4>
+                                        <ul className="list-disc list-inside space-y-1 text-green-200">
+                                            <li><strong>Fast transcription</strong> - Real-time audio processing</li>
+                                            <li><strong>Best audio quality</strong> - Direct from meeting app</li>
+                                            <li><strong>Low latency</strong> - Immediate transcript display</li>
+                                            <li>✅ Choose this for fastest results</li>
+                                        </ul>
                                     </div>
+                                    
+                                    <div className="bg-yellow-800/30 border border-yellow-600 rounded p-3">
+                                        <h4 className="text-yellow-300 font-semibold mb-1">🐌 Screen Sharing</h4>
+                                        <ul className="list-disc list-inside space-y-1 text-yellow-200">
+                                            <li><strong>Slower transcription</strong> - System audio has delay</li>
+                                            <li><strong>Audio buffering</strong> - OS audio mixing adds latency</li>
+                                            <li><strong>1-3 second delay</strong> - Transcript appears after speech</li>
+                                            <li>⚠️ Use only if you need to show other apps</li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="bg-red-900/30 border border-red-700 rounded-lg p-4">
@@ -246,24 +261,17 @@ const InterviewCopilotPage = () => {
                                 </ul>
                             </div>
 
-                            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
-                                <h3 className="text-blue-300 font-semibold mb-2">💡 Troubleshooting</h3>
+                            <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-4">
+                                <h3 className="text-gray-300 font-semibold mb-2">💡 Troubleshooting</h3>
                                 <ul className="list-disc list-inside space-y-1 text-sm">
-                                    <li>If you get "Window sharing not supported" - select a tab or entire screen instead</li>
-                                    <li>If you see "No audio detected" - make sure to check the audio sharing option</li>
-                                    <li>Check "Share tab audio" (for tabs) or "Share system audio" (for screen) when prompted</li>
-                                    <li><strong>Missing your voice?</strong> Screen sharing only captures system audio, not your microphone. Use tab sharing instead.</li>
+                                    <li>If transcription is slow, try <strong>tab sharing</strong> instead of screen sharing</li>
+                                    <li>If you get "Window sharing not supported" - select a tab or entire screen</li>
+                                    <li>If you see "No audio detected" - check the audio sharing option</li>
+                                    <li>Check "Share tab audio" (for tabs) or "Share system audio" (for screen)</li>
                                     <li>Make sure your meeting has participants speaking</li>
-                                    <li>Check browser permissions for microphone and screen sharing</li>
-                                    <li>Use the manual input field if audio transcription fails</li>
+                                    <li>Use the manual input field if audio transcription is too slow</li>
                                 </ul>
                             </div>
-                        </div>
-                        
-                        <div className="mt-6 flex justify-end">
-                            <Button onClick={() => setShowHelpModal(false)}>
-                                Got it!
-                            </Button>
                         </div>
                     </div>
                 </div>
@@ -313,9 +321,6 @@ const InterviewCopilotPage = () => {
                         <h2 className="text-xl font-semibold text-blue-300">Live Transcription</h2>
                         <div className="text-xs text-gray-400 mt-1">
                             Transcripts count: {transcripts.length}
-                            {userOverride && (
-                                <span className="ml-2 text-green-400">• User override active</span>
-                            )}
                             {isCapturing && tabStream && tabStream.getAudioTracks().length === 0 && (
                                 <span className="ml-2 text-yellow-400">• No audio - transcription disabled</span>
                             )}
@@ -416,12 +421,13 @@ const InterviewCopilotPage = () => {
                             <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-gray-500 p-4">
                                 <Monitor size={64} className="mb-4" />
                                 <h3 className="text-xl font-semibold text-gray-300 mb-2">Interview Copilot</h3>
-                                <p className="text-sm mb-4">Click 'Start Capture' to select your meeting tab.</p>
+                                <p className="text-sm mb-4">Click 'Start Capture' to begin transcription.</p>
                                 <div className="bg-blue-900/50 border border-blue-700 rounded-lg p-4 max-w-md">
-                                    <h4 className="text-blue-300 font-semibold mb-2">📋 Selection Requirements:</h4>
+                                    <h4 className="text-blue-300 font-semibold mb-2">📋 Audio Performance:</h4>
                                     <ul className="text-xs text-blue-200 space-y-1 text-left">
-                                        <li>✅ <strong>Select:</strong> meeting tab or screen(captures all audio including your voice)</li>
-                                        <li>✅ Check "Share tab audio" (for tabs) or "Share system audio" (for screen)</li>
+                                        <li>🚀 <strong>Tab Sharing:</strong> Fast, real-time transcription</li>
+                                        <li>🐌 <strong>Screen Sharing:</strong> Slower than Tab Sharing</li>
+                                        <li>✅ Check "Share tab audio" or "Share system audio"</li>
                                         <li>❌ <strong>Not supported:</strong> Window sharing</li>
                                     </ul>
                                 </div>
