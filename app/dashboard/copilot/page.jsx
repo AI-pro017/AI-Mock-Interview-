@@ -245,7 +245,7 @@ const InterviewCopilotPage = () => {
                                         <ul className="list-disc list-inside space-y-1 text-yellow-200">
                                             <li><strong>Slower transcription</strong> - System audio has delay</li>
                                             <li><strong>Audio buffering</strong> - OS audio mixing adds latency</li>
-                                            <li><strong>1-3 second delay</strong> - Transcript appears after speech</li>
+                                            <li><strong>1-2 second delay</strong> - Transcript appears after speech</li>
                                             <li>⚠️ Use only if you need to show other apps</li>
                                         </ul>
                                     </div>
@@ -426,7 +426,7 @@ const InterviewCopilotPage = () => {
                                     <h4 className="text-blue-300 font-semibold mb-2">📋 Audio Performance:</h4>
                                     <ul className="text-xs text-blue-200 space-y-1 text-left">
                                         <li>🚀 <strong>Tab Sharing:</strong> Fast, real-time transcription</li>
-                                        <li>🐌 <strong>Screen Sharing:</strong> Slower than Tab Sharing</li>
+                                        <li>🐌 <strong>Screen Sharing:</strong> Slightly Slower than Tab Sharing</li>
                                         <li>✅ Check "Share tab audio" or "Share system audio"</li>
                                         <li>❌ <strong>Not supported:</strong> Window sharing</li>
                                     </ul>
