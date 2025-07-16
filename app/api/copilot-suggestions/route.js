@@ -9,11 +9,11 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Rate limiting and retry configuration
+// Rate limiting and retry configuration - optimized for 500 users
 const RATE_LIMIT_CONFIG = {
-    maxRetries: 3,
-    baseDelay: 1000,
-    maxDelay: 10000,
+    maxRetries: 2,
+    baseDelay: 500,
+    maxDelay: 5000,
 };
 
 // Helper function to wait for a specified time
@@ -22,7 +22,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // Helper function to calculate exponential backoff delay
 const calculateBackoffDelay = (attempt, baseDelay, maxDelay) => {
     const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
-    return delay + Math.random() * 1000;
+    return delay + Math.random() * 500;
 };
 
 // Helper function to extract retry delay from OpenAI error
@@ -108,6 +108,154 @@ function formatProfileForAI(profile) {
     return profileText;
 }
 
+// Helper function to format session context for AI
+function formatSessionContext(sessionContext) {
+    if (!sessionContext || sessionContext.length === 0) return '';
+    
+    let contextText = '\nSESSION CONTEXT (Previous Questions):\n';
+    sessionContext.forEach((item, index) => {
+        contextText += `${index + 1}. "${item.question}"\n`;
+    });
+    
+    return contextText;
+}
+
+// Helper function to check for overlapping topics
+function checkTopicOverlap(currentQuestion, sessionContext) {
+    if (!sessionContext || sessionContext.length === 0) return null;
+    
+    const currentLower = currentQuestion.toLowerCase();
+    const recentQuestions = sessionContext.slice(-5);
+    
+    for (const item of recentQuestions) {
+        const prevLower = item.question.toLowerCase();
+        
+        // Check for keyword overlap
+        const currentWords = currentLower.split(' ').filter(w => w.length > 3);
+        const prevWords = prevLower.split(' ').filter(w => w.length > 3);
+        
+        const overlap = currentWords.filter(word => prevWords.includes(word));
+        
+        if (overlap.length >= 2) {
+            return item.question;
+        }
+    }
+    
+    return null;
+}
+
+// Enhanced JSON extraction function
+function extractValidJSON(responseText) {
+    try {
+        // First try direct parsing
+        return JSON.parse(responseText);
+    } catch (directError) {
+        console.log('Direct JSON parse failed, trying extraction methods...');
+        
+        // Method 1: Find JSON between braces
+        try {
+            const cleanedResponse = responseText.trim();
+            const firstBrace = cleanedResponse.indexOf('{');
+            const lastBrace = cleanedResponse.lastIndexOf('}');
+            
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                const jsonString = cleanedResponse.substring(firstBrace, lastBrace + 1);
+                return JSON.parse(jsonString);
+            }
+        } catch (braceError) {
+            console.log('Brace extraction failed, trying regex method...');
+        }
+        
+        // Method 2: Use regex to find JSON structure
+        try {
+            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                return JSON.parse(jsonMatch[0]);
+            }
+        } catch (regexError) {
+            console.log('Regex extraction failed, trying line-by-line method...');
+        }
+        
+        // Method 3: Try to reconstruct JSON from lines
+        try {
+            const lines = responseText.split('\n');
+            let jsonStart = -1;
+            let jsonEnd = -1;
+            let braceCount = 0;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.includes('{') && jsonStart === -1) {
+                    jsonStart = i;
+                }
+                
+                if (jsonStart !== -1) {
+                    braceCount += (line.match(/\{/g) || []).length;
+                    braceCount -= (line.match(/\}/g) || []).length;
+                    
+                    if (braceCount === 0) {
+                        jsonEnd = i;
+                        break;
+                    }
+                }
+            }
+            
+            if (jsonStart !== -1 && jsonEnd !== -1) {
+                const jsonLines = lines.slice(jsonStart, jsonEnd + 1);
+                const jsonString = jsonLines.join('\n');
+                return JSON.parse(jsonString);
+            }
+        } catch (lineError) {
+            console.log('Line-by-line extraction failed, trying manual reconstruction...');
+        }
+        
+        // Method 4: Try to manually reconstruct basic structure
+        try {
+            // Look for suggestions array pattern
+            const suggestionsMatch = responseText.match(/"suggestions"\s*:\s*\[([\s\S]*?)\]/);
+            if (suggestionsMatch) {
+                // Try to parse just the suggestions array
+                const suggestionsContent = suggestionsMatch[1];
+                
+                // Extract individual suggestion objects
+                const suggestions = [];
+                const objectMatches = suggestionsContent.match(/\{[^}]*\}/g);
+                
+                if (objectMatches) {
+                    objectMatches.forEach(objMatch => {
+                        try {
+                            const obj = JSON.parse(objMatch);
+                            if (obj.type && obj.content) {
+                                suggestions.push(obj);
+                            }
+                        } catch (objError) {
+                            // Try to manually extract type and content
+                            const typeMatch = objMatch.match(/"type"\s*:\s*"([^"]*?)"/);
+                            const contentMatch = objMatch.match(/"content"\s*:\s*"([^"]*?)"/);
+                            
+                            if (typeMatch && contentMatch) {
+                                suggestions.push({
+                                    type: typeMatch[1],
+                                    content: contentMatch[1]
+                                });
+                            }
+                        }
+                    });
+                }
+                
+                if (suggestions.length > 0) {
+                    return { suggestions };
+                }
+            }
+        } catch (manualError) {
+            console.log('Manual reconstruction failed');
+        }
+        
+        // If all methods fail, throw error
+        throw new Error('Could not extract valid JSON from response');
+    }
+}
+
 // Helper function to make OpenAI API call with retry logic
 async function makeOpenAICallWithRetry(systemPrompt, userPrompt, maxRetries = RATE_LIMIT_CONFIG.maxRetries) {
     let lastError;
@@ -115,13 +263,13 @@ async function makeOpenAICallWithRetry(systemPrompt, userPrompt, maxRetries = RA
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
             const response = await openai.chat.completions.create({
-                model: 'gpt-4o',
+                model: 'gpt-4o-mini',
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt }
                 ],
-                temperature: 0.6,
-                max_tokens: 1000,
+                temperature: 0.3, // Reduced temperature for more consistent JSON
+                max_tokens: 800,
                 response_format: { type: "json_object" }
             });
 
@@ -153,9 +301,32 @@ async function makeOpenAICallWithRetry(systemPrompt, userPrompt, maxRetries = RA
     throw lastError;
 }
 
+// Helper function to get fallback suggestions
+function getFallbackSuggestions(stage) {
+    return stage === 1 ? [
+        { 
+            type: 'Key Points to Mention', 
+            content: 'Core experience, key achievements' 
+        },
+        { 
+            type: '💬 Sample Response', 
+            content: 'I successfully handled similar challenges using proven methodologies.' 
+        }
+    ] : [
+        { 
+            type: 'Key Points to Mention', 
+            content: 'Detailed experience, quantifiable achievements, specific technologies, project outcomes' 
+        },
+        { 
+            type: '💬 Sample Response', 
+            content: 'At TechCorp, I led a 6-month platform overhaul as Senior Developer. Our legacy system had 8-second load times causing 40% cart abandonment. I assembled a 4-person team, chose React/Node.js architecture, and implemented microservices with Redis caching. We migrated 75,000 products using automated scripts, integrated Stripe payments, and deployed with zero downtime using blue-green deployment. Key technical challenges included data consistency during migration and real-time inventory sync, which I solved using event-driven architecture and optimistic locking. Results: 60% faster load times (8s to 3.2s), 25% higher conversion rates, $2M additional quarterly revenue. The main optimization was implementing database connection pooling and query optimization, reducing database load by 70%.' 
+        }
+    ];
+}
+
 export async function POST(req) {
     try {
-        const { question, history } = await req.json();
+        const { question, history, sessionContext, stage = 1, isFollowUp = false } = await req.json();
 
         if (!question) {
             return NextResponse.json({ error: 'Question is required' }, { status: 400 });
@@ -173,158 +344,175 @@ export async function POST(req) {
             .join('\n');
 
         const profileContext = formatProfileForAI(userProfile);
+        const sessionContextText = formatSessionContext(sessionContext);
+        const overlappingTopic = checkTopicOverlap(question, sessionContext);
 
-        const systemPrompt = `You are an interview assistant. Your job is to interpret unclear/poorly worded questions and provide structured responses.
+        let systemPrompt, userPrompt;
 
-FIRST: Interpret the real intent behind the question, even if it has poor grammar or unclear wording.
-SECOND: Determine the best response structure from these options:
-- Describe → Explain → Highlight Achievements (for experience questions)
-- Define → Compare → Demonstrate with Code (for comparison questions)
-- Define → Explain → Show with Code (for concept/technical questions)
-- Context → Action → Results (for behavioral questions)
-- Problem → Solution → Impact (for problem-solving questions)
+        if (stage === 1) {
+            // Stage 1: Quick, brief response
+            systemPrompt = `You are an interview assistant providing QUICK, BRIEF responses for immediate use during interviews.
 
-THIRD: Respond ONLY with JSON in this exact format:
+CRITICAL: You MUST respond with VALID JSON only. No explanations, no markdown, no additional text.
+
+PERFORMANCE CRITICAL: This serves 500+ concurrent users. Response must be:
+- INSTANT and BRIEF (1-2 sentences max for sample response)
+- Immediately actionable
+- Ready to speak without reading
+
+CONTEXT RETENTION: ${isFollowUp ? 'This is a FOLLOW-UP question' : 'This is a NEW question'}
+${overlappingTopic ? `RELATED TO: "${overlappingTopic}"` : ''}
+
+RESPOND with brief suggestions in EXACT JSON format:
 
 {
   "suggestions": [
     {
       "type": "Key Points to Mention",
-      "content": "[7-15 words max. Quick highlights they should mention]"
+      "content": "[5-8 words max - core highlights only]"
     },
     {
       "type": "💬 Sample Response",
-      "content": "[COMPLETE, ready-to-speak response following your internally chosen structure. For technical questions, ALWAYS include relevant code examples. Start directly with the answer - do NOT include question interpretation phrases like 'I believe you're asking about...'. Include specific examples, technologies, numbers, timeline, and outcomes. User should be able to speak this response directly.]"
+      "content": "[BRIEF 1-2 sentence answer. ${isFollowUp ? 'Build on previous context briefly.' : 'Direct short answer.'} Maximum 25 words. Ready to speak immediately.]"
     }
   ]
 }
 
-FORMATTING RULES:
-- Key Points: Maximum 15 words, focus on what to highlight
-- Sample Response: CRITICAL - 
-  * Internally choose the best structure (Define → Compare → Demonstrate, etc.) but don't show it in output
-  * Start directly with the answer - NEVER include interpretation phrases like "I believe you're asking about..."
-  * Follow your chosen structure exactly in the response organization
-  * For technical questions, ALWAYS include working code examples
-  * Include specific scenarios with context, numbers, timeline, and outcomes
-  * Make it conversational and ready-to-speak
+BEHAVIORAL LOGIC:
+${overlappingTopic ? `- Reference previous: "Building on what I mentioned about X..."` : ''}
+${isFollowUp ? '- Provide brief elaboration based on context' : '- Give concise, direct answer'}
+- Avoid repetition from session context
+- Focus on immediate, speakable response
 
-QUESTION INTERPRETATION EXAMPLES:
-- "What's the difference between dictionary and the listers in Python?" → "What's the difference between dictionaries and lists in Python?"
-- "What do you what are, like, classes in Python?" → "Can you explain what classes are in Python?"
-- "Can you tell us about your ex experience on Azure Databricks?" → "Can you tell us about your past experience with Azure Databricks?"
+${profileContext ? 'USER PROFILE:\n' + profileContext : ''}
+${sessionContextText}`;
 
-EXAMPLE OUTPUT FORMAT:
+        } else {
+            // Stage 2: Detailed response with integrated deep dive tips
+            systemPrompt = `You are an interview assistant providing DETAILED, COMPREHENSIVE responses with integrated deep insights.
 
-For experience questions like "Can you tell us about your ex experience on Azure Databricks?":
-- Key Points: "Role using Databricks, data workflows, Delta Lake, optimization techniques"
-- Sample Response: Use "Describe → Explain → Highlight Achievements" structure internally. Complete answer with specific project details, technologies, and measurable results
+CRITICAL: You MUST respond with VALID JSON only. No explanations, no markdown, no additional text.
 
-For comparison questions like "What's the difference between dictionary and the listers in Python?":
-- Key Points: "List ordered index-based, dictionary key-value mapping, performance differences"  
-- Sample Response: Use "Define → Compare → Demonstrate with Code" structure internally. Define both concepts, compare differences, include working code examples
+CONTEXT RETENTION: Enhance the brief response with comprehensive details
+${overlappingTopic ? `BUILDING ON: "${overlappingTopic}"` : ''}
 
-For concept questions like "What do you what are, like, classes in Python?":
-- Key Points: "Class blueprint for objects, encapsulation, reusable logic modeling"
-- Sample Response: Use "Define → Explain → Show with Code" structure internally. Define classes, explain concepts, provide complete code examples with class definition and usage
+RESPOND with detailed suggestions in EXACT JSON format:
 
-STRUCTURE SELECTION GUIDE:
-- Experience questions ("Tell me about your experience with...") → Describe → Explain → Highlight Achievements
-- Comparison questions ("What's the difference between X and Y?") → Define → Compare → Demonstrate with Code
-- Concept questions ("What are classes in Python?") → Define → Explain → Show with Code
-- Behavioral questions ("Tell me about a time when...") → Context → Action → Results
-- Problem-solving questions ("How would you solve...?") → Problem → Solution → Impact
+{
+  "suggestions": [
+    {
+      "type": "Key Points to Mention",
+      "content": "[10-15 words - comprehensive highlights with specific technical details]"
+    },
+    {
+      "type": "💬 Sample Response",
+      "content": "[COMPREHENSIVE detailed response. For technical questions: INCLUDE code examples, edge cases, optimizations, and best practices directly in the response. For behavioral: include full STAR method with metrics. For experience: include specific technologies, challenges, and measurable outcomes. ${isFollowUp ? 'Expand significantly on previous context with new technical depth.' : 'Complete detailed answer with examples and technical insights.'} Integrate deep dive tips naturally into the response. Ready to speak fluently with full context.]"
+    }
+  ]
+}
 
-IMPORTANT: 
-- Always interpret the question's real intent internally (but don't mention this in the response)
-- Choose the most appropriate structure from the options above
-- Start sample responses directly with the answer, not with interpretation phrases
-- For technical questions, include working code examples in the sample response
-- Make suggestions immediately actionable during live interview
-- Tailor to the specific question type and user profile
+BEHAVIORAL LOGIC:
+${overlappingTopic ? `- Connect deeply to previous topic: "Expanding on our earlier discussion about X, here's the technical depth..."` : ''}
+${isFollowUp ? '- Provide comprehensive examples and technical details building on context' : '- Include complete technical context and advanced concepts'}
+- Use session history to avoid repetition but add new depth
+- For technical questions: Include code examples, performance considerations, edge cases
+- For behavioral: Include full situation, metrics, and lessons learned
+- For experience: Include specific technologies, architecture decisions, and business impact
 
-${profileContext ? 'USER PROFILE:\n' + profileContext : 'No user profile available - provide generic but helpful suggestions.'}`;
+STRUCTURE SELECTION & INTEGRATION:
+- Experience: Describe → Explain → Highlight Achievements (with specific metrics)
+- Comparison: Define → Compare → Demonstrate with Code → Performance Analysis
+- Concept: Define → Explain → Show with Code → Best Practices & Edge Cases
+- Behavioral: Context → Action → Results → Lessons Learned
+- Problem-solving: Problem → Solution → Implementation → Optimization
 
-        const userPrompt = `Question: ${question}
+IMPORTANT FOR TECHNICAL QUESTIONS:
+- Always include working code examples in the sample response
+- Add performance considerations and optimization tips
+- Mention edge cases and how to handle them
+- Include best practices and common pitfalls
+- Integrate all deep dive insights naturally into the main response
 
-Conversation: ${formattedHistory}
+${profileContext ? 'USER PROFILE:\n' + profileContext : ''}
+${sessionContextText}`;
+        }
 
-Generate interview suggestions in the exact JSON format specified. Focus on the most recent question.`;
+        userPrompt = `Current Question: "${question}"
+
+Recent Conversation:
+${formattedHistory}
+
+${isFollowUp ? 'This is a follow-up question - provide context-aware response.' : 'This is a new question - provide fresh perspective.'}
+
+Generate ${stage === 1 ? 'brief, immediate' : 'detailed, comprehensive'} interview suggestions in the exact JSON format specified. Return ONLY valid JSON.`;
 
         const aiResponse = await makeOpenAICallWithRetry(systemPrompt, userPrompt);
         
-        // Parse the JSON response with multiple fallback strategies
+        // Enhanced JSON parsing with detailed error logging
         let parsedResponse;
         try {
-            // First try direct parsing
-            parsedResponse = JSON.parse(aiResponse);
-        } catch (parseError) {
-            // Try to clean and extract JSON
-            try {
-                // Remove any text before first { and after last }
-                let cleanedResponse = aiResponse.trim();
-                const firstBrace = cleanedResponse.indexOf('{');
-                const lastBrace = cleanedResponse.lastIndexOf('}');
-                
-                if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-                    cleanedResponse = cleanedResponse.substring(firstBrace, lastBrace + 1);
-                    parsedResponse = JSON.parse(cleanedResponse);
-                } else {
-                    throw new Error("No valid JSON structure found");
-                }
-            } catch (extractError) {
-                // Fallback to properly formatted suggestions
-                const fallbackSuggestions = [
-                    { 
-                        type: 'Key Points to Mention', 
-                        content: 'Relevant experience, quantifiable achievements, specific skills' 
-                    },
-                    { 
-                        type: '💬 Sample Response', 
-                        content: 'At TechCorp, I led a 6-month e-commerce platform overhaul as Senior Developer. Our legacy system had 8-second load times causing 40% cart abandonment. I assembled a 4-person team, chose React/Node.js architecture, and implemented microservices. We migrated 75,000 products using automated scripts, integrated Stripe payments, and deployed with zero downtime using blue-green deployment. Results: 60% faster load times (8s to 3.2s), 25% higher conversion rates, $2M additional quarterly revenue. Challenges included data consistency during migration and real-time inventory sync, solved with Redis caching and event-driven architecture.' 
-                    }
-                ];
-                return NextResponse.json({ suggestions: fallbackSuggestions });
-            }
-        }
-
-        // Validate the parsed response structure
-        if (!parsedResponse || !parsedResponse.suggestions || !Array.isArray(parsedResponse.suggestions)) {
+            parsedResponse = extractValidJSON(aiResponse);
+            console.log('Successfully parsed AI response');
+        } catch (extractError) {
+            console.error('JSON extraction failed:', {
+                error: extractError.message,
+                stage: stage,
+                question: question.substring(0, 100),
+                responsePreview: aiResponse.substring(0, 200),
+                responseLength: aiResponse.length
+            });
+            
             // Use fallback suggestions
-            parsedResponse = {
-                suggestions: [
-                    { 
-                        type: 'Key Points to Mention', 
-                        content: 'Relevant experience, quantifiable achievements, specific skills' 
-                    },
-                    { 
-                        type: '💬 Sample Response', 
-                        content: 'At TechCorp, I led a 6-month e-commerce platform overhaul as Senior Developer. Our legacy system had 8-second load times causing 40% cart abandonment. I assembled a 4-person team, chose React/Node.js architecture, and implemented microservices. We migrated 75,000 products using automated scripts, integrated Stripe payments, and deployed with zero downtime using blue-green deployment. Results: 60% faster load times (8s to 3.2s), 25% higher conversion rates, $2M additional quarterly revenue. Challenges included data consistency during migration and real-time inventory sync, solved with Redis caching and event-driven architecture.' 
-                    }
-                ]
-            };
+            const fallbackSuggestions = getFallbackSuggestions(stage);
+            console.log('Using fallback suggestions for stage:', stage);
+                return NextResponse.json({ suggestions: fallbackSuggestions });
         }
 
-        return NextResponse.json({ suggestions: parsedResponse.suggestions });
+        // Validate response structure
+        if (!parsedResponse || !parsedResponse.suggestions || !Array.isArray(parsedResponse.suggestions)) {
+            console.error('Invalid response structure:', {
+                hasResponse: !!parsedResponse,
+                hasSuggestions: !!parsedResponse?.suggestions,
+                isArray: Array.isArray(parsedResponse?.suggestions),
+                stage: stage
+            });
+            
+            const fallbackSuggestions = getFallbackSuggestions(stage);
+            parsedResponse = { suggestions: fallbackSuggestions };
+        }
+
+        // Validate individual suggestions
+        const validSuggestions = parsedResponse.suggestions.filter(s => 
+            s && typeof s === 'object' && s.type && s.content
+        );
+
+        if (validSuggestions.length === 0) {
+            console.error('No valid suggestions found, using fallback');
+            const fallbackSuggestions = getFallbackSuggestions(stage);
+            return NextResponse.json({ suggestions: fallbackSuggestions });
+        }
+
+        return NextResponse.json({ suggestions: validSuggestions });
 
     } catch (error) {
-        console.error("Error in copilot suggestions:", error);
+        console.error(`Error in copilot suggestions (Stage ${stage || 1}):`, error);
         
+        // Fast error responses for high-load scenarios
         if (error.status === 429) {
             return NextResponse.json({ 
-                error: 'Rate limit exceeded. Please wait a moment before trying again.' 
+                error: 'High traffic detected. Please wait briefly.' 
             }, { status: 429 });
         } else if (error.status >= 500) {
             return NextResponse.json({ 
-                error: 'OpenAI service temporarily unavailable. Please try again.' 
+                error: 'AI service temporarily busy. Retrying...' 
             }, { status: 502 });
         } else if (error.status === 401) {
             return NextResponse.json({ 
-                error: 'Authentication error with AI service.' 
+                error: 'Authentication error.' 
             }, { status: 500 });
         } else {
             return NextResponse.json({ 
-                error: 'Failed to generate AI suggestions. Please try again.' 
+                error: 'Unable to generate suggestions. Please try again.' 
             }, { status: 500 });
         }
     }
