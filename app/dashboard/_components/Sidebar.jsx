@@ -74,7 +74,7 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="hidden md:block h-screen fixed left-0 top-[65px] w-64 text-white bg-[#0d1526] border-r border-[#1e293b]">
+    <div className="hidden md:block h-screen fixed left-0 top-[65px] w-64 text-white bg-[#0d1526] border-r border-[#1e293b] z-50">
       <div className="py-8">
         {/* Menu items */}
         <div className="px-4">

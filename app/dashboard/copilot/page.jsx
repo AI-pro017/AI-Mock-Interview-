@@ -257,7 +257,7 @@ const InterviewCopilotPage = () => {
     }, [handleMouseMove]);
 
     return (
-        <div className="bg-gray-900 text-white min-h-screen flex flex-col p-1 sm:p-2 lg:p-4 overflow-hidden">
+        <div className="text-white h-full flex flex-col p-1 sm:p-2 lg:p-4 overflow-hidden">
             <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 flex-shrink-0 gap-2 sm:gap-3">
                 <h1 className="text-lg sm:text-xl md:text-2xl font-bold flex items-center">
                     <Bot className="w-5 h-5 sm:w-6 sm:h-6 mr-1 sm:mr-2" />
@@ -555,20 +555,20 @@ const InterviewCopilotPage = () => {
                 </div>
             )}
 
-            {/* Mobile Layout (Stack vertically) */}
-            <div className="flex-grow flex flex-col lg:hidden gap-3 min-h-0">
-                {/* Mobile: AI Suggestion Box (Top Priority) */}
-                <div className="h-[45%] bg-gray-800 rounded-lg shadow-lg flex flex-col min-h-0">
-                    <div className="p-3 border-b border-gray-700 flex-shrink-0">
+            {/* Mobile Layout (Stack vertically with scrollable content) */}
+            <div className="flex-grow flex flex-col lg:hidden gap-4 overflow-y-auto">
+                {/* Mobile: AI Suggestion Box - Longer with natural height */}
+                <div className="bg-gray-800 rounded-lg shadow-lg flex flex-col min-h-[400px]">
+                    <div className="p-4 border-b border-gray-700 flex-shrink-0">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h2 className="text-lg font-semibold text-green-300">AI Suggestion BOX</h2>
-                        <div className="text-xs text-gray-400 mt-1">
+                                <h2 className="text-xl font-semibold text-green-300">AI Suggestion BOX</h2>
+                                <div className="text-sm text-gray-400 mt-1">
                                     <span className="hidden sm:inline">Interviewer questions only • Context memory • Two-stage responses • Manual override</span>
                                     <span className="sm:hidden">Smart AI Ready</span>
                                     {isStage2Loading && (
                                         <div className="flex items-center text-blue-400 mt-1">
-                                            <Zap className="w-3 h-3 mr-1" />
+                                            <Zap className="w-4 h-4 mr-1" />
                                             <span>Stage 2 enhancing...</span>
                                         </div>
                                     )}
@@ -576,40 +576,40 @@ const InterviewCopilotPage = () => {
                             </div>
                             {isLoadingSuggestions && (
                                 <div className="flex items-center text-gray-400">
-                                    <Loader className="w-4 h-4 mr-1 animate-spin" />
-                                    <span className="text-xs">Loading...</span>
+                                    <Loader className="w-5 h-5 mr-2 animate-spin" />
+                                    <span className="text-sm">Loading...</span>
                                 </div>
                             )}
                         </div>
                     </div>
-                    <div className="flex-grow p-3 space-y-3 overflow-y-auto">
+                    <div className="flex-grow p-4 space-y-4">
                         {aiError && (
-                            <div className="bg-red-900/50 border border-red-800 p-3 rounded-lg">
+                            <div className="bg-red-900/50 border border-red-800 p-4 rounded-lg">
                                 <div className="flex items-center text-red-300">
-                                    <AlertTriangle className="w-4 h-4 mr-2" />
-                                    <span className="text-sm">{aiError}</span>
+                                    <AlertTriangle className="w-5 h-5 mr-2" />
+                                    <span className="text-base">{aiError}</span>
                                 </div>
                             </div>
                         )}
                         
                         {suggestions.length === 0 && !isLoadingSuggestions && !aiError && (
-                            <div className="text-gray-400 text-center py-6">
-                                <BrainCircuit className="w-12 h-12 mx-auto mb-4 text-gray-600" />
-                                <h3 className="text-lg font-medium text-gray-300 mb-2">Smart AI Ready</h3>
-                                <p className="text-sm leading-relaxed">
+                            <div className="text-gray-400 text-center py-12">
+                                <BrainCircuit className="w-16 h-16 mx-auto mb-6 text-gray-600" />
+                                <h3 className="text-xl font-medium text-gray-300 mb-4">Smart AI Ready</h3>
+                                <p className="text-base leading-relaxed">
                                     AI will automatically respond to any meaningful interviewer speech.<br />
                                     Your responses won't trigger AI - only client speech will.
                                 </p>
-                                        </div>
+                            </div>
                         )}
                         
                         {suggestions.map((s, i) => (
-                            <div key={i} className="bg-gray-700 p-4 rounded-lg">
-                                <h4 className="font-bold text-base flex items-center mb-3">
-                                    <BrainCircuit className="w-5 h-5 mr-2 text-green-400" />
+                            <div key={i} className="bg-gray-700 p-6 rounded-lg">
+                                <h4 className="font-bold text-xl flex items-center mb-4">
+                                    <BrainCircuit className="w-6 h-6 mr-3 text-green-400" />
                                     {s.type}
                                 </h4>
-                                <div className="max-h-64 overflow-y-auto text-sm leading-relaxed">
+                                <div className="text-lg leading-relaxed">
                                     <CodeHighlighter content={s.content} />
                                 </div>
                             </div>
@@ -619,8 +619,8 @@ const InterviewCopilotPage = () => {
                     </div>
                 </div>
 
-                {/* Mobile: Video Component */}
-                <div className="h-[30%] bg-black rounded-lg overflow-hidden flex items-center justify-center relative min-h-0">
+                {/* Mobile: Video Component - Longer with better aspect ratio */}
+                <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center relative min-h-[300px] h-[300px]">
                     <video 
                         ref={mobileVideoRef} 
                         autoPlay 
@@ -630,43 +630,55 @@ const InterviewCopilotPage = () => {
                         style={{ maxWidth: '100%', maxHeight: '100%' }}
                     />
                     {!isCapturing && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-gray-500 p-3">
-                            <Monitor size={32} className="mb-2" />
-                            <h3 className="text-sm font-semibold text-gray-300 mb-1">Interview Copilot</h3>
-                            <p className="text-xs mb-2">Click 'Start Capture' to begin.</p>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-gray-500 p-6">
+                            <Monitor size={48} className="mb-4" />
+                            <h3 className="text-lg font-semibold text-gray-300 mb-2">Interview Copilot</h3>
+                            <p className="text-sm mb-4">Click 'Start Capture' to begin.</p>
+                            
+                            {/* Enhanced mobile features card */}
+                            <div className="bg-blue-900/50 border border-blue-700 rounded-lg p-4 w-full max-w-sm">
+                                <h4 className="text-blue-300 font-semibold mb-3 text-sm">🤖 Smart AI Features:</h4>
+                                <div className="text-xs text-blue-200 space-y-2 text-left">
+                                    <div>🎯 <strong>Smart Detection:</strong> AI responds to questions</div>
+                                    <div>🚫 <strong>Silent on Your Responses:</strong> No interference</div>
+                                    <div>⚡ <strong>Two-Stage Responses:</strong> Instant + Detailed</div>
+                                    <div>🧠 <strong>Context Memory:</strong> Remembers context</div>
+                                    <div>🔧 <strong>Manual Override:</strong> Force suggestions</div>
+                                </div>
+                            </div>
                         </div>
                     )}
                     {/* Debug info for mobile */}
                     {isCapturing && !tabStream && (
-                        <div className="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-1 rounded">
+                        <div className="absolute top-3 left-3 bg-red-600 text-white text-sm px-3 py-1 rounded">
                             No stream
                         </div>
                     )}
                     {isCapturing && tabStream && (
-                        <div className="absolute top-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                        <div className="absolute top-3 left-3 bg-green-600 text-white text-sm px-3 py-1 rounded">
                             Stream active
                         </div>
                     )}
                 </div>
 
-                {/* Mobile: Input and Transcription Combined */}
-                <div className="h-[25%] bg-gray-800 rounded-lg shadow-lg flex flex-col min-h-0">
+                {/* Mobile: Input and Transcription Combined - Much longer */}
+                <div className="bg-gray-800 rounded-lg shadow-lg flex flex-col min-h-[500px] mb-6">
                     {/* Input Section */}
-                    <div className="p-2 border-b border-gray-700">
+                    <div className="p-4 border-b border-gray-700">
                         {userOverride && (
-                            <div className="mb-2 p-2 rounded-lg bg-green-600 relative">
-                                        <button
-                                            onClick={() => setUserOverride(null)}
-                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                                        >
-                                    <X className="w-2 h-2 text-white" />
-                                        </button>
-                                <span className="font-semibold block text-xs">User Override</span>
-                                <p className="text-gray-200 text-xs">{userOverride.text}</p>
+                            <div className="mb-3 p-3 rounded-lg bg-green-600 relative">
+                                <button
+                                    onClick={() => setUserOverride(null)}
+                                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                                >
+                                    <X className="w-3 h-3 text-white" />
+                                </button>
+                                <span className="font-semibold block text-sm">User Override</span>
+                                <p className="text-gray-200 text-sm">{userOverride.text}</p>
                             </div>
                         )}
                         
-                        <form onSubmit={handleUserInput} className="flex gap-2">
+                        <form onSubmit={handleUserInput} className="flex gap-3">
                             <input
                                 ref={inputRef}
                                 type="text"
@@ -674,7 +686,7 @@ const InterviewCopilotPage = () => {
                                 onChange={(e) => setUserInput(e.target.value)}
                                 placeholder={isCapturing ? "Type question..." : "Start capture first"}
                                 disabled={!isCapturing}
-                                className={`flex-1 px-2 py-1 border rounded text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
+                                className={`flex-1 px-3 py-2 border rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base ${
                                     isCapturing 
                                         ? 'bg-gray-700 border-gray-600' 
                                         : 'bg-gray-800 border-gray-700 cursor-not-allowed opacity-50'
@@ -682,41 +694,60 @@ const InterviewCopilotPage = () => {
                             />
                             <Button 
                                 type="submit" 
-                                size="sm" 
                                 disabled={!userInput.trim() || !isCapturing}
-                                className="px-2 py-1"
+                                className="px-4 py-2"
                             >
-                                <Send className="w-3 h-3" />
+                                <Send className="w-4 h-4" />
                             </Button>
                         </form>
                     </div>
 
-                    {/* Transcription Section */}
-                    <div className="flex-grow p-2 overflow-y-auto">
-                        <div className="text-xs text-gray-400 mb-2">
+                    {/* Transcription Section - Much more space */}
+                    <div className="flex-grow p-4">
+                        <div className="text-sm text-gray-400 mb-4">
                             Live Transcription • {transcripts.length} transcripts
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                             {transcripts.length === 0 && (
-                                <div className="text-gray-400 text-center py-4 text-xs">
+                                <div className="text-gray-400 text-center py-12 text-base">
                                     No transcripts yet. Start speaking...
                                 </div>
                             )}
-                            {transcripts.slice(-3).map((block) => {
+                            {transcripts.map((block) => {
                                 const isUser = block.speaker === 'You';
                                 return (
-                                    <div key={block.id} className={`flex items-start gap-1 ${isUser ? 'justify-end' : ''}`}>
-                                        {!isUser && <UserIcon className="w-3 h-3 text-gray-400 mt-1 flex-shrink-0" />}
+                                    <div key={block.id} className={`flex items-start gap-2 ${isUser ? 'justify-end' : ''}`}>
+                                        {!isUser && <UserIcon className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />}
                                         <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
-                                            <div className={`p-2 rounded max-w-xs ${isUser ? 'bg-blue-600' : 'bg-gray-700'}`}>
-                                                <span className="font-semibold block text-xs">{block.speaker}</span>
-                                                <p className="text-gray-200 text-xs">{block.text}</p>
+                                            <div className={`p-3 rounded-lg max-w-[85%] ${isUser ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                                                <span className="font-semibold block text-sm">{block.speaker}</span>
+                                                <p className="text-gray-200 text-sm leading-relaxed">{block.text}</p>
                                             </div>
                                         </div>
-                                        {isUser && <UserIcon className="w-3 h-3 text-blue-300 mt-1 flex-shrink-0" />}
+                                        {isUser && <UserIcon className="w-4 h-4 text-blue-300 mt-1 flex-shrink-0" />}
                                     </div>
                                 );
                             })}
+                            
+                            {/* User Override Block - appears after transcripts */}
+                            {userOverride && (
+                                <div className="flex items-start gap-2 justify-end">
+                                    <div className="flex flex-col items-end">
+                                        <div className="p-3 rounded-lg max-w-[85%] bg-green-600 relative">
+                                            <button
+                                                onClick={() => setUserOverride(null)}
+                                                className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                                            >
+                                                <X className="w-2.5 h-2.5 text-white" />
+                                            </button>
+                                            <span className="font-semibold block text-sm">User Override</span>
+                                            <p className="text-gray-200 text-sm leading-relaxed">{userOverride.text}</p>
+                                        </div>
+                                    </div>
+                                    <MessageSquare className="w-4 h-4 text-green-300 mt-1 flex-shrink-0" />
+                                </div>
+                            )}
+                            
                             <div ref={transcriptEndRef} />
                         </div>
                     </div>
@@ -726,7 +757,7 @@ const InterviewCopilotPage = () => {
             {/* Desktop Layout (Side by side) */}
             <div ref={containerRef} className="hidden lg:flex flex-grow gap-4 min-h-0 w-full overflow-hidden">
                 {/* Left Column - 3 panels stacked */}
-                <div className="flex flex-col gap-4 min-h-0 h-[calc(100vh-80px)] overflow-hidden" style={{width: `${leftPanelWidth}%`}}>
+                <div className="flex flex-col gap-4 min-h-0 h-[calc(100vh-80px)] overflow-hidden flex-shrink-0" style={{width: `${leftPanelWidth}%`}}>
                     {/* Top Left: Interview Copilot Component (Video) */}
                     <div className="h-[45%] bg-black rounded-lg overflow-hidden flex items-center justify-center relative min-h-0">
                         <video ref={videoRef} autoPlay muted className="w-full h-full object-contain" />
@@ -870,7 +901,7 @@ const InterviewCopilotPage = () => {
                 </div>
 
                 {/* Right Side: AI Suggestion Box (Largest Component) - Desktop */}
-                <div className="bg-gray-800 rounded-lg shadow-lg flex flex-col h-[calc(100vh-80px)] min-h-0 overflow-hidden" style={{width: `${100 - leftPanelWidth - 1}%`}}>
+                <div className="bg-gray-800 rounded-lg shadow-lg flex flex-col h-[calc(100vh-80px)] min-h-0 overflow-hidden flex-1">
                     <div className="p-4 border-b border-gray-700 flex-shrink-0">
                         <div className="flex items-center justify-between">
                             <div className="min-w-0 flex-1">
