@@ -715,13 +715,18 @@ const InterviewCopilotPage = () => {
                             )}
                             {transcripts.map((block) => {
                                 const isUser = block.speaker === 'You';
+                                const textLength = block.text.length;
+                                // Dynamic width based on text length
+                                const widthClass = textLength <= 20 ? 'w-fit min-w-[120px] max-w-[70%]' : 
+                                                 textLength <= 50 ? 'max-w-[75%]' : 'max-w-[85%]';
+                                
                                 return (
                                     <div key={block.id} className={`flex items-start gap-2 ${isUser ? 'justify-end' : ''}`}>
                                         {!isUser && <UserIcon className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />}
                                         <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
-                                            <div className={`p-3 rounded-lg max-w-[85%] ${isUser ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                                            <div className={`p-3 rounded-lg ${widthClass} ${isUser ? 'bg-blue-600' : 'bg-gray-700'}`}>
                                                 <span className="font-semibold block text-sm">{block.speaker}</span>
-                                                <p className="text-gray-200 text-sm leading-relaxed">{block.text}</p>
+                                                <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">{block.text}</p>
                                             </div>
                                         </div>
                                         {isUser && <UserIcon className="w-4 h-4 text-blue-300 mt-1 flex-shrink-0" />}
@@ -733,16 +738,23 @@ const InterviewCopilotPage = () => {
                             {userOverride && (
                                 <div className="flex items-start gap-2 justify-end">
                                     <div className="flex flex-col items-end">
-                                        <div className="p-3 rounded-lg max-w-[85%] bg-green-600 relative">
-                                            <button
-                                                onClick={() => setUserOverride(null)}
-                                                className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                                            >
-                                                <X className="w-2.5 h-2.5 text-white" />
-                                            </button>
-                                            <span className="font-semibold block text-sm">User Override</span>
-                                            <p className="text-gray-200 text-sm leading-relaxed">{userOverride.text}</p>
-                                        </div>
+                                        {(() => {
+                                            const overrideTextLength = userOverride.text.length;
+                                            const overrideWidthClass = overrideTextLength <= 20 ? 'w-fit min-w-[120px] max-w-[70%]' : 
+                                                                     overrideTextLength <= 50 ? 'max-w-[75%]' : 'max-w-[85%]';
+                                            return (
+                                                <div className={`p-3 rounded-lg ${overrideWidthClass} bg-green-600 relative`}>
+                                                    <button
+                                                        onClick={() => setUserOverride(null)}
+                                                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                                                    >
+                                                        <X className="w-2.5 h-2.5 text-white" />
+                                                    </button>
+                                                    <span className="font-semibold block text-sm">User Override</span>
+                                                    <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">{userOverride.text}</p>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                     <MessageSquare className="w-4 h-4 text-green-300 mt-1 flex-shrink-0" />
                                 </div>
@@ -850,13 +862,18 @@ const InterviewCopilotPage = () => {
                             
                             {transcripts.map((block) => {
                                 const isUser = block.speaker === 'You';
+                                const textLength = block.text.length;
+                                // Dynamic width based on text length for desktop
+                                const widthClass = textLength <= 20 ? 'w-fit min-w-[100px] max-w-[65%]' : 
+                                                 textLength <= 50 ? 'max-w-[70%]' : 'max-w-[80%]';
+                                
                                 return (
                                     <div key={block.id} className={`flex items-start gap-1 xl:gap-2 ${isUser ? 'justify-end' : ''}`}>
                                         {!isUser && <UserIcon className="w-3 h-3 xl:w-4 xl:h-4 text-gray-400 mt-1 flex-shrink-0" />}
                                         <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} min-w-0`}>
-                                            <div className={`p-1 xl:p-1.5 2xl:p-2 rounded max-w-[80%] ${isUser ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                                            <div className={`p-1 xl:p-1.5 2xl:p-2 rounded ${widthClass} ${isUser ? 'bg-blue-600' : 'bg-gray-700'}`}>
                                                 <span className="font-semibold block text-xs">{block.speaker}</span>
-                                                <p className="text-gray-200 text-xs xl:text-sm break-words">{block.text}</p>
+                                                <p className="text-gray-200 text-xs xl:text-sm break-words whitespace-pre-wrap">{block.text}</p>
                                             </div>
                                         </div>
                                         {isUser && <UserIcon className="w-3 h-3 xl:w-4 xl:h-4 text-blue-300 mt-1 flex-shrink-0" />}
@@ -868,16 +885,23 @@ const InterviewCopilotPage = () => {
                             {userOverride && (
                                 <div className="flex items-start gap-1 xl:gap-2 justify-end">
                                     <div className="flex flex-col items-end min-w-0">
-                                        <div className="p-1 xl:p-1.5 2xl:p-2 rounded max-w-[80%] bg-green-600 relative">
-                                            <button
-                                                onClick={() => setUserOverride(null)}
-                                                className="absolute -top-1 -right-1 xl:-top-2 xl:-right-2 w-3 h-3 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors flex-shrink-0"
-                                            >
-                                                <X className="w-1.5 h-1.5 xl:w-2 xl:h-2 2xl:w-3 2xl:h-3 text-white" />
-                                            </button>
-                                            <span className="font-semibold block text-xs">User Override</span>
-                                            <p className="text-gray-200 text-xs xl:text-sm break-words">{userOverride.text}</p>
-                                        </div>
+                                        {(() => {
+                                            const overrideTextLength = userOverride.text.length;
+                                            const overrideWidthClass = overrideTextLength <= 20 ? 'w-fit min-w-[100px] max-w-[65%]' : 
+                                                                     overrideTextLength <= 50 ? 'max-w-[70%]' : 'max-w-[80%]';
+                                            return (
+                                                <div className={`p-1 xl:p-1.5 2xl:p-2 rounded ${overrideWidthClass} bg-green-600 relative`}>
+                                                    <button
+                                                        onClick={() => setUserOverride(null)}
+                                                        className="absolute -top-1 -right-1 xl:-top-2 xl:-right-2 w-3 h-3 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors flex-shrink-0"
+                                                    >
+                                                        <X className="w-1.5 h-1.5 xl:w-2 xl:h-2 2xl:w-3 2xl:h-3 text-white" />
+                                                    </button>
+                                                    <span className="font-semibold block text-xs">User Override</span>
+                                                    <p className="text-gray-200 text-xs xl:text-sm break-words whitespace-pre-wrap">{userOverride.text}</p>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                     <MessageSquare className="w-3 h-3 xl:w-4 xl:h-4 text-green-300 mt-1 flex-shrink-0" />
                                 </div>
