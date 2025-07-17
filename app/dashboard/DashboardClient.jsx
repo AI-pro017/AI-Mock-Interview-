@@ -28,7 +28,7 @@ function DashboardClient({ user, interviews }) { // Receive user data as a prop
           {/* Main call to action - New clean button */}
           <StartInterviewButton />
           
-          {/* Recent Interview History - self-contained component */}
+          {/* Recent Mock Interview History - self-contained component */}
           <InterviewList interviews={interviews} limit={6} />
         </div>
 

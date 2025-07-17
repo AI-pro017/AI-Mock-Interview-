@@ -23,21 +23,21 @@ const MobileNavigation = () => {
         },
         {
             id: 2,
-            name: 'New Interview',
+            name: 'Interview Copilot',
+            icon: Bot,
+            path: '/dashboard/copilot',
+        },
+        {
+            id: 3,
+            name: 'New Mock Interview',
             icon: PlusSquare,
             path: '/dashboard/interview',
         },
         {
-            id: 3,
-            name: 'Interview History',
+            id: 4,
+            name: 'Mock Interview History',
             icon: History,
             path: '/dashboard/interview-history',
-        },
-        {
-            id: 4,
-            name: 'Interview Copilot',
-            icon: Bot,
-            path: '/dashboard/copilot',
         },
         {
             id: 5,

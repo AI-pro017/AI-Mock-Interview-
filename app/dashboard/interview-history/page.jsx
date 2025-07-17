@@ -48,7 +48,7 @@ export default function InterviewHistory() {
           <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="text-3xl font-bold">Interview History</h1>
+          <h1 className="text-3xl font-bold">Mock Interview History</h1>
         </div>
         <p className="text-gray-300">Loading your past interviews...</p>
       </div>
@@ -62,7 +62,7 @@ export default function InterviewHistory() {
           <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="text-3xl font-bold">Interview History</h1>
+          <h1 className="text-3xl font-bold">Mock Interview History</h1>
         </div>
         <p className="text-red-400">Error: {error}</p>
       </div>
@@ -75,15 +75,15 @@ export default function InterviewHistory() {
         <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors">
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h1 className="text-3xl font-bold">Interview History</h1>
+        <h1 className="text-3xl font-bold">Mock Interview History</h1>
       </div>
-      <p className="text-gray-400 mb-8">View all your previous interviews and their feedback.</p>
+      <p className="text-gray-400 mb-8">View all your previous mock interviews and their feedback.</p>
       
       {/* Replace white container with dark container */}
       <div className="bg-[#111827] p-6 rounded-xl shadow-none">
         <div className="flex items-center mb-6">
           <History className="h-5 w-5 text-gray-400 mr-2" />
-          <h2 className="text-xl font-semibold text-white">Recent Interviews</h2>
+          <h2 className="text-xl font-semibold text-white">Recent Mock Interviews</h2>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

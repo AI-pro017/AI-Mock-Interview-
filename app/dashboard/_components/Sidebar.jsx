@@ -23,21 +23,21 @@ const Sidebar = () => {
     },
     {
       id: 2,
-      name: 'New Interview',
+      name: 'Interview Copilot',
+      icon: Bot,
+      path: '/dashboard/copilot',
+    },
+    {
+      id: 3,
+      name: 'New Mock Interview',
       icon: PlusSquare,
       path: '/dashboard/interview',
     },
     {
-      id: 3,
-      name: 'Interview History',
+      id: 4,
+      name: 'Mock Interview History',
       icon: History,
       path: '/dashboard/interview-history',
-    },
-    {
-      id: 4,
-      name: 'Interview Copilot',
-      icon: Bot,
-      path: '/dashboard/copilot',
     },
     {
       id: 5,
@@ -81,7 +81,7 @@ const Sidebar = () => {
           {menuList.map((item) => (
             <Link href={item.path} key={item.id}>
               <div
-                className={`flex items-center justify-start gap-3 p-3 mb-2 px-4 rounded-lg cursor-pointer transition-all
+                className={`flex items-center justify-start gap-3 p-3 mb-2 px-2 rounded-lg cursor-pointer transition-all
                 ${isActive(item.path) 
                   ? 'bg-gray-700 text-white' 
                   : 'text-gray-400 hover:text-white hover:bg-gray-800'

@@ -38,7 +38,7 @@ function StartInterviewButton() {
                     className="group relative inline-flex items-center justify-center px-8 py-3 bg-blue-500/20 hover:bg-blue-500/30 backdrop-blur-sm rounded-full text-white font-medium transition-all duration-300 shadow-lg hover:shadow-blue-500/20"
                 >
                     <Play className="h-5 w-5 mr-3 -ml-1 text-sky-300 group-hover:text-white transition-colors" />
-                    Start a New Interview
+                    Start a New Mock Interview
                 </button>
             </div>
         </div>

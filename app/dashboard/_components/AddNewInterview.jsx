@@ -56,7 +56,7 @@ function AddNewInterview() {
 
     return (
         <div className="p-6 md:p-8 border rounded-lg bg-white shadow-sm">
-            <h2 className="text-2xl font-bold mb-1 text-gray-800">Start a New Interview</h2>
+            <h2 className="text-2xl font-bold mb-1 text-gray-800">Start a New Mock Interview</h2>
             <p className="text-gray-500 mb-6">Configure a new interview to match your target job.</p>
             <form onSubmit={onSubmit} className="space-y-4">
                 <div>
