@@ -16,7 +16,9 @@ const InterviewCopilotPage = () => {
     const [showHelpModal, setShowHelpModal] = useState(false);
     const [leftPanelWidth, setLeftPanelWidth] = useState(45); // percentage
     const videoRef = useRef(null);
+    const mobileVideoRef = useRef(null); // Separate ref for mobile
     const transcriptEndRef = useRef(null);
+    const aiSuggestionsEndRef = useRef(null); // New ref for AI suggestions auto-scroll
     const lastProcessedTranscriptRef = useRef(null);
     const inputRef = useRef(null);
     const containerRef = useRef(null);
@@ -101,10 +103,20 @@ const InterviewCopilotPage = () => {
     }, [userInput, transcripts, generateSuggestions]);
 
     useEffect(() => {
-        if (tabStream && videoRef.current) {
+        if (tabStream) {
+            if (videoRef.current) {
             videoRef.current.srcObject = tabStream;
-        } else if (videoRef.current) {
+            }
+            if (mobileVideoRef.current) {
+                mobileVideoRef.current.srcObject = tabStream;
+            }
+        } else {
+            if (videoRef.current) {
             videoRef.current.srcObject = null;
+            }
+            if (mobileVideoRef.current) {
+                mobileVideoRef.current.srcObject = null;
+            }
         }
     }, [tabStream]);
 
@@ -211,6 +223,11 @@ const InterviewCopilotPage = () => {
         }
     }, [transcripts, generateSuggestions, userOverride, isClientSpeaker, isQuestionBlock]);
 
+    // Add auto-scroll effect for AI suggestions
+    useEffect(() => {
+        aiSuggestionsEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, [suggestions]);
+
     // Resize functionality
     const handleMouseDown = useCallback((e) => {
         isResizing.current = true;
@@ -240,21 +257,22 @@ const InterviewCopilotPage = () => {
     }, [handleMouseMove]);
 
     return (
-        <div className="bg-gray-900 text-white min-h-screen flex flex-col p-4 lg:p-8">
-            <header className="flex justify-between items-center mb-6 flex-shrink-0">
-                <h1 className="text-2xl md:text-3xl font-bold flex items-center">
-                    <Bot className="w-8 h-8 mr-3" />
-                    Realtime Interview Copilot
-                    <span className="ml-3 text-sm bg-blue-600 px-2 py-1 rounded-full">
+        <div className="bg-gray-900 text-white min-h-screen flex flex-col p-1 sm:p-2 lg:p-4 overflow-hidden">
+            <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 flex-shrink-0 gap-2 sm:gap-3">
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold flex items-center">
+                    <Bot className="w-5 h-5 sm:w-6 sm:h-6 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Realtime Interview Copilot</span>
+                    <span className="sm:hidden">Interview Copilot</span>
+                    <span className="ml-2 sm:ml-3 text-xs bg-blue-600 px-2 py-1 rounded-full">
                         Enhanced Context AI
                     </span>
                 </h1>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-end">
                     {/* Session Context Indicator */}
                     {sessionContext.length > 0 && (
-                        <div className="flex items-center gap-2 bg-green-900/30 border border-green-700 rounded-lg px-3 py-1">
-                            <BrainCircuit className="w-4 h-4 text-green-400" />
-                            <span className="text-sm text-green-300">
+                        <div className="flex items-center gap-1 sm:gap-2 bg-green-900/30 border border-green-700 rounded-lg px-2 sm:px-3 py-1">
+                            <BrainCircuit className="w-3 h-3 sm:w-4 sm:h-4 text-green-400" />
+                            <span className="text-xs sm:text-sm text-green-300">
                                 {sessionContext.length} context{sessionContext.length !== 1 ? 's' : ''}
                             </span>
                         </div>
@@ -264,14 +282,15 @@ const InterviewCopilotPage = () => {
                         onClick={() => setShowHelpModal(true)} 
                         variant="outline" 
                         size="sm"
-                        className="flex items-center gap-2"
+                        className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3"
                     >
-                        <HelpCircle className="w-4 h-4" />
-                        Help
+                        <HelpCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="hidden sm:inline">Help</span>
                     </Button>
-                    <Button onClick={toggleCapture} variant={isCapturing ? "destructive" : "default"} className="w-[160px]">
-                        {isCapturing ? <MonitorOff className="w-5 h-5 mr-2" /> : <Monitor className="w-5 h-5 mr-2" />}
-                        {isCapturing ? 'Stop Capture' : 'Start Capture'}
+                    <Button onClick={toggleCapture} variant={isCapturing ? "destructive" : "default"} className="text-xs sm:text-sm px-2 sm:px-4">
+                        {isCapturing ? <MonitorOff className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" /> : <Monitor className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />}
+                        {isCapturing ? 'Stop' : 'Start'}
+                        <span className="hidden sm:inline ml-1"> Capture</span>
                     </Button>
                 </div>
             </header>
@@ -499,18 +518,18 @@ const InterviewCopilotPage = () => {
             )}
 
             {captureError && (
-                <div className={`p-4 rounded-lg mb-4 text-center ${
+                <div className={`p-3 sm:p-4 rounded-lg mb-4 text-center ${
                     captureError.type === 'warning' 
                         ? 'text-yellow-300 bg-yellow-900/50 border border-yellow-700' 
                         : 'text-red-400 bg-red-900/50 border border-red-800'
                 }`}>
                     <div className="flex items-center justify-center gap-2">
                         {captureError.type === 'warning' ? (
-                            <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                            <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" />
                         ) : (
-                            <AlertTriangle className="w-5 h-5 text-red-400" />
+                            <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
                         )}
-                        <span>{captureError.message}</span>
+                        <span className="text-sm sm:text-base">{captureError.message}</span>
                     </div>
                     <div className="mt-3 flex justify-center gap-2">
                         <Button 
@@ -536,70 +555,126 @@ const InterviewCopilotPage = () => {
                 </div>
             )}
 
-            <div ref={containerRef} className="flex-grow flex gap-6 min-h-0">
-                <div className="bg-gray-800 rounded-lg shadow-lg flex flex-col h-[calc(100vh-80px)]" style={{width: `${leftPanelWidth}%`}}>
-                    <div className="p-4 border-b border-gray-700 flex-shrink-0">
-                        <h2 className="text-xl font-semibold text-blue-300">Live Transcription</h2>
+            {/* Mobile Layout (Stack vertically) */}
+            <div className="flex-grow flex flex-col lg:hidden gap-3 min-h-0">
+                {/* Mobile: AI Suggestion Box (Top Priority) */}
+                <div className="h-[45%] bg-gray-800 rounded-lg shadow-lg flex flex-col min-h-0">
+                    <div className="p-3 border-b border-gray-700 flex-shrink-0">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-lg font-semibold text-green-300">AI Suggestion BOX</h2>
                         <div className="text-xs text-gray-400 mt-1">
-                            Transcripts: {transcripts.length} • Context: {sessionContext.length}
-                            {isCapturing && tabStream && tabStream.getAudioTracks().length === 0 && (
-                                <span className="ml-2 text-yellow-400">• No audio - transcription disabled</span>
+                                    <span className="hidden sm:inline">Interviewer questions only • Context memory • Two-stage responses • Manual override</span>
+                                    <span className="sm:hidden">Smart AI Ready</span>
+                                    {isStage2Loading && (
+                                        <div className="flex items-center text-blue-400 mt-1">
+                                            <Zap className="w-3 h-3 mr-1" />
+                                            <span>Stage 2 enhancing...</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            {isLoadingSuggestions && (
+                                <div className="flex items-center text-gray-400">
+                                    <Loader className="w-4 h-4 mr-1 animate-spin" />
+                                    <span className="text-xs">Loading...</span>
+                                </div>
                             )}
                         </div>
                     </div>
-                    <div className="flex-grow p-4 space-y-4 overflow-y-auto">
-                        {transcripts.length === 0 && (
-                            <div className="text-gray-400 text-center py-8">
-                                No transcripts yet. Start speaking...
+                    <div className="flex-grow p-3 space-y-3 overflow-y-auto">
+                        {aiError && (
+                            <div className="bg-red-900/50 border border-red-800 p-3 rounded-lg">
+                                <div className="flex items-center text-red-300">
+                                    <AlertTriangle className="w-4 h-4 mr-2" />
+                                    <span className="text-sm">{aiError}</span>
+                                </div>
                             </div>
                         )}
-                        {transcripts.map((block) => {
-                            const isUser = block.speaker === 'You';
-                            return (
-                                <div key={block.id} className={`flex items-start gap-3 ${isUser ? 'justify-end' : ''}`}>
-                                    {!isUser && <UserIcon className="w-5 h-5 text-gray-400 mt-1 flex-shrink-0" />}
-                                    <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
-                                        <div className={`p-3 rounded-lg max-w-md ${isUser ? 'bg-blue-600' : 'bg-gray-700'}`}>
-                                            <span className="font-semibold block text-sm">{block.speaker}</span>
-                                            <p className="text-gray-200 whitespace-pre-wrap">{block.text}</p>
-                                        </div>
-                                    </div>
-                                    {isUser && <UserIcon className="w-5 h-5 text-blue-300 mt-1 flex-shrink-0" />}
-                                </div>
-                            );
-                        })}
                         
+                        {suggestions.length === 0 && !isLoadingSuggestions && !aiError && (
+                            <div className="text-gray-400 text-center py-6">
+                                <BrainCircuit className="w-12 h-12 mx-auto mb-4 text-gray-600" />
+                                <h3 className="text-lg font-medium text-gray-300 mb-2">Smart AI Ready</h3>
+                                <p className="text-sm leading-relaxed">
+                                    AI will automatically respond to any meaningful interviewer speech.<br />
+                                    Your responses won't trigger AI - only client speech will.
+                                </p>
+                                        </div>
+                        )}
+                        
+                        {suggestions.map((s, i) => (
+                            <div key={i} className="bg-gray-700 p-4 rounded-lg">
+                                <h4 className="font-bold text-base flex items-center mb-3">
+                                    <BrainCircuit className="w-5 h-5 mr-2 text-green-400" />
+                                    {s.type}
+                                </h4>
+                                <div className="max-h-64 overflow-y-auto text-sm leading-relaxed">
+                                    <CodeHighlighter content={s.content} />
+                                </div>
+                            </div>
+                        ))}
+                        
+                        <div ref={aiSuggestionsEndRef} />
+                    </div>
+                </div>
+
+                {/* Mobile: Video Component */}
+                <div className="h-[30%] bg-black rounded-lg overflow-hidden flex items-center justify-center relative min-h-0">
+                    <video 
+                        ref={mobileVideoRef} 
+                        autoPlay 
+                        muted 
+                        playsInline={true}
+                        className="w-full h-full object-contain" 
+                        style={{ maxWidth: '100%', maxHeight: '100%' }}
+                    />
+                    {!isCapturing && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-gray-500 p-3">
+                            <Monitor size={32} className="mb-2" />
+                            <h3 className="text-sm font-semibold text-gray-300 mb-1">Interview Copilot</h3>
+                            <p className="text-xs mb-2">Click 'Start Capture' to begin.</p>
+                        </div>
+                    )}
+                    {/* Debug info for mobile */}
+                    {isCapturing && !tabStream && (
+                        <div className="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-1 rounded">
+                            No stream
+                        </div>
+                    )}
+                    {isCapturing && tabStream && (
+                        <div className="absolute top-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                            Stream active
+                        </div>
+                    )}
+                </div>
+
+                {/* Mobile: Input and Transcription Combined */}
+                <div className="h-[25%] bg-gray-800 rounded-lg shadow-lg flex flex-col min-h-0">
+                    {/* Input Section */}
+                    <div className="p-2 border-b border-gray-700">
                         {userOverride && (
-                            <div className="flex items-start gap-3 justify-end">
-                                <div className="flex flex-col items-end">
-                                    <div className="p-3 rounded-lg max-w-md bg-green-600 relative">
+                            <div className="mb-2 p-2 rounded-lg bg-green-600 relative">
                                         <button
                                             onClick={() => setUserOverride(null)}
-                                            className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
                                         >
-                                            <X className="w-3 h-3 text-white" />
+                                    <X className="w-2 h-2 text-white" />
                                         </button>
-                                        <span className="font-semibold block text-sm">User Override</span>
-                                        <p className="text-gray-200 whitespace-pre-wrap">{userOverride.text}</p>
-                                    </div>
-                                </div>
-                                <MessageSquare className="w-5 h-5 text-green-300 mt-1 flex-shrink-0" />
+                                <span className="font-semibold block text-xs">User Override</span>
+                                <p className="text-gray-200 text-xs">{userOverride.text}</p>
                             </div>
                         )}
                         
-                         <div ref={transcriptEndRef} />
-                    </div>
-                    
-                    <div className="p-4 border-t border-gray-700 flex-shrink-0">
                         <form onSubmit={handleUserInput} className="flex gap-2">
                             <input
                                 ref={inputRef}
                                 type="text"
                                 value={userInput}
                                 onChange={(e) => setUserInput(e.target.value)}
-                                placeholder={isCapturing ? "🔧 Manual Override: Type question to force AI suggestions..." : "Start capture first to enable manual override"}
+                                placeholder={isCapturing ? "Type question..." : "Start capture first"}
                                 disabled={!isCapturing}
-                                className={`flex-1 px-3 py-2 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                className={`flex-1 px-2 py-1 border rounded text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
                                     isCapturing 
                                         ? 'bg-gray-700 border-gray-600' 
                                         : 'bg-gray-800 border-gray-700 cursor-not-allowed opacity-50'
@@ -609,23 +684,182 @@ const InterviewCopilotPage = () => {
                                 type="submit" 
                                 size="sm" 
                                 disabled={!userInput.trim() || !isCapturing}
-                                className="px-3 py-2"
+                                className="px-2 py-1"
                             >
-                                <Send className="w-4 h-4" />
+                                <Send className="w-3 h-3" />
                             </Button>
                         </form>
-                        <div className="text-xs text-gray-500 mt-2">
-                            {isCapturing 
-                                ? "🔧 Manual Override: Force AI suggestions by typing a question (bypasses auto-detection)"
-                                : "Manual override will be available once you start capturing"
-                            }
+                    </div>
+
+                    {/* Transcription Section */}
+                    <div className="flex-grow p-2 overflow-y-auto">
+                        <div className="text-xs text-gray-400 mb-2">
+                            Live Transcription • {transcripts.length} transcripts
+                        </div>
+                        <div className="space-y-2">
+                            {transcripts.length === 0 && (
+                                <div className="text-gray-400 text-center py-4 text-xs">
+                                    No transcripts yet. Start speaking...
+                                </div>
+                            )}
+                            {transcripts.slice(-3).map((block) => {
+                                const isUser = block.speaker === 'You';
+                                return (
+                                    <div key={block.id} className={`flex items-start gap-1 ${isUser ? 'justify-end' : ''}`}>
+                                        {!isUser && <UserIcon className="w-3 h-3 text-gray-400 mt-1 flex-shrink-0" />}
+                                        <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+                                            <div className={`p-2 rounded max-w-xs ${isUser ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                                                <span className="font-semibold block text-xs">{block.speaker}</span>
+                                                <p className="text-gray-200 text-xs">{block.text}</p>
+                                            </div>
+                                        </div>
+                                        {isUser && <UserIcon className="w-3 h-3 text-blue-300 mt-1 flex-shrink-0" />}
+                                    </div>
+                                );
+                            })}
+                            <div ref={transcriptEndRef} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Desktop Layout (Side by side) */}
+            <div ref={containerRef} className="hidden lg:flex flex-grow gap-4 min-h-0 w-full overflow-hidden">
+                {/* Left Column - 3 panels stacked */}
+                <div className="flex flex-col gap-4 min-h-0 h-[calc(100vh-80px)] overflow-hidden" style={{width: `${leftPanelWidth}%`}}>
+                    {/* Top Left: Interview Copilot Component (Video) */}
+                    <div className="h-[45%] bg-black rounded-lg overflow-hidden flex items-center justify-center relative min-h-0">
+                        <video ref={videoRef} autoPlay muted className="w-full h-full object-contain" />
+                        {!isCapturing && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-gray-500 p-1 xl:p-2 2xl:p-4 overflow-y-auto">
+                                <Monitor size={24} className="mb-1 xl:mb-2 2xl:mb-3 flex-shrink-0" />
+                                <h3 className="text-xs xl:text-sm 2xl:text-lg font-semibold text-gray-300 mb-1 xl:mb-2 flex-shrink-0">Interview Copilot</h3>
+                                <p className="text-xs xl:text-sm mb-1 xl:mb-2 2xl:mb-3 flex-shrink-0 px-1 leading-tight">Click 'Start Capture' to begin detection.</p>
+                                
+                                {/* Highly Responsive Smart AI Features Card */}
+                                <div className="bg-blue-900/50 border border-blue-700 rounded-lg p-1 xl:p-2 2xl:p-3 w-full max-w-[200px] xl:max-w-[280px] 2xl:max-w-sm overflow-hidden mx-auto">
+                                    <h4 className="text-blue-300 font-semibold mb-1 xl:mb-2 text-xs 2xl:text-sm">🤖 Smart AI Features:</h4>
+                                    
+                                    {/* Compact version for very small screens */}
+                                    <div className="xl:hidden">
+                                        <div className="text-xs text-blue-200 space-y-0.5 leading-tight">
+                                            <div className="break-words">🎯 Smart Detection</div>
+                                            <div className="break-words">🚫 Silent on Your Responses</div>
+                                            <div className="break-words">⚡ Two-Stage Responses</div>
+                                            <div className="break-words">🧠 Context Memory</div>
+                                            <div className="break-words">🔧 Manual Override</div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Full version for larger screens */}
+                                    <ul className="hidden xl:block text-xs text-blue-200 space-y-0.5 xl:space-y-1 text-left leading-tight">
+                                        <li className="break-words">🎯 <strong>Smart Detection:</strong> <span className="hidden 2xl:inline">AI responds to question words and meaningful client speech</span><span className="2xl:hidden">AI responds to questions</span></li>
+                                        <li className="break-words">🚫 <strong>Silent on Your Responses:</strong> <span className="hidden 2xl:inline">No interference when you speak</span><span className="2xl:hidden">No interference</span></li>
+                                        <li className="break-words">⚡ <strong>Two-Stage Responses:</strong> <span className="hidden 2xl:inline">Instant (0.2s) + Detailed (3-8s)</span><span className="2xl:hidden">Instant + Detailed</span></li>
+                                        <li className="break-words">🧠 <strong>Context Memory:</strong> <span className="hidden 2xl:inline">Remembers previous questions for better follow-ups</span><span className="2xl:hidden">Remembers context</span></li>
+                                        <li className="break-words">🔧 <strong>Manual Override:</strong> <span className="hidden 2xl:inline">Force AI suggestions anytime</span><span className="2xl:hidden">Force suggestions</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Middle Left: Chatbox (User Input) - Highly Responsive */}
+                    <div className="h-[15%] bg-gray-800 rounded-lg shadow-lg flex flex-col min-h-0 overflow-hidden">
+                        <div className="p-1 xl:p-2 2xl:p-3 border-b border-gray-700 flex-shrink-0">
+                            <div className="text-xs text-gray-400 truncate">
+                                <span className="hidden xl:inline">Manual Override • Force AI suggestions</span>
+                                <span className="xl:hidden">Manual Override</span>
+                            </div>
+                        </div>
+                        <div className="flex-grow p-1 xl:p-2 2xl:p-2 flex flex-col justify-center min-h-0">
+                            <form onSubmit={handleUserInput} className="flex gap-1 xl:gap-2 min-h-0 w-full">
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    value={userInput}
+                                    onChange={(e) => setUserInput(e.target.value)}
+                                    placeholder={isCapturing ? "Type question..." : "Start capture..."}
+                                    disabled={!isCapturing}
+                                    className={`flex-1 px-1 xl:px-2 2xl:px-3 py-1 xl:py-2 border rounded text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent text-xs xl:text-sm min-w-0 ${
+                                        isCapturing 
+                                            ? 'bg-gray-700 border-gray-600' 
+                                            : 'bg-gray-800 border-gray-700 cursor-not-allowed opacity-50'
+                                    }`}
+                                />
+                                <Button 
+                                    type="submit" 
+                                    disabled={!userInput.trim() || !isCapturing}
+                                    className="px-1 xl:px-2 2xl:px-3 py-1 xl:py-2 flex-shrink-0 h-auto"
+                                >
+                                    <Send className="w-3 h-3 xl:w-4 xl:h-4" />
+                                </Button>
+                            </form>
+                        </div>
+                    </div>
+
+                    {/* Bottom Left: Live Transcription */}
+                    <div className="h-[40%] bg-gray-800 rounded-lg shadow-lg flex flex-col min-h-0 overflow-hidden">
+                        <div className="p-1 xl:p-2 2xl:p-3 border-b border-gray-700 flex-shrink-0">
+                            <h2 className="text-xs xl:text-sm 2xl:text-lg font-semibold text-blue-300">Live Transcription</h2>
+                            <div className="text-xs text-gray-400 mt-1 truncate">
+                                <span className="hidden xl:inline">Transcripts: {transcripts.length} • Context: {sessionContext.length}</span>
+                                <span className="xl:hidden">Transcripts: {transcripts.length}</span>
+                                {isCapturing && tabStream && tabStream.getAudioTracks().length === 0 && (
+                                    <span className="ml-2 text-yellow-400 hidden xl:inline">• No audio</span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex-grow p-1 xl:p-2 2xl:p-3 space-y-1 xl:space-y-2 2xl:space-y-3 overflow-y-auto">
+                            {transcripts.length === 0 && (
+                                <div className="text-gray-400 text-center py-2 xl:py-4 2xl:py-6 text-xs">
+                                    No transcripts yet. Start speaking...
+                                </div>
+                            )}
+                            
+                            {transcripts.map((block) => {
+                                const isUser = block.speaker === 'You';
+                                return (
+                                    <div key={block.id} className={`flex items-start gap-1 xl:gap-2 ${isUser ? 'justify-end' : ''}`}>
+                                        {!isUser && <UserIcon className="w-3 h-3 xl:w-4 xl:h-4 text-gray-400 mt-1 flex-shrink-0" />}
+                                        <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} min-w-0`}>
+                                            <div className={`p-1 xl:p-1.5 2xl:p-2 rounded max-w-[80%] ${isUser ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                                                <span className="font-semibold block text-xs">{block.speaker}</span>
+                                                <p className="text-gray-200 text-xs xl:text-sm break-words">{block.text}</p>
+                                            </div>
+                                        </div>
+                                        {isUser && <UserIcon className="w-3 h-3 xl:w-4 xl:h-4 text-blue-300 mt-1 flex-shrink-0" />}
+                                    </div>
+                                );
+                            })}
+                            
+                            {/* User Override Block - appears after transcripts */}
+                            {userOverride && (
+                                <div className="flex items-start gap-1 xl:gap-2 justify-end">
+                                    <div className="flex flex-col items-end min-w-0">
+                                        <div className="p-1 xl:p-1.5 2xl:p-2 rounded max-w-[80%] bg-green-600 relative">
+                                            <button
+                                                onClick={() => setUserOverride(null)}
+                                                className="absolute -top-1 -right-1 xl:-top-2 xl:-right-2 w-3 h-3 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors flex-shrink-0"
+                                            >
+                                                <X className="w-1.5 h-1.5 xl:w-2 xl:h-2 2xl:w-3 2xl:h-3 text-white" />
+                                            </button>
+                                            <span className="font-semibold block text-xs">User Override</span>
+                                            <p className="text-gray-200 text-xs xl:text-sm break-words">{userOverride.text}</p>
+                                        </div>
+                                    </div>
+                                    <MessageSquare className="w-3 h-3 xl:w-4 xl:h-4 text-green-300 mt-1 flex-shrink-0" />
+                                </div>
+                            )}
+                            
+                            <div ref={transcriptEndRef} />
                         </div>
                     </div>
                 </div>
 
-                {/* Resizable divider */}
+                {/* Resizable divider - Desktop only */}
                 <div 
-                    className="w-1 bg-gray-600 hover:bg-blue-500 cursor-col-resize transition-colors relative group" 
+                    className="w-1 bg-gray-600 hover:bg-blue-500 cursor-col-resize transition-colors relative group flex-shrink-0" 
                     onMouseDown={handleMouseDown}
                     title="Drag to resize panels"
                 >
@@ -635,87 +869,67 @@ const InterviewCopilotPage = () => {
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-6 min-h-0 h-[calc(100vh-80px)]" style={{width: `${100 - leftPanelWidth - 1}%`}}>
-                    <div className="h-[40%] bg-black rounded-lg overflow-hidden flex items-center justify-center relative min-h-0">
-                        <video ref={videoRef} autoPlay muted className="w-full h-full object-contain" />
-                        {!isCapturing && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-gray-500 p-4">
-                                <Monitor size={64} className="mb-4" />
-                                <h3 className="text-xl font-semibold text-gray-300 mb-2">Smart Interview Copilot</h3>
-                                <p className="text-sm mb-4">Click 'Start Capture' to begin intelligent question detection.</p>
-                                <div className="bg-blue-900/50 border border-blue-700 rounded-lg p-4 max-w-md">
-                                    <h4 className="text-blue-300 font-semibold mb-2">🤖 Smart AI Features:</h4>
-                                    <ul className="text-xs text-blue-200 space-y-1 text-left">
-                                        <li>🎯 <strong>Smart Detection:</strong> AI responds to question words and meaningful client speech</li>
-                                        <li>🚫 <strong>Silent on Your Responses:</strong> No interference when you speak</li>
-                                        <li>⚡ <strong>Two-Stage Responses:</strong> Instant (0.2s) + Detailed (3-8s)</li>
-                                        <li>🧠 <strong>Context Memory:</strong> Remembers previous questions for better follow-ups</li>
-                                        <li>🔧 <strong>Manual Override:</strong> Force AI suggestions anytime</li>
-                                    </ul>
+                {/* Right Side: AI Suggestion Box (Largest Component) - Desktop */}
+                <div className="bg-gray-800 rounded-lg shadow-lg flex flex-col h-[calc(100vh-80px)] min-h-0 overflow-hidden" style={{width: `${100 - leftPanelWidth - 1}%`}}>
+                    <div className="p-4 border-b border-gray-700 flex-shrink-0">
+                        <div className="flex items-center justify-between">
+                            <div className="min-w-0 flex-1">
+                                <h2 className="text-2xl font-semibold text-green-300">AI Suggestion BOX</h2>
+                                <div className="text-sm text-gray-400 mt-1 flex items-center gap-4">
+                                    <span className="truncate">Interviewer questions only • Context memory • Two-stage responses • Manual override</span>
+                                    {isStage2Loading && (
+                                        <div className="flex items-center text-blue-400 flex-shrink-0">
+                                            <Zap className="w-4 h-4 mr-1" />
+                                            <span>Stage 2 enhancing...</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            {isLoadingSuggestions && (
+                                <div className="flex items-center text-gray-400 flex-shrink-0">
+                                    <Loader className="w-5 h-5 mr-2 animate-spin" />
+                                    <span className="text-sm">Stage 1 generating...</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex-grow p-4 space-y-4 overflow-y-auto">
+                        
+                        {aiError && (
+                            <div className="bg-red-900/50 border border-red-800 p-4 rounded-lg">
+                                <div className="flex items-center text-red-300">
+                                    <AlertTriangle className="w-5 h-5 mr-2" />
+                                    <span className="text-base">{aiError}</span>
                                 </div>
                             </div>
                         )}
-                    </div>
-                    <div className="h-[calc(60%-24px)] bg-gray-800 rounded-lg shadow-lg flex flex-col min-h-0">
-                        <div className="p-4 border-b border-gray-700">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h2 className="text-xl font-semibold text-green-300">Smart AI Suggestions</h2>
-                                    <div className="text-xs text-gray-400 mt-1 flex items-center gap-4">
-                                        <span>Interviewer questions only • Context memory • Two-stage responses • Manual override</span>
-                                        {isStage2Loading && (
-                                            <div className="flex items-center text-blue-400">
-                                                <Zap className="w-3 h-3 mr-1" />
-                                                <span>Stage 2 enhancing...</span>
-                                            </div>
-                                        )}
-                                    </div>
+                        
+                        {suggestions.length === 0 && !isLoadingSuggestions && !aiError && (
+                            <div className="text-gray-400 text-center py-8">
+                                <BrainCircuit className="w-12 h-12 mx-auto mb-4 text-gray-600" />
+                                <h3 className="text-xl font-medium text-gray-300 mb-3">Smart AI Ready</h3>
+                                <div className="text-sm text-gray-400">
+                                    AI will automatically respond to any meaningful interviewer speech.<br />
+                                    Your responses won't trigger AI - only client speech will.<br />
+                                    Use manual input below to override when needed.
                                 </div>
-                                {isLoadingSuggestions && (
-                                    <div className="flex items-center text-gray-400">
-                                        <Loader className="w-4 h-4 mr-2 animate-spin" />
-                                        <span className="text-sm">Stage 1 generating...</span>
-                                    </div>
-                                )}
                             </div>
-                        </div>
-                        <div className="flex-grow p-4 space-y-4 overflow-y-auto">
-                            
-                            {aiError && (
-                                <div className="bg-red-900/50 border border-red-800 p-3 rounded-lg">
-                                    <div className="flex items-center text-red-300">
-                                        <AlertTriangle className="w-4 h-4 mr-2" />
-                                        <span className="text-sm">{aiError}</span>
-                                    </div>
+                        )}
+                        
+                        {suggestions.map((s, i) => (
+                            <div key={i} className="bg-gray-700 p-4 rounded-lg overflow-hidden">
+                                <h4 className="font-bold text-xl flex items-center mb-3">
+                                    <BrainCircuit className="w-5 h-5 mr-2 text-green-400" />
+                                    <span className="truncate">{s.type}</span>
+                                </h4>
+                                <div className="overflow-y-auto text-lg leading-relaxed">
+                                    <CodeHighlighter content={s.content} />
                                 </div>
-                            )}
-                            
-                            {suggestions.length === 0 && !isLoadingSuggestions && !aiError && (
-                                <div className="text-gray-400 text-center py-8">
-                                    <BrainCircuit className="w-12 h-12 mx-auto mb-4 text-gray-600" />
-                                    <h3 className="text-lg font-medium text-gray-300 mb-2">Smart AI Ready</h3>
-                                                            <p className="text-sm">
-                            AI will automatically respond to any meaningful interviewer speech.
-                            <br />
-                            Your responses won't trigger AI - only client speech will.
-                            <br />
-                            Use manual input below to override when needed.
-                        </p>
-                                </div>
-                            )}
-                            
-                            {suggestions.map((s, i) => (
-                                <div key={i} className="bg-gray-700 p-4 rounded-lg">
-                                    <h4 className="font-bold text-lg flex items-center mb-3">
-                                        <BrainCircuit className="w-5 h-5 mr-2 text-green-400" />
-                                        {s.type}
-                                    </h4>
-                                    <div className="max-h-96 overflow-y-auto">
-                                        <CodeHighlighter content={s.content} />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                            </div>
+                        ))}
+                        
+                        {/* Auto-scroll anchor */}
+                        <div ref={aiSuggestionsEndRef} />
                     </div>
                 </div>
             </div>

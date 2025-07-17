@@ -2,6 +2,7 @@
 import React from 'react'
 import Header from './_components/Header'
 import Sidebar from './_components/Sidebar'
+import MobileNavigation from './_components/MobileNavigation'
 import { usePathname } from 'next/navigation'
 import { SessionProvider } from "next-auth/react"
 import { Toaster } from "@/components/ui/toaster"
@@ -33,10 +34,14 @@ function DashboardLayout({ children }) {
                 {/* Content area with sidebar */}
                 <div className="flex">
                     <Sidebar />
-                    <div className={`w-full md:ml-64 ${isInterviewHistoryPage() ? 'bg-[#0d1526]' : ''}`}>
+                    <div className={`w-full md:ml-64 ${isInterviewHistoryPage() ? 'bg-[#0d1526]' : ''} pb-20 md:pb-0`}>
                         {children}
                     </div>
                 </div>
+                
+                {/* Mobile Navigation */}
+                <MobileNavigation />
+                
                 <Toaster />
             </div>
         </SessionProvider>
