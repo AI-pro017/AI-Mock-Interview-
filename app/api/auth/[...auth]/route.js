@@ -1,7 +1,7 @@
 import { handlers } from "@/auth"
 
-// Force dynamic rendering for this route
-export const dynamic = 'force-dynamic';
+// Remove this line - it's breaking OAuth
+// export const dynamic = 'force-dynamic';
 
 // Export the handlers
 export const { GET, POST } = handlers; 
