@@ -18,72 +18,69 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      profile(profile) {
-        return {
-          id: profile.sub,
-          name: profile.name,
-          email: profile.email,
-          image: profile.picture,
-          experienceLevel: null,
-          targetRoles: null,
-          resumeUrl: null,
-          timezone: null,
-        }
-      },
     }),
     Credentials({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" }
+      },
       async authorize(credentials) {
-        if (!credentials.email || !credentials.password) {
-          return null;
+        if (!credentials?.email || !credentials?.password) {
+          return null
         }
 
-        const userResult = await db.select().from(users).where(eq(users.email, credentials.email)).limit(1);
-        const user = userResult[0];
+        try {
+          const user = await db.select().from(users).where(eq(users.email, credentials.email)).limit(1)
+          
+          if (user.length === 0) {
+            return null
+          }
 
-        if (!user || !user.passwordHash) {
-          return null;
-        }
-        
-        if (!user.emailVerified) {
-          return null;
-        }
-        
-        const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
+          const foundUser = user[0]
+          
+          if (!foundUser.password) {
+            return null
+          }
 
-        if (!isValid) {
-          return null;
-        }
+          const isPasswordValid = await bcrypt.compare(credentials.password, foundUser.password)
+          
+          if (!isPasswordValid) {
+            return null
+          }
 
-        return user;
+          return {
+            id: foundUser.id,
+            email: foundUser.email,
+            name: foundUser.name,
+          }
+        } catch (error) {
+          console.error("Auth error:", error)
+          return null
+        }
       }
     })
   ],
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.experienceLevel = user.experienceLevel;
-        token.targetRoles = user.targetRoles;
-        token.resumeUrl = user.resumeUrl;
-        token.timezone = user.timezone;
+        token.id = user.id
       }
-      return token;
+      return token
     },
     async session({ session, token }) {
-      if (token && session.user) {
-        session.user.id = token.id;
-        session.user.experienceLevel = token.experienceLevel;
-        session.user.targetRoles = token.targetRoles;
-        session.user.resumeUrl = token.resumeUrl;
-        session.user.timezone = token.timezone;
+      if (token) {
+        session.user.id = token.id
       }
-      return session;
+      return session
     },
   },
-  session: {
-    strategy: "jwt",
-  },
   pages: {
-    signIn: '/sign-in',
+    signIn: '/auth/login',
+    signUp: '/auth/register',
   },
 }) 

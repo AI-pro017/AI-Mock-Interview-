@@ -10,6 +10,16 @@ const nextConfig = {
             },
         ],
     },
+    experimental: {
+        serverComponentsExternalPackages: ['bcryptjs'],
+    },
+    webpack: (config, { isServer }) => {
+        if (isServer) {
+            config.externals.push('bcryptjs');
+        }
+        return config;
+    },
 };
 
 export default nextConfig;
+ 
