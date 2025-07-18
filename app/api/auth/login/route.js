@@ -7,56 +7,78 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(request) {
   try {
     const { email, password } = await request.json();
 
     if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+      return NextResponse.json(
+        { message: 'Email and password are required' },
+        { status: 400 }
+      );
     }
 
     // Find user by email
-    const user = await db.query.users.findFirst({ // Changed from Users to users
-      where: eq(users.email, email), // Changed from Users to users
-    });
+    const user = await db.select().from(users).where(eq(users.email, email));
 
-    if (!user) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    if (user.length === 0) {
+      return NextResponse.json(
+        { message: 'Invalid credentials' },
+        { status: 401 }
+      );
     }
+
+    const foundUser = user[0];
 
     // Check if user is verified
-    if (!user.verified) {
-      return NextResponse.json({ error: 'Please verify your email before logging in.' }, { status: 403 });
+    if (!foundUser.emailVerified) {
+      return NextResponse.json(
+        { 
+          message: 'Please verify your email before signing in',
+          requiresVerification: true 
+        },
+        { status: 403 }
+      );
     }
 
-    // Compare password
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, foundUser.password);
+
     if (!isPasswordValid) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+      return NextResponse.json(
+        { message: 'Invalid credentials' },
+        { status: 401 }
+      );
     }
 
     // Generate session token
     const sessionToken = crypto.randomBytes(32).toString('hex');
-    const sessionExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-    // Store session token in database
-    await db.update(users) // Changed from Users to users
-      .set({ sessionToken: sessionToken })
-      .where(eq(users.id, user.id)); // Changed from Users to users
-
+    
     // Set session cookie
-    cookies().set('auth-token', sessionToken, {
+    cookies().set('session-token', sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      expires: sessionExpiry,
-      path: '/',
       sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
-    return NextResponse.json({ success: true, message: 'Logged in successfully' });
+    return NextResponse.json({
+      message: 'Sign in successful',
+      user: {
+        id: foundUser.id,
+        email: foundUser.email,
+        name: foundUser.name
+      }
+    });
 
   } catch (error) {
-    console.error('Login API Error:', error);
-    return NextResponse.json({ error: 'Failed to login' }, { status: 500 });
+    console.error('Sign in error:', error);
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

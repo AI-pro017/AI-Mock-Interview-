@@ -4,46 +4,45 @@ import { MockInterview, InterviewReport } from '@/utils/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '@/auth';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function GET(req) {
   const session = await auth();
-
-  if (!session || !session.user || !session.user.email) {
+  
+  if (!session?.user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const userEmail = session.user.email;
-    
-    // Fetch all interviews created by the current user
-    const interviews = await db.select()
-      .from(MockInterview)
-      .where(eq(MockInterview.createdBy, userEmail))
-      .orderBy(MockInterview.createdAt, 'desc'); // Show the newest first
-
-    // Fetch report data for each interview
-    const interviewsWithReports = await Promise.all(
-      interviews.map(async (interview) => {
-        // Get the report data if it exists
-        const reports = await db.select()
-          .from(InterviewReport)
-          .where(eq(InterviewReport.mockIdRef, interview.mockId));
-        
-        const report = reports.length > 0 ? reports[0] : null;
-        
-        return {
-          ...interview,
-          report
-        };
+    const interviews = await db
+      .select({
+        mockId: MockInterview.mockId,
+        jobPosition: MockInterview.jobPosition,
+        jobDesc: MockInterview.jobDesc,
+        jobExperience: MockInterview.jobExperience,
+        createdAt: MockInterview.createdAt,
+        rating: InterviewReport.rating,
+        feedback: InterviewReport.feedback,
+        overallFeedback: InterviewReport.overallFeedback,
       })
-    );
+      .from(MockInterview)
+      .leftJoin(InterviewReport, eq(MockInterview.mockId, InterviewReport.mockInterviewId))
+      .where(eq(MockInterview.createdBy, session.user.email))
+      .orderBy(MockInterview.createdAt);
 
-    return NextResponse.json(interviewsWithReports);
+    // Group by mockId to handle potential duplicates
+    const groupedInterviews = interviews.reduce((acc, interview) => {
+      const existing = acc.find(item => item.mockId === interview.mockId);
+      if (!existing) {
+        acc.push(interview);
+      }
+      return acc;
+    }, []);
 
+    return NextResponse.json(groupedInterviews);
   } catch (error) {
     console.error('Error fetching interview history:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch interview history' }, 
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch interview history' }, { status: 500 });
   }
 } 

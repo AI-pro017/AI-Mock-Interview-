@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { stripe } from '@/utils/stripe';
 import { SubscriptionService } from '@/utils/subscriptionService';
 import { db } from '@/utils/db';
-import { subscriptionPlans } from '@/utils/schema';
+import { subscriptionPlans, userSubscriptions } from '@/utils/schema';
 import { eq } from 'drizzle-orm';
 
 export async function POST(req) {
@@ -21,6 +21,8 @@ export async function POST(req) {
     console.error('Webhook signature verification failed:', err.message);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
+
+  console.log('Webhook received:', event.type, event.id);
 
   try {
     switch (event.type) {
@@ -51,8 +53,17 @@ export async function POST(req) {
 }
 
 async function handleCheckoutCompleted(session) {
+  console.log('Processing checkout completed:', session.id);
+  
   const userId = session.metadata.userId;
   const planName = session.metadata.planName;
+
+  if (!userId || !planName) {
+    console.error('Missing metadata in checkout session:', { userId, planName });
+    return;
+  }
+
+  console.log('User ID:', userId, 'Plan Name:', planName);
 
   // Get plan details
   const plan = await db
@@ -66,22 +77,33 @@ async function handleCheckoutCompleted(session) {
     return;
   }
 
+  console.log('Plan found:', plan[0]);
+
   // Get subscription details from Stripe
   const subscription = await stripe.subscriptions.retrieve(session.subscription);
+  console.log('Stripe subscription:', subscription.id, subscription.status);
 
   // Create or update subscription in database
-  await SubscriptionService.createOrUpdateSubscription(userId, plan[0].id, {
+  const success = await SubscriptionService.createOrUpdateSubscription(userId, plan[0].id, {
     customerId: session.customer,
     subscriptionId: session.subscription,
     status: subscription.status,
     currentPeriodStart: new Date(subscription.current_period_start * 1000),
     currentPeriodEnd: new Date(subscription.current_period_end * 1000),
   });
+
+  if (success) {
+    console.log('Subscription created/updated successfully for user:', userId);
+  } else {
+    console.error('Failed to create/update subscription for user:', userId);
+  }
 }
 
 async function handleSubscriptionUpdated(subscription) {
+  console.log('Processing subscription updated:', subscription.id);
+  
   // Update subscription status in database
-  await db
+  const result = await db
     .update(userSubscriptions)
     .set({
       status: subscription.status,
@@ -91,9 +113,13 @@ async function handleSubscriptionUpdated(subscription) {
       updatedAt: new Date(),
     })
     .where(eq(userSubscriptions.stripeSubscriptionId, subscription.id));
+
+  console.log('Subscription updated in database:', result);
 }
 
 async function handleSubscriptionDeleted(subscription) {
+  console.log('Processing subscription deleted:', subscription.id);
+  
   // Update subscription status to canceled
   await db
     .update(userSubscriptions)
@@ -105,6 +131,8 @@ async function handleSubscriptionDeleted(subscription) {
 }
 
 async function handlePaymentSucceeded(invoice) {
+  console.log('Processing payment succeeded:', invoice.id);
+  
   // Update subscription status if needed
   if (invoice.subscription) {
     await db
@@ -118,6 +146,8 @@ async function handlePaymentSucceeded(invoice) {
 }
 
 async function handlePaymentFailed(invoice) {
+  console.log('Processing payment failed:', invoice.id);
+  
   // Update subscription status to past_due
   if (invoice.subscription) {
     await db

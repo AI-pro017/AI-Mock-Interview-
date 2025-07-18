@@ -4,6 +4,9 @@ import { UserProfile, WorkHistory, Education, Certifications } from '@/utils/sch
 import { eq } from 'drizzle-orm';
 import { auth } from '@/auth';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   try {
     const session = await auth();
@@ -14,35 +17,46 @@ export async function GET(request) {
 
     const userEmail = session.user.email;
 
-    // Find the user profile
-    const userProfiles = await db.select().from(UserProfile).where(eq(UserProfile.email, userEmail));
-    
-    if (!userProfiles || userProfiles.length === 0) {
-      return NextResponse.json(null); // No profile found
+    // Fetch user profile
+    const userProfile = await db
+      .select()
+      .from(UserProfile)
+      .where(eq(UserProfile.userEmail, userEmail))
+      .limit(1);
+
+    if (userProfile.length === 0) {
+      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
-    
-    const userProfile = userProfiles[0];
-    
-    // Find work history
-    const workHistory = await db.select().from(WorkHistory).where(eq(WorkHistory.userProfileId, userProfile.id));
-    
-    // Find education
-    const education = await db.select().from(Education).where(eq(Education.userProfileId, userProfile.id));
-    
-    // Find certifications
-    const certifications = await db.select().from(Certifications).where(eq(Certifications.userProfileId, userProfile.id));
-    
-    // Combine everything into a single response
-    const completeProfile = {
-      ...userProfile,
+
+    const profile = userProfile[0];
+
+    // Fetch work history
+    const workHistory = await db
+      .select()
+      .from(WorkHistory)
+      .where(eq(WorkHistory.userEmail, userEmail));
+
+    // Fetch education
+    const education = await db
+      .select()
+      .from(Education)
+      .where(eq(Education.userEmail, userEmail));
+
+    // Fetch certifications
+    const certifications = await db
+      .select()
+      .from(Certifications)
+      .where(eq(Certifications.userEmail, userEmail));
+
+    return NextResponse.json({
+      profile,
       workHistory,
       education,
-      certifications,
-    };
-    
-    return NextResponse.json(completeProfile);
+      certifications
+    });
+
   } catch (error) {
     console.error('Error fetching user full profile:', error);
-    return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -4,130 +4,157 @@ import { UserProfile, WorkHistory, Education, Certifications } from '@/utils/sch
 import { eq } from 'drizzle-orm';
 import { auth } from '@/auth';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email');
 
   if (!email) {
-    return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+    return NextResponse.json({ error: 'Email parameter is required' }, { status: 400 });
   }
 
   try {
-    // Find the user profile
-    const userProfiles = await db.select().from(UserProfile).where(eq(UserProfile.email, email));
-    
-    if (!userProfiles || userProfiles.length === 0) {
-      return NextResponse.json(null); // No profile found
+    // Fetch user profile
+    const userProfile = await db
+      .select()
+      .from(UserProfile)
+      .where(eq(UserProfile.userEmail, email))
+      .limit(1);
+
+    if (userProfile.length === 0) {
+      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
-    
-    const userProfile = userProfiles[0];
-    
-    // Find work history
-    const workHistory = await db.select().from(WorkHistory).where(eq(WorkHistory.userProfileId, userProfile.id));
-    
-    // Find education
-    const education = await db.select().from(Education).where(eq(Education.userProfileId, userProfile.id));
-    
-    // Find certifications
-    const certifications = await db.select().from(Certifications).where(eq(Certifications.userProfileId, userProfile.id));
-    
-    // Combine everything into a single response
-    const completeProfile = {
-      ...userProfile,
+
+    const profile = userProfile[0];
+
+    // Fetch work history
+    const workHistory = await db
+      .select()
+      .from(WorkHistory)
+      .where(eq(WorkHistory.userEmail, email));
+
+    // Fetch education
+    const education = await db
+      .select()
+      .from(Education)
+      .where(eq(Education.userEmail, email));
+
+    // Fetch certifications
+    const certifications = await db
+      .select()
+      .from(Certifications)
+      .where(eq(Certifications.userEmail, email));
+
+    return NextResponse.json({
+      profile,
       workHistory,
       education,
-      certifications,
-    };
-    
-    return NextResponse.json(completeProfile);
+      certifications
+    });
+
   } catch (error) {
     console.error('Error fetching profile:', error);
-    return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function POST(request) {
   try {
     const session = await auth();
-
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const data = await request.json();
+    const {
+      firstName,
+      lastName,
+      phoneNumber,
+      address,
+      jobTitle,
+      jobDescription,
+      jobExperience,
+      workHistory,
+      education,
+      certifications
+    } = data;
+
     const userEmail = session.user.email;
-    const formData = await request.json();
 
-    // Step 1: Find or create the user profile
-    let userProfile = await db
-      .select()
-      .from(UserProfile)
-      .where(eq(UserProfile.email, userEmail))
-      .then(profiles => profiles[0]);
-
-    if (!userProfile) {
-      // Create a new user profile
-      [userProfile] = await db
+    // Start a transaction
+    await db.transaction(async (tx) => {
+      // Insert or update user profile
+      await tx
         .insert(UserProfile)
         .values({
-          email: userEmail,
-          fullName: formData.fullName,
-          phoneNumber: formData.phoneNumber,
-          professionalTitle: formData.professionalTitle,
-          locationCity: formData.location?.city,
-          locationCountry: formData.location?.country,
-          yearsOfExperience: formData.yearsOfExperience,
-          professionalSummary: formData.professionalSummary,
-          skills: Array.isArray(formData.skills) ? formData.skills.join(', ') : formData.skills,
-          hobbiesInterests: formData.hobbiesInterests,
+          firstName,
+          lastName,
+          userEmail,
+          phoneNumber,
+          address,
+          jobTitle,
+          jobDescription,
+          jobExperience,
+          createdAt: new Date(),
+          updatedAt: new Date()
         })
-        .returning();
-    } else {
-      // Update existing profile
-      await db
-        .update(UserProfile)
-        .set({
-          fullName: formData.fullName,
-          phoneNumber: formData.phoneNumber,
-          professionalTitle: formData.professionalTitle,
-          locationCity: formData.location?.city,
-          locationCountry: formData.location?.country,
-          yearsOfExperience: formData.yearsOfExperience,
-          professionalSummary: formData.professionalSummary,
-          skills: Array.isArray(formData.skills) ? formData.skills.join(', ') : formData.skills,
-          hobbiesInterests: formData.hobbiesInterests,
-        })
-        .where(eq(UserProfile.email, userEmail));
-    }
+        .onConflictDoUpdate({
+          target: UserProfile.userEmail,
+          set: {
+            firstName,
+            lastName,
+            phoneNumber,
+            address,
+            jobTitle,
+            jobDescription,
+            jobExperience,
+            updatedAt: new Date()
+          }
+        });
 
-    const userProfileId = userProfile.id;
+      // Delete existing work history and insert new ones
+      await tx.delete(WorkHistory).where(eq(WorkHistory.userEmail, userEmail));
+      if (workHistory && workHistory.length > 0) {
+        await tx.insert(WorkHistory).values(
+          workHistory.map(work => ({
+            ...work,
+            userEmail,
+            createdAt: new Date()
+          }))
+        );
+      }
 
-    // Step 2: Handle Work History
-    await db.delete(WorkHistory).where(eq(WorkHistory.userProfileId, userProfileId));
-    if (formData.workHistory?.length > 0) {
-      await db.insert(WorkHistory).values(
-        formData.workHistory.map(item => ({ ...item, userProfileId }))
-      );
-    }
+      // Delete existing education and insert new ones
+      await tx.delete(Education).where(eq(Education.userEmail, userEmail));
+      if (education && education.length > 0) {
+        await tx.insert(Education).values(
+          education.map(edu => ({
+            ...edu,
+            userEmail,
+            createdAt: new Date()
+          }))
+        );
+      }
 
-    // Step 3: Handle Education
-    await db.delete(Education).where(eq(Education.userProfileId, userProfileId));
-    if (formData.education?.length > 0) {
-      await db.insert(Education).values(
-        formData.education.map(item => ({ ...item, userProfileId }))
-      );
-    }
-    
-    // Step 4: Handle Certifications
-    await db.delete(Certifications).where(eq(Certifications.userProfileId, userProfileId));
-    if (formData.certifications?.length > 0) {
-      await db.insert(Certifications).values(
-        formData.certifications.map(item => ({ ...item, userProfileId }))
-      );
-    }
+      // Delete existing certifications and insert new ones
+      await tx.delete(Certifications).where(eq(Certifications.userEmail, userEmail));
+      if (certifications && certifications.length > 0) {
+        await tx.insert(Certifications).values(
+          certifications.map(cert => ({
+            ...cert,
+            userEmail,
+            createdAt: new Date()
+          }))
+        );
+      }
+    });
 
-    return NextResponse.json({ success: true, message: 'Profile updated successfully' });
+    return NextResponse.json({ message: 'Profile saved successfully' });
+
   } catch (error) {
-    console.error('Failed to update profile:', error);
-    return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+    console.error('Error saving profile:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

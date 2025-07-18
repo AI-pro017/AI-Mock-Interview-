@@ -1,6 +1,9 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
     try {
         const session = await auth();
@@ -18,23 +21,23 @@ export async function GET() {
                     allowed: false,
                     error: 'Subscription limit reached',
                     reason: subscriptionCheck.reason,
-                    upgradeRequired: true
-                }, { status: 403 });
+                    currentUsage: subscriptionCheck.currentUsage,
+                    limit: subscriptionCheck.limit,
+                    plan: subscriptionCheck.plan
+                });
             }
 
-            return NextResponse.json({
+            return NextResponse.json({ 
                 allowed: true,
-                subscription: subscriptionCheck.subscription,
-                usage: subscriptionCheck.usage
+                currentUsage: subscriptionCheck.currentUsage,
+                limit: subscriptionCheck.limit,
+                plan: subscriptionCheck.plan
             });
-        } catch (error) {
-            console.error('Error checking copilot limits:', error);
-            // If subscription service fails, allow usage (fallback)
-            return NextResponse.json({
-                allowed: true,
-                subscription: null,
-                usage: null
-            });
+
+        } catch (middlewareError) {
+            console.error('Subscription middleware error:', middlewareError);
+            // Allow access if middleware fails
+            return NextResponse.json({ allowed: true });
         }
 
     } catch (error) {

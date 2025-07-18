@@ -71,6 +71,49 @@ export class SubscriptionService {
     }
   }
 
+  // Create or update user subscription
+  static async createOrUpdateSubscription(userId, planId, subscriptionData) {
+    try {
+      // Check if user already has a subscription
+      const existingSubscription = await db
+        .select()
+        .from(userSubscriptions)
+        .where(eq(userSubscriptions.userId, userId))
+        .limit(1);
+
+      const subscriptionRecord = {
+        userId,
+        planId,
+        stripeCustomerId: subscriptionData.customerId,
+        stripeSubscriptionId: subscriptionData.subscriptionId,
+        status: subscriptionData.status,
+        currentPeriodStart: subscriptionData.currentPeriodStart,
+        currentPeriodEnd: subscriptionData.currentPeriodEnd,
+        cancelAtPeriodEnd: subscriptionData.cancelAtPeriodEnd || false,
+        updatedAt: new Date(),
+      };
+
+      if (existingSubscription[0]) {
+        // Update existing subscription
+        await db
+          .update(userSubscriptions)
+          .set(subscriptionRecord)
+          .where(eq(userSubscriptions.userId, userId));
+      } else {
+        // Create new subscription
+        await db.insert(userSubscriptions).values({
+          ...subscriptionRecord,
+          createdAt: new Date(),
+        });
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error creating/updating subscription:', error);
+      return false;
+    }
+  }
+
   // Get user's usage for current billing period
   static async getUserUsage(userId, subscriptionId) {
     try {

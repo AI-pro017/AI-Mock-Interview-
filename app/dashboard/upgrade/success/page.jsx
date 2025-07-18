@@ -1,28 +1,31 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
-export default function SuccessPage() {
+function SuccessPageContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [subscription, setSubscription] = useState(null);
-  const sessionId = searchParams.get('session_id');
+  const { toast } = useToast();
 
   useEffect(() => {
+    const sessionId = searchParams.get('session_id');
     if (sessionId) {
-      // Give webhook time to process
-      setTimeout(() => {
-        fetchSubscription();
-      }, 2000);
+      fetchSubscriptionData();
+    } else {
+      setLoading(false);
     }
-  }, [sessionId]);
+  }, [searchParams]);
 
-  const fetchSubscription = async () => {
+  const fetchSubscriptionData = async () => {
     try {
       const response = await fetch('/api/subscriptions/current');
       if (response.ok) {
@@ -36,39 +39,87 @@ export default function SuccessPage() {
     }
   };
 
+  const handleSyncSubscription = async () => {
+    setSyncing(true);
+    try {
+      const response = await fetch('/api/subscriptions/sync-stripe', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Subscription Synced!",
+          description: "Your subscription has been updated successfully.",
+        });
+        await fetchSubscriptionData();
+        window.location.reload(); // Refresh to update header
+      } else {
+        throw new Error('Failed to sync subscription');
+      }
+    } catch (error) {
+      console.error('Error syncing subscription:', error);
+      toast({
+        title: "Sync Failed",
+        description: "Please try again or contact support if the issue persists.",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-300">Processing your subscription...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full bg-gray-800 border-gray-700">
-        <CardHeader className="text-center">
-          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <CardTitle className="text-2xl font-bold text-white">
-            Welcome to {subscription?.plan?.displayName || 'Premium'}!
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md text-center">
+        <CardHeader>
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+            <CheckCircle className="h-8 w-8 text-green-600" />
+          </div>
+          <CardTitle className="text-2xl font-bold text-gray-900">
+            Payment Successful!
           </CardTitle>
-          <CardDescription className="text-gray-300">
-            Your subscription has been activated successfully.
+          <CardDescription className="text-gray-600">
+            {subscription?.plan?.displayName 
+              ? `Welcome to ${subscription.plan.displayName}! Your subscription is now active.`
+              : "Your payment has been processed successfully."
+            }
           </CardDescription>
         </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <div className="bg-gray-700 p-4 rounded-lg">
-            <h3 className="font-semibold text-white mb-2">What's Next?</h3>
-            <ul className="text-sm text-gray-300 space-y-1">
-              <li>• Start unlimited mock interviews</li>
-              <li>• Get advanced AI feedback</li>
-              <li>• Track your progress over time</li>
-              <li>• Access premium features</li>
-            </ul>
-          </div>
+        <CardContent className="space-y-4">
+          {!subscription?.plan && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800 mb-3">
+                If your subscription doesn't appear immediately, please sync your account:
+              </p>
+              <Button 
+                onClick={handleSyncSubscription}
+                disabled={syncing}
+                variant="outline"
+                size="sm"
+                className="w-full"
+              >
+                {syncing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Sync Subscription
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
           
           <div className="space-y-2">
             <Button asChild className="w-full">
@@ -78,12 +129,24 @@ export default function SuccessPage() {
             </Button>
             <Button asChild variant="outline" className="w-full">
               <Link href="/dashboard/interview">
-                Start Your First Interview
+                Start Mock Interview
               </Link>
             </Button>
           </div>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    }>
+      <SuccessPageContent />
+    </Suspense>
   );
 }
