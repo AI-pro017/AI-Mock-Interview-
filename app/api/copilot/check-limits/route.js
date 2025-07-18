@@ -1,6 +1,9 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
+// Add this line to fix the dynamic server usage error
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
     try {
         const session = await auth();

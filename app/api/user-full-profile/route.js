@@ -4,6 +4,9 @@ import { UserProfile, WorkHistory, Education, Certifications } from '@/utils/sch
 import { eq } from 'drizzle-orm';
 import { auth } from '@/auth';
 
+// Add this line to fix the dynamic server usage error
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   try {
     const session = await auth();

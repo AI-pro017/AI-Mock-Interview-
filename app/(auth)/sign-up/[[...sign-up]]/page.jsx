@@ -1,4 +1,4 @@
-// AI-Mock-Interview-/app/(auth)/sign-up/page.jsx
+// AI-Mock-Interview-/app/(auth)/sign-up/[[...sign-up]]/page.jsx  // Corrected path
 'use client';
 
 import { useState } from 'react';
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FaGoogle } from 'react-icons/fa';
 
-export default function SignUpPage() {
+export default function Page() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
