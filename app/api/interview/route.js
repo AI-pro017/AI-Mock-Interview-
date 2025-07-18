@@ -11,7 +11,6 @@ const openai = new OpenAI({
 });
 
 export async function POST(req) {
-
     try {
         const session = await auth();
         if (!session?.user?.id) {
@@ -19,7 +18,6 @@ export async function POST(req) {
         }
 
         const body = await req.json();
-
         const { 
             jobRole, jobDescription, jobExperience, industry, skills, 
             difficulty, focus, duration, interviewStyle, interviewMode 
@@ -27,6 +25,49 @@ export async function POST(req) {
 
         if (!jobRole || !jobExperience) {
             return NextResponse.json({ error: 'Job role and experience are required' }, { status: 400 });
+        }
+
+        // Check subscription limits (with fallback for users without subscriptions)
+        let subscriptionInfo = null;
+        try {
+            const { SubscriptionService } = await import('@/utils/subscriptionService');
+            const subscriptionCheck = await SubscriptionService.canStartSession(session.user.id, 'mock_interview');
+            
+            if (!subscriptionCheck.canStart) {
+                return NextResponse.json({ 
+                    error: 'Subscription limit reached',
+                    reason: subscriptionCheck.reason,
+                    upgradeRequired: true
+                }, { status: 403 });
+            }
+            
+            subscriptionInfo = subscriptionCheck;
+            
+            // Check duration limits based on subscription
+            const maxDuration = subscriptionCheck.subscription?.plan?.mockSessionDuration;
+            if (maxDuration && duration > maxDuration) {
+                return NextResponse.json({ 
+                    error: `Duration exceeds plan limit of ${maxDuration} minutes`,
+                    maxDuration,
+                    upgradeRequired: true
+                }, { status: 403 });
+            }
+        } catch (error) {
+            console.log('Subscription service not available, allowing interview creation');
+            // If subscription service fails, allow interview creation (fallback to free tier)
+            subscriptionInfo = {
+                allowed: true,
+                subscription: {
+                    plan: {
+                        displayName: 'Free',
+                        mockSessionsLimit: 2,
+                        mockSessionDuration: 10
+                    }
+                },
+                usage: {
+                    mock_interview: { count: 0, totalDuration: 0 }
+                }
+            };
         }
 
         const toolSchema = {
@@ -54,54 +95,73 @@ export async function POST(req) {
             }
         };
 
-        const prompt = `Generate 5 interview questions for a ${jobRole} with ${jobExperience} years of experience.
-${jobDescription ? `Job Description: ${jobDescription}` : ''}
-The questions should focus on ${focus} aspects and be at a ${difficulty} difficulty level.`;
+        const prompt = `Generate ${difficulty} level interview questions for a ${jobRole} position with ${jobExperience} years of experience. 
+        
+        Job Description: ${jobDescription}
+        Industry: ${industry}
+        Required Skills: ${skills}
+        Interview Focus: ${focus}
+        Interview Style: ${interviewStyle}
+        Interview Mode: ${interviewMode}
+        
+        Generate 5-7 relevant questions with detailed expected answers.`;
 
         const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [{ role: "user", content: prompt }],
+            model: "gpt-3.5-turbo",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are an expert interview coach. Generate relevant interview questions with comprehensive answers."
+                },
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ],
             tools: [toolSchema],
-            tool_choice: { type: "function", function: { name: "generate_interview_questions" } },
+            tool_choice: { type: "function", function: { name: "generate_interview_questions" } }
         });
-        
-        
+
         const toolCall = response.choices[0].message.tool_calls[0];
-        if (!toolCall) {
-            throw new Error("[DIAGNOSTIC] CRITICAL: OpenAI response did not include a tool call.");
-        }
+        const questions = JSON.parse(toolCall.function.arguments).questions;
 
-        const functionArguments = toolCall.function.arguments;
-        const parsedResult = JSON.parse(functionArguments);
+        const mockId = uuidv4();
 
-        if (!parsedResult.questions || parsedResult.questions.length === 0) {
-             throw new Error("[DIAGNOSTIC] CRITICAL: AI tool call succeeded but generated no questions.");
-        }
-
-        const jsonMockResponse = JSON.stringify(parsedResult.questions);
-        const interviewId = uuidv4();
-        
-        await db.insert(MockInterview).values({
-            mockId: interviewId,
+        const result = await db.insert(MockInterview).values({
+            mockId: mockId,
             jobPosition: jobRole,
-            jobDesc: jsonMockResponse,
-            jobExperience: jobExperience.toString(),
-            industry: industry || '',
-            skills: skills || '',
-            difficulty: difficulty || 'Medium',
-            focus: focus || 'Behavioral',
-            duration: duration || 30,
-            interviewStyle: interviewStyle || 'Conversational',
-            interviewMode: interviewMode || 'Practice',
+            jobDesc: jobDescription,
+            jobExperience: jobExperience,
+            industry: industry,
+            skills: skills,
+            difficulty: difficulty,
+            focus: focus,
+            duration: duration,
+            interviewStyle: interviewStyle,
+            interviewMode: interviewMode,
             createdBy: session.user.email,
             createdAt: new Date().toISOString(),
         });
-        
-        return NextResponse.json({ success: true, interviewId });
+
+        // ✅ REMOVED: Don't track usage here - only track when user actually starts the interview
+        console.log('✅ Interview created (not tracked yet):', mockId);
+
+        return NextResponse.json({
+            mockId: mockId,
+            questions: questions,
+            subscription: subscriptionInfo ? {
+                plan: subscriptionInfo.subscription?.plan?.displayName || 'Free',
+                usage: subscriptionInfo.usage || { mock_interview: { count: 0, totalDuration: 0 } },
+                limits: {
+                    mockSessions: subscriptionInfo.subscription?.plan?.mockSessionsLimit || 2,
+                    duration: subscriptionInfo.subscription?.plan?.mockSessionDuration || 10
+                }
+            } : null
+        });
 
     } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+        console.error('Error creating interview:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
 

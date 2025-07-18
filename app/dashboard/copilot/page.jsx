@@ -8,13 +8,20 @@ import { useDeepgram } from './hooks/useDeepgram';
 import { useTranscriptManager } from './hooks/useTranscriptManager';
 import { useAI } from './hooks/useAI';
 import CodeHighlighter from './components/CodeHighlighter';
+import UpgradeModal from '@/components/ui/upgrade-modal';
+import { useRouter } from 'next/navigation';
 
 const InterviewCopilotPage = () => {
     const [deepgramToken, setDeepgramToken] = useState('');
     const [userInput, setUserInput] = useState('');
     const [userOverride, setUserOverride] = useState(null);
     const [showHelpModal, setShowHelpModal] = useState(false);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [upgradeReason, setUpgradeReason] = useState('');
     const [leftPanelWidth, setLeftPanelWidth] = useState(45); // percentage
+    const [sessionStartTime, setSessionStartTime] = useState(null);
+    const [sessionId, setSessionId] = useState(null);
+    const [sessionTracked, setSessionTracked] = useState(false);
     const videoRef = useRef(null);
     const mobileVideoRef = useRef(null); // Separate ref for mobile
     const transcriptEndRef = useRef(null);
@@ -23,6 +30,7 @@ const InterviewCopilotPage = () => {
     const inputRef = useRef(null);
     const containerRef = useRef(null);
     const isResizing = useRef(false);
+    const router = useRouter();
 
     const {
         micStream,
@@ -208,20 +216,17 @@ const InterviewCopilotPage = () => {
             return;
         }
         
-        // Create a unique key for this transcript state
-        const transcriptKey = `${lastBlock.id}-${lastBlock.text}-${transcripts.length}`;
-        
-        // Only generate suggestions if this is a new state we haven't processed yet
-        if (lastProcessedTranscriptRef.current !== transcriptKey) {
-            console.log(`Generating AI suggestions for client question: "${lastBlock.text.substring(0, 50)}..."`);
-            lastProcessedTranscriptRef.current = transcriptKey;
-            
-            // Generate context-aware suggestions with session history
-            generateSuggestions(lastBlock.text, transcripts.slice(-10));
-        } else {
-            console.log("Skipping AI generation - already processed this transcript");
+        // Skip if we've already processed this exact transcript
+        if (lastProcessedTranscriptRef.current === lastBlock.text) {
+            console.log("Skipping - already processed this transcript");
+            return;
         }
-    }, [transcripts, generateSuggestions, userOverride, isClientSpeaker, isQuestionBlock]);
+        
+        lastProcessedTranscriptRef.current = lastBlock.text;
+        
+        console.log(`✅ Generating AI suggestions for client question: "${lastBlock.text.substring(0, 50)}..."`);
+        generateSuggestions(lastBlock.text, transcripts);
+    }, [transcripts, userOverride, generateSuggestions]);
 
     // Add auto-scroll effect for AI suggestions
     useEffect(() => {
@@ -256,6 +261,164 @@ const InterviewCopilotPage = () => {
         document.body.style.userSelect = '';
     }, [handleMouseMove]);
 
+    // Track copilot usage
+    const trackCopilotUsage = useCallback(async (duration) => {
+        try {
+            await fetch('/api/copilot/track-usage', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    sessionId: sessionId,
+                    duration: Math.round(duration / 60) // Convert to minutes
+                })
+            });
+        } catch (error) {
+            console.error('Failed to track copilot usage:', error);
+        }
+    }, [sessionId]);
+
+    // Check subscription limits before starting
+    const checkSubscriptionLimits = useCallback(async () => {
+        try {
+            const response = await fetch('/api/copilot/check-limits');
+            if (response.ok) {
+                const data = await response.json();
+                return data;
+            } else {
+                const errorData = await response.json();
+                return {
+                    allowed: false,
+                    reason: errorData.reason || 'Subscription limit reached',
+                    upgradeRequired: errorData.upgradeRequired || false
+                };
+            }
+        } catch (error) {
+            console.error('Error checking subscription limits:', error);
+            // If check fails, allow usage (fallback)
+            return { allowed: true };
+        }
+    }, []);
+
+    // Force refresh subscription status
+    const refreshSubscriptionStatus = useCallback(() => {
+        // Trigger a re-render of the header by navigating to the same page
+        router.refresh();
+    }, [router]);
+
+    // Track copilot session start (only once)
+    const trackSessionStart = useCallback(async (sessionId) => {
+        try {
+            const response = await fetch('/api/copilot/track-usage', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    sessionId: sessionId,
+                    duration: 0
+                })
+            });
+
+            if (response.ok) {
+                console.log('✅ Copilot session start tracked:', sessionId);
+                // Refresh subscription status after tracking
+                setTimeout(refreshSubscriptionStatus, 500);
+            }
+        } catch (error) {
+            console.error('❌ Failed to track copilot session start:', error);
+        }
+    }, [refreshSubscriptionStatus]);
+
+    // Update session duration (not create new record)
+    const updateSessionDuration = useCallback(async (sessionId, duration) => {
+        try {
+            const response = await fetch('/api/copilot/update-usage', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    sessionId: sessionId,
+                    duration: duration
+                })
+            });
+
+            if (response.ok) {
+                console.log('✅ Copilot session duration updated:', sessionId, Math.round(duration / 60000), 'minutes');
+                // Refresh subscription status after updating
+                setTimeout(refreshSubscriptionStatus, 500);
+            }
+        } catch (error) {
+            console.error('❌ Failed to update copilot session duration:', error);
+        }
+    }, [refreshSubscriptionStatus]);
+
+    // Enhanced capture start with subscription check
+    const handleStartCapture = useCallback(async () => {
+        try {
+            console.log('🔍 Checking subscription limits...');
+            
+            // Check subscription limits first
+            const response = await checkSubscriptionLimits();
+            
+            if (!response.allowed) {
+                console.log('❌ Subscription limit reached:', response.reason);
+                setUpgradeReason(response.reason || 'You have reached your real-time help session limit.');
+                setShowUpgradeModal(true);
+                return;
+            }
+
+            console.log('✅ Subscription limits OK, starting session...');
+            
+            // Start session tracking
+            const newSessionId = `copilot_${Date.now()}`;
+            setSessionId(newSessionId);
+            setSessionStartTime(Date.now());
+            setSessionTracked(false);
+            
+            console.log('🚀 Starting copilot session:', newSessionId);
+            
+            await startCapture();
+            
+            // Track session start only once
+            if (!sessionTracked) {
+                await trackSessionStart(newSessionId);
+                setSessionTracked(true);
+            }
+            
+        } catch (error) {
+            console.error('❌ Error starting capture:', error);
+        }
+    }, [startCapture, checkSubscriptionLimits, trackSessionStart, sessionTracked]);
+
+    // Enhanced capture stop with duration update
+    const handleStopCapture = useCallback(async () => {
+        try {
+            await stopCapture();
+            
+            // Update session duration (don't create new record)
+            if (sessionStartTime && sessionId) {
+                const sessionDuration = Date.now() - sessionStartTime;
+                await updateSessionDuration(sessionId, sessionDuration);
+                
+                console.log('🛑 Ended copilot session. Duration:', Math.round(sessionDuration / 60000), 'minutes');
+            }
+            
+            // Reset session state
+            setSessionStartTime(null);
+            setSessionId(null);
+            setSessionTracked(false);
+            
+        } catch (error) {
+            console.error('❌ Error stopping capture:', error);
+        }
+    }, [stopCapture, updateSessionDuration, sessionStartTime, sessionId]);
+
+    // Remove periodic tracking - we only track start and update duration at end
+    // The periodic tracking was causing multiple records
+
     return (
         <div className="text-white h-full flex flex-col p-1 sm:p-2 lg:p-4 overflow-hidden">
             <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 flex-shrink-0 gap-2 sm:gap-3">
@@ -278,19 +441,49 @@ const InterviewCopilotPage = () => {
                         </div>
                     )}
                     
-                    <Button 
-                        onClick={() => setShowHelpModal(true)} 
-                        variant="outline" 
+                    {/* Session Timer */}
+                    {isCapturing && sessionStartTime && (
+                        <div className="flex items-center gap-1 sm:gap-2 bg-blue-900/30 border border-blue-700 rounded-lg px-2 sm:px-3 py-1">
+                            <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-blue-400" />
+                            <span className="text-xs text-blue-300">
+                                {Math.round((Date.now() - sessionStartTime) / 60000)}m
+                            </span>
+                        </div>
+                    )}
+                    
+                    {/* Help Button */}
+                    <Button
+                        onClick={() => setShowHelpModal(true)}
+                        variant="outline"
                         size="sm"
-                        className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3"
+                        className="bg-gray-800 border-gray-600 hover:bg-gray-700 text-white p-1 sm:p-2"
                     >
                         <HelpCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span className="hidden sm:inline">Help</span>
                     </Button>
-                    <Button onClick={toggleCapture} variant={isCapturing ? "destructive" : "default"} className="text-xs sm:text-sm px-2 sm:px-4">
-                        {isCapturing ? <MonitorOff className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" /> : <Monitor className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />}
-                        {isCapturing ? 'Stop' : 'Start'}
-                        <span className="hidden sm:inline ml-1"> Capture</span>
+                    
+                    {/* Main Control Button */}
+                    <Button
+                        onClick={isCapturing ? handleStopCapture : handleStartCapture}
+                        className={`text-xs sm:text-sm px-2 sm:px-4 py-1 sm:py-2 ${
+                            isCapturing 
+                                ? 'bg-red-600 hover:bg-red-700' 
+                                : 'bg-green-600 hover:bg-green-700'
+                        }`}
+                        disabled={!deepgramToken}
+                    >
+                        {isCapturing ? (
+                            <>
+                                <MonitorOff className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                <span className="hidden sm:inline">Stop Capture</span>
+                                <span className="sm:hidden">Stop</span>
+                            </>
+                        ) : (
+                            <>
+                                <Monitor className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                <span className="hidden sm:inline">Start Capture</span>
+                                <span className="sm:hidden">Start</span>
+                            </>
+                        )}
                     </Button>
                 </div>
             </header>
@@ -988,6 +1181,13 @@ const InterviewCopilotPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Upgrade Modal */}
+            <UpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                reason={upgradeReason}
+            />
         </div>
     );
 };

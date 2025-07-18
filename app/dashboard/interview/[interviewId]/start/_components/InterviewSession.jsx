@@ -30,6 +30,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const [cameraEnabled, setCameraEnabled] = useState(useCameraInInterview);
   const [interviewerGender, setInterviewerGender] = useState("random");
   const [interviewerIndustry, setInterviewerIndustry] = useState("random");
+  const [sessionTracked, setSessionTracked] = useState(false);
 
   const timerRef = useRef(null);
   const videoRef = useRef(null);
@@ -381,6 +382,39 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       setSelectedInterviewer(newInterviewer);
     }
   }, [interviewerGender, interviewerIndustry, isInterviewActive]);
+
+  // Track session start when interview becomes active (only once)
+  useEffect(() => {
+    if (isInterviewActive && !sessionTracked) {
+      trackInterviewStart();
+      setSessionTracked(true);
+    }
+  }, [isInterviewActive, sessionTracked]);
+
+  const trackInterviewStart = async () => {
+    try {
+      console.log('🚀 Tracking interview session start for:', interview.mockId);
+      
+      const response = await fetch('/api/interview/track-start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mockId: interview.mockId,
+          duration: interview.duration
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Interview session start tracked successfully');
+      } else {
+        console.error('❌ Failed to track interview start');
+      }
+    } catch (error) {
+      console.error('❌ Error tracking interview start:', error);
+    }
+  };
 
   return (
     <div className="bg-gray-900 text-white">

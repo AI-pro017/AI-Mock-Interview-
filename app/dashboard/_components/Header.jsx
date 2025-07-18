@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { Bell, UserCircle, LogOut, User } from 'lucide-react'
 import Link from 'next/link'
+import SubscriptionStatus from './SubscriptionStatus'
 
 function Header({ pageTitle }) {
     const { data: session } = useSession();
@@ -24,9 +25,9 @@ function Header({ pageTitle }) {
     }, [dropdownRef]);
 
     return (
-        <header className='w-full bg-[#111827] border-b border-gray-700 flex justify-between items-center sticky top-0 z-30'>
+        <header className='w-full h-16 bg-[#111827] border-b border-gray-700 flex items-center justify-between sticky top-0 z-30 px-4'>
             {/* Left side with logo and page title */}
-            <div className='flex items-center p-4'>
+            <div className='flex items-center gap-3'>
                 <Link href="/dashboard" className="flex items-center gap-3">
                     <Image
                         src="/favicon.jpg"
@@ -39,10 +40,15 @@ function Header({ pageTitle }) {
                 </Link>
             </div>
             
-            {/* Right side with notification and user profile */}
-            <div className='flex items-center gap-6 p-4 pr-6'>
+            {/* Right side with subscription status, notification and user profile */}
+            <div className='flex items-center gap-6'>
+                {/* Subscription Status */}
+                <SubscriptionStatus />
+                
+                {/* Notification */}
                 <Bell className='h-5 w-5 text-slate-400 hover:text-white cursor-pointer transition-colors' />
                 
+                {/* User Profile */}
                 <div className='relative' ref={dropdownRef}>
                     <button onClick={() => setDropdownOpen(!dropdownOpen)} className='flex items-center gap-3 focus:outline-none'>
                         <UserCircle className='h-8 w-8 text-slate-500' />

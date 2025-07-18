@@ -9,8 +9,11 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PRE_CONFIGURED_ROLES, INTERVIEW_STYLES, FOCUS_AREAS, DIFFICULTY_LEVELS, DURATION_OPTIONS, INTERVIEW_MODES } from '../_components/questions';
-import { useRouter } from 'next/navigation'; // Import the router
+import { useRouter } from 'next/navigation';
+import { AlertTriangle, Crown, Info } from 'lucide-react';
+import UpgradeModal from '@/components/ui/upgrade-modal';
 
 export default function NewInterviewPage() {
     const [selectedRole, setSelectedRole] = useState('');
@@ -25,13 +28,17 @@ export default function NewInterviewPage() {
     const [interviewStyle, setInterviewStyle] = useState('Conversational');
     const [interviewMode, setInterviewMode] = useState('Practice');
     const [loading, setLoading] = useState(false);
-    const router = useRouter(); // Initialize the router
+    const [error, setError] = useState(null);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [upgradeReason, setUpgradeReason] = useState('');
+    const router = useRouter();
 
     const showCustomRoleFields = selectedRole === 'custom';
 
     const onSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setError(null);
 
         try {
             const response = await fetch('/api/interview', {
@@ -54,29 +61,44 @@ export default function NewInterviewPage() {
             if (response.ok) {
                 const result = await response.json();
                 console.log("Interview created successfully:", result);
-                if (result.interviewId) {
-                    // This is the crucial part that was missing
-                    router.push(`/dashboard/interview/${result.interviewId}/start`);
+                
+                if (result.mockId) {
+                    console.log("✅ Redirecting to interview:", result.mockId);
+                    router.push(`/dashboard/interview/${result.mockId}/start`);
                 } else {
-                    alert("Failed to create interview. Please try again.");
+                    console.error("❌ No mockId in response:", result);
+                    setError("Failed to create interview. Please try again.");
                 }
             } else {
-                alert("An error occurred. Please try again.");
-                console.error("Failed to create interview");
+                const errorData = await response.json();
+                console.error("❌ API Error:", errorData);
+                
+                if (errorData.upgradeRequired) {
+                    setUpgradeReason(errorData.reason || 'You have reached your plan limit.');
+                    setShowUpgradeModal(true);
+                } else {
+                    setError(errorData.error || "An error occurred. Please try again.");
+                }
             }
         } catch (error) {
-            console.error("Error during interview creation:", error);
-            alert("An unexpected error occurred. Please check the console.");
+            console.error("❌ Error during interview creation:", error);
+            setError("An unexpected error occurred. Please check your internet connection and try again.");
         } finally {
             setLoading(false);
         }
     };
 
-
     return (
         <div className="p-10 bg-gray-900 min-h-screen text-white">
             <h2 className="font-bold text-3xl text-white">Let's Get Started</h2>
             <h3 className="text-gray-400 mt-2">Create a new mock interview session with your custom settings.</h3>
+
+            {error && (
+                <Alert className="mt-6 bg-red-900/20 border-red-700 text-red-300">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                </Alert>
+            )}
 
             <form onSubmit={onSubmit}>
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-10 mt-8'>
@@ -215,11 +237,21 @@ export default function NewInterviewPage() {
                 </div>
 
                 <div className='flex justify-end mt-10'>
-                    <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-all disabled:bg-gray-500">
+                    <Button 
+                        type="submit" 
+                        disabled={loading} 
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-all disabled:bg-gray-500"
+                    >
                         {loading ? 'Generating Interview...' : 'Start Interview'}
                     </Button>
                 </div>
             </form>
+
+            <UpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                reason={upgradeReason}
+            />
         </div>
     );
 }

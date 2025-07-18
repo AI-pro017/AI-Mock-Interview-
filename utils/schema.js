@@ -9,6 +9,7 @@ import {
   varchar,
   serial,
   boolean,
+  decimal,
 } from "drizzle-orm/pg-core"
 import { relations } from 'drizzle-orm'
 
@@ -189,4 +190,61 @@ export const userProfileRelations = relations(UserProfile, ({ many }) => ({
 	workHistory: many(WorkHistory),
 	education: many(Education),
     certifications: many(Certifications),
+}));
+
+// Subscription Tables
+export const subscriptionPlans = pgTable('subscription_plans', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 50 }).notNull().unique(), // 'freemium', 'starter', 'pro', 'unlimited'
+  displayName: varchar('display_name', { length: 100 }).notNull(),
+  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+  mockSessionsLimit: integer('mock_sessions_limit'), // null for unlimited
+  realTimeHelpLimit: integer('real_time_help_limit'), // null for unlimited
+  mockSessionDuration: integer('mock_session_duration'), // in minutes, null for unlimited
+  realTimeHelpDuration: integer('real_time_help_duration'), // in minutes, null for unlimited
+  features: text('features'), // JSON string of features
+  stripePriceId: varchar('stripe_price_id', { length: 255 }),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const userSubscriptions = pgTable('user_subscriptions', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  planId: integer('plan_id').notNull().references(() => subscriptionPlans.id),
+  stripeCustomerId: varchar('stripe_customer_id', { length: 255 }),
+  stripeSubscriptionId: varchar('stripe_subscription_id', { length: 255 }),
+  status: varchar('status', { length: 50 }).notNull().default('active'), // 'active', 'canceled', 'past_due', 'incomplete'
+  currentPeriodStart: timestamp('current_period_start'),
+  currentPeriodEnd: timestamp('current_period_end'),
+  cancelAtPeriodEnd: boolean('cancel_at_period_end').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const usageTracking = pgTable('usage_tracking', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  subscriptionId: integer('subscription_id').notNull().references(() => userSubscriptions.id, { onDelete: 'cascade' }),
+  sessionType: varchar('session_type', { length: 50 }).notNull(), // 'mock_interview', 'real_time_help'
+  sessionId: varchar('session_id', { length: 255 }).notNull(), // Reference to MockInterview.mockId or other session ID
+  duration: integer('duration'), // in minutes
+  usedAt: timestamp('used_at').defaultNow(),
+  billingMonth: varchar('billing_month', { length: 7 }).notNull(), // 'YYYY-MM' format
+});
+
+export const subscriptionRelations = relations(subscriptionPlans, ({ many }) => ({
+  userSubscriptions: many(userSubscriptions),
+}));
+
+export const userSubscriptionRelations = relations(userSubscriptions, ({ one, many }) => ({
+  user: one(users, { fields: [userSubscriptions.userId], references: [users.id] }),
+  plan: one(subscriptionPlans, { fields: [userSubscriptions.planId], references: [subscriptionPlans.id] }),
+  usageTracking: many(usageTracking),
+}));
+
+export const usageTrackingRelations = relations(usageTracking, ({ one }) => ({
+  user: one(users, { fields: [usageTracking.userId], references: [users.id] }),
+  subscription: one(userSubscriptions, { fields: [usageTracking.subscriptionId], references: [userSubscriptions.id] }),
 }));
