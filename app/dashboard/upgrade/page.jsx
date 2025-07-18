@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 
 const UpgradePage = () => {
-  const [loading, setLoading] = useState(false);
+  // Change from single loading state to individual loading states
+  const [loadingPlan, setLoadingPlan] = useState(null); // Track which plan is loading
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [usage, setUsage] = useState(null);
   const { toast } = useToast();
@@ -48,8 +49,8 @@ const UpgradePage = () => {
         '8 Real-Time Help Sessions per month',
         '30 min mock sessions, 60 min real-time',
         'Advanced AI Feedback',
-        'Industry-Specific Questions',
-        'Progress Tracking',
+        'Performance Analytics',
+        'Email Support',
       ],
       cta: 'Choose Starter',
       popular: false,
@@ -59,7 +60,7 @@ const UpgradePage = () => {
       displayName: 'Pro',
       price: '$65',
       priceSuffix: '/ month',
-      description: 'Best for serious interview preparation and career growth.',
+      description: 'Perfect for serious interview preparation.',
       mockSessions: '12/month',
       realTimeHelp: '10/month',
       maxDuration: '30 min (mock), 90 min (real-time)',
@@ -67,10 +68,10 @@ const UpgradePage = () => {
         '12 Mock Interview Sessions per month',
         '10 Real-Time Help Sessions per month',
         '30 min mock, 90 min real-time sessions',
-        'Premium AI Analysis',
-        'Custom Interview Scenarios',
-        'Detailed Performance Reports',
-        'Priority Support',
+        'Premium AI Feedback',
+        'Advanced Performance Analytics',
+        'Priority Email Support',
+        'Custom Question Banks',
       ],
       cta: 'Choose Pro',
       popular: true,
@@ -80,19 +81,20 @@ const UpgradePage = () => {
       displayName: 'Unlimited',
       price: '$99',
       priceSuffix: '/ month',
-      description: 'Ultimate solution for intensive preparation and coaching.',
+      description: 'For professionals who want unlimited access.',
       mockSessions: 'Unlimited',
       realTimeHelp: 'Unlimited',
       maxDuration: 'Unlimited',
       features: [
         'Unlimited Mock Interview Sessions',
         'Unlimited Real-Time Help Sessions',
-        'No time restrictions',
-        'Expert-Level AI Coaching',
-        'Personal Interview Coach',
-        'Custom Company Preparation',
-        'White-glove Support',
-        'API Access',
+        'Unlimited session duration',
+        'Premium AI Feedback with detailed insights',
+        'Comprehensive Performance Analytics',
+        'Priority Support',
+        'Custom Question Banks',
+        'Detailed Performance Reports',
+        'Priority Support',
       ],
       cta: 'Go Unlimited',
       popular: false,
@@ -125,7 +127,9 @@ const UpgradePage = () => {
       return;
     }
 
-    setLoading(true);
+    // Set loading state for specific plan
+    setLoadingPlan(planName);
+    
     try {
       const response = await fetch('/api/subscriptions/checkout', {
         method: 'POST',
@@ -139,27 +143,34 @@ const UpgradePage = () => {
         const data = await response.json();
         window.location.href = data.url;
       } else {
-        const error = await response.json();
+        const errorData = await response.json();
         toast({
-          title: "Error",
-          description: error.error || "Failed to create checkout session",
+          title: "Upgrade Failed",
+          description: errorData.error || "Something went wrong. Please try again.",
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error('Error creating checkout:', error);
+      console.error('Error upgrading:', error);
       toast({
-        title: "Error",
-        description: "An unexpected error occurred",
+        title: "Upgrade Failed",
+        description: "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      // Clear loading state
+      setLoadingPlan(null);
     }
   };
 
   const isCurrentPlan = (planName) => {
-    return currentSubscription?.plan?.name === planName;
+    const currentPlanName = currentSubscription?.plan?.name || 'freemium';
+    return currentPlanName === planName;
+  };
+
+  // Check if a specific plan is loading
+  const isPlanLoading = (planName) => {
+    return loadingPlan === planName;
   };
 
   const getUsageText = (sessionType) => {
@@ -180,24 +191,23 @@ const UpgradePage = () => {
   };
 
   return (
-    <div className="p-8 bg-gray-900 min-h-screen text-white">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-900 text-white">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
         <header className="text-center mb-12">
-          <h1 className="text-4xl font-bold tracking-tight text-white">
-            Choose Your Perfect Plan
-          </h1>
-          <p className="mt-4 text-lg text-gray-300">
-            Unlock advanced features and take your interview preparation to the next level.
+          <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
+          <p className="text-xl text-gray-400 mb-8">
+            Unlock your interview potential with our AI-powered platform
           </p>
+          
           {currentSubscription && (
-            <div className="mt-6 p-4 bg-gray-800 rounded-lg">
-              <p className="text-sm text-gray-300">
-                Current Plan: <span className="font-semibold text-white">{currentSubscription.plan.displayName}</span>
-              </p>
-              <div className="mt-2 text-xs text-gray-400">
-                <span className="mr-4">Mock Sessions: {getUsageText('mock_interview')}</span>
-                <span>Real-Time Help: {getUsageText('real_time_help')}</span>
-              </div>
+            <div className="inline-flex items-center bg-gray-800 rounded-full px-4 py-2 text-sm">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+              Currently on <span className="font-semibold ml-1">{currentSubscription.plan?.displayName || 'Freemium'}</span> plan
+              {usage && (
+                <div className="ml-4 text-gray-400">
+                  {usage.mock_interview?.count || 0} mock interviews, {usage.real_time_help?.count || 0} real-time sessions used this month
+                </div>
+              )}
             </div>
           )}
         </header>
@@ -251,32 +261,25 @@ const UpgradePage = () => {
                   Most Popular
                 </div>
               )}
-              <CardHeader className="flex-shrink-0">
-                <CardTitle className="text-xl font-bold text-white flex items-center justify-between">
-                  {plan.displayName}
-                  {isCurrentPlan(plan.name) && (
-                    <Badge className="bg-green-600 text-white text-xs">Current</Badge>
-                  )}
-                </CardTitle>
-                <CardDescription className="text-gray-300 text-sm">{plan.description}</CardDescription>
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl text-white">{plan.displayName}</CardTitle>
+                <div className="text-4xl font-bold text-white">
+                  {plan.price}
+                  <span className="text-lg font-normal text-gray-400">{plan.priceSuffix}</span>
+                </div>
+                <CardDescription className="text-gray-400">{plan.description}</CardDescription>
               </CardHeader>
               <CardContent className="flex-grow">
-                <div className="mb-6">
-                  <span className="text-3xl font-extrabold text-white">{plan.price}</span>
-                  <span className="text-base font-medium text-gray-400">{plan.priceSuffix}</span>
-                </div>
-                
-                {/* Quick Stats */}
-                <div className="mb-6 space-y-2">
-                  <div className="flex items-center text-sm text-gray-300">
+                <div className="grid grid-cols-1 gap-4 mb-6">
+                  <div className="flex items-center text-gray-300 text-sm">
                     <MessageSquare className="w-4 h-4 mr-2 text-blue-400" />
-                    <span>{plan.mockSessions} mock sessions</span>
+                    <span>{plan.mockSessions}</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-300">
+                  <div className="flex items-center text-gray-300 text-sm">
                     <Users className="w-4 h-4 mr-2 text-green-400" />
-                    <span>{plan.realTimeHelp} real-time help</span>
+                    <span>{plan.realTimeHelp}</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-300">
+                  <div className="flex items-center text-gray-300 text-sm">
                     <Clock className="w-4 h-4 mr-2 text-purple-400" />
                     <span>{plan.maxDuration}</span>
                   </div>
@@ -297,9 +300,9 @@ const UpgradePage = () => {
                   size="lg" 
                   variant={plan.popular ? 'default' : plan.isFreemium ? 'outline' : 'secondary'}
                   onClick={() => handleUpgrade(plan.name)}
-                  disabled={loading || isCurrentPlan(plan.name)}
+                  disabled={isPlanLoading(plan.name) || isCurrentPlan(plan.name)}
                 >
-                  {loading ? (
+                  {isPlanLoading(plan.name) ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Processing...
