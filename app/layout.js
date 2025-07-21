@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 
 import { Toaster } from "@/components/ui/sonner";
 import Provider from './Provider'
+import ChatAssistant from '@/components/ui/chat-assistant'
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -33,6 +34,7 @@ export default function RootLayout({ children }) {
         <Provider>
           <Toaster theme="dark" />
         {children}
+        <ChatAssistant />
         </Provider>
       </body>
     </html>
