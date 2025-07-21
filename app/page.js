@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from "next/image";
 import { ArrowRight, Bot, ShieldCheck, Zap, CheckCircle } from 'lucide-react';
 import { useEffect, useState } from "react"; // Import useEffect and useState
+import FirstTimeVisitModal from "@/components/ui/first-time-visit-modal"; // Add this import
 
 export default function Home() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -53,6 +54,9 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0d1526] text-gray-300">
+      {/* Add the First Time Visit Modal */}
+      <FirstTimeVisitModal />
+      
       {/* Navigation Bar */}
       <nav className="w-full py-4 px-6 md:px-12 bg-[#111827]/80 backdrop-blur-sm sticky top-0 z-50 border-b border-gray-700">
         <div className="container mx-auto flex justify-between items-center">
@@ -86,13 +90,13 @@ export default function Home() {
               Our AI-powered mock interviews help you practice, get instant
               feedback, and build the confidence you need to succeed.
             </p>
-            <a
-              href="/dashboard"
+            <Link
+              href="/sign-up"
               className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-white rounded-lg bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-800"
             >
                   Start Your Free Trial
               <ArrowRight className="w-5 h-5 ml-2 -mr-1" />
-            </a>
+            </Link>
           </div>
           <div className="hidden lg:mt-0 lg:col-span-5 lg:flex">
             <Image 
