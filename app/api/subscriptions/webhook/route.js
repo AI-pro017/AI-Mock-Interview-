@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { stripe } from '@/utils/stripe';
 import { SubscriptionService } from '@/utils/subscriptionService';
 import { db } from '@/utils/db';
-import { subscriptionPlans } from '@/utils/schema';
+import { subscriptionPlans, userSubscriptions } from '@/utils/schema';
 import { eq } from 'drizzle-orm';
 
 export async function POST(req) {
@@ -69,8 +69,8 @@ async function handleCheckoutCompleted(session) {
   // Get subscription details from Stripe
   const subscription = await stripe.subscriptions.retrieve(session.subscription);
 
-  // Create or update subscription in database
-  await SubscriptionService.createOrUpdateSubscription(userId, plan[0].id, {
+  // Create or update subscription in database using the corrected function call
+  await SubscriptionService.createOrUpdateUserSubscription(userId, plan[0].id, {
     customerId: session.customer,
     subscriptionId: session.subscription,
     status: subscription.status,

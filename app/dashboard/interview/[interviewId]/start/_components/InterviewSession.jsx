@@ -31,6 +31,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const [interviewerGender, setInterviewerGender] = useState("random");
   const [interviewerIndustry, setInterviewerIndustry] = useState("random");
   const [sessionTracked, setSessionTracked] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState(null); // Add this line
 
   const timerRef = useRef(null);
   const videoRef = useRef(null);
@@ -154,6 +155,28 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     }
   };
 
+  // Add this new function to update session duration
+  const updateInterviewDuration = async (mockId, duration) => {
+    try {
+      const response = await fetch('/api/interview/update-usage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mockId: mockId,
+          duration: duration
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Mock interview session duration updated:', mockId, Math.round(duration / 60000), 'minutes');
+      }
+    } catch (error) {
+      console.error('❌ Failed to update mock interview session duration:', error);
+    }
+  };
+
   const endInterview = async () => {
     setIsInterviewActive(false);
     
@@ -163,6 +186,13 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     }
     
     try {
+      // Update session duration before ending (add this block)
+      if (sessionStartTime) {
+        const sessionDuration = Date.now() - sessionStartTime;
+        await updateInterviewDuration(interview.mockId, sessionDuration);
+        console.log('🛑 Ended mock interview session. Duration:', Math.round(sessionDuration / 60000), 'minutes');
+      }
+
       // First shut down the interview engine and camera
       endConversation();
       
@@ -388,6 +418,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     if (isInterviewActive && !sessionTracked) {
       trackInterviewStart();
       setSessionTracked(true);
+      setSessionStartTime(Date.now()); // Add this line
     }
   }, [isInterviewActive, sessionTracked]);
 
@@ -402,17 +433,17 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
         },
         body: JSON.stringify({
           mockId: interview.mockId,
-          duration: interview.duration
-        })
+          duration: 0 // Initial duration, will be updated when interview ends
+        }),
       });
 
-      if (response.ok) {
-        console.log('✅ Interview session start tracked successfully');
+      if (!response.ok) {
+        console.warn('Failed to track interview start');
       } else {
-        console.error('❌ Failed to track interview start');
+        console.log('✅ Interview start tracked successfully');
       }
     } catch (error) {
-      console.error('❌ Error tracking interview start:', error);
+      console.error('Error tracking interview start:', error);
     }
   };
 

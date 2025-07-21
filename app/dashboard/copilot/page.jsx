@@ -411,6 +411,10 @@ const InterviewCopilotPage = () => {
             setSessionId(null);
             setSessionTracked(false);
             
+            // Force refresh the header subscription status
+            // Dispatch a custom event to notify the header component
+            window.dispatchEvent(new CustomEvent('subscriptionUpdated'));
+            
         } catch (error) {
             console.error('❌ Error stopping capture:', error);
         }

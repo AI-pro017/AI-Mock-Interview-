@@ -8,7 +8,8 @@ import { Crown, Check, X, Zap, Clock, Users, MessageSquare } from 'lucide-react'
 import { useRouter } from 'next/navigation';
 
 export default function UpgradeModal({ isOpen, onClose, currentPlan, reason }) {
-  const [loading, setLoading] = useState(false);
+  // Change from single loading state to track which plan is loading
+  const [loadingPlan, setLoadingPlan] = useState(null);
   const router = useRouter();
 
   const plans = [
@@ -65,7 +66,8 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan, reason }) {
   ];
 
   const handleUpgrade = async (planName) => {
-    setLoading(true);
+    // Set loading state for the specific plan
+    setLoadingPlan(planName);
     try {
       const response = await fetch('/api/subscriptions/checkout', {
         method: 'POST',
@@ -86,7 +88,8 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan, reason }) {
       console.error('Error creating checkout:', error);
       alert('An unexpected error occurred');
     } finally {
-      setLoading(false);
+      // Clear loading state
+      setLoadingPlan(null);
     }
   };
 
@@ -110,73 +113,88 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan, reason }) {
 
         <div className="mt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {plans.map((plan) => (
-              <div
-                key={plan.name}
-                className={`relative p-6 rounded-lg border ${
-                  plan.popular 
-                    ? 'border-primary bg-primary/5' 
-                    : 'border-gray-700 bg-gray-800'
-                }`}
-              >
-                {plan.popular && (
-                  <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground">
-                    Most Popular
-                  </Badge>
-                )}
-                
-                <div className="text-center mb-4">
-                  <h3 className="text-xl font-bold text-white">{plan.displayName}</h3>
-                  <div className="mt-2">
-                    <span className="text-3xl font-bold text-white">{plan.price}</span>
-                    <span className="text-gray-400">/month</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center text-sm text-gray-300">
-                    <MessageSquare className="w-4 h-4 mr-2 text-blue-400" />
-                    <span>{plan.mockSessions} mock sessions</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-300">
-                    <Users className="w-4 h-4 mr-2 text-green-400" />
-                    <span>{plan.realTimeHelp} real-time help</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-300">
-                    <Clock className="w-4 h-4 mr-2 text-purple-400" />
-                    <span>{plan.duration}</span>
-                  </div>
-                </div>
-
-                <ul className="space-y-2 mb-6">
-                  {plan.features.slice(0, 3).map((feature) => (
-                    <li key={feature} className="flex items-start text-sm text-gray-300">
-                      <Check className="w-4 h-4 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <Button
-                  onClick={() => handleUpgrade(plan.name)}
-                  disabled={loading}
-                  className={`w-full ${
+            {plans.map((plan) => {
+              // Check if this specific plan is loading
+              const isThisPlanLoading = loadingPlan === plan.name;
+              
+              return (
+                <div
+                  key={plan.name}
+                  className={`relative p-6 rounded-lg border ${
                     plan.popular 
-                      ? 'bg-primary hover:bg-primary/90' 
-                      : 'bg-gray-700 hover:bg-gray-600'
+                      ? 'border-primary bg-primary/5' 
+                      : 'border-gray-700 bg-gray-800'
                   }`}
                 >
-                  {loading ? 'Processing...' : `Choose ${plan.displayName}`}
-                </Button>
-              </div>
-            ))}
+                  {plan.popular && (
+                    <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground">
+                      Most Popular
+                    </Badge>
+                  )}
+                  
+                  <div className="text-center mb-4">
+                    <h3 className="text-xl font-bold text-white">{plan.displayName}</h3>
+                    <div className="mt-2">
+                      <span className="text-3xl font-bold text-white">{plan.price}</span>
+                      <span className="text-gray-400">/month</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center text-sm text-gray-300">
+                      <MessageSquare className="w-4 h-4 mr-2 text-blue-400" />
+                      <span>{plan.mockSessions} mock sessions</span>
+                    </div>
+                    <div className="flex items-center text-sm text-gray-300">
+                      <Users className="w-4 h-4 mr-2 text-green-400" />
+                      <span>{plan.realTimeHelp} real-time help</span>
+                    </div>
+                    <div className="flex items-center text-sm text-gray-300">
+                      <Clock className="w-4 h-4 mr-2 text-purple-400" />
+                      <span>{plan.duration}</span>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-2 mb-6">
+                    {plan.features.slice(0, 3).map((feature) => (
+                      <li key={feature} className="flex items-start text-sm text-gray-300">
+                        <Check className="w-4 h-4 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Button
+                    onClick={() => handleUpgrade(plan.name)}
+                    disabled={loadingPlan !== null} // Disable all buttons when any is loading
+                    className={`w-full ${
+                      plan.popular 
+                        ? 'bg-primary hover:bg-primary/90' 
+                        : 'bg-gray-700 hover:bg-gray-600'
+                    }`}
+                  >
+                    {isThisPlanLoading ? 'Processing...' : `Choose ${plan.displayName}`}
+                  </Button>
+                </div>
+              );
+            })}
           </div>
 
           <div className="mt-6 flex justify-center gap-4">
-            <Button variant="outline" onClick={handleViewAllPlans} className="border-gray-600 text-gray-300 hover:bg-gray-800">
+            <Button 
+              variant="outline" 
+              onClick={handleViewAllPlans} 
+              disabled={loadingPlan !== null}
+              className="border-gray-600 text-gray-300 hover:bg-gray-800"
+            >
               View All Plans & Features
             </Button>
-            <Button variant="ghost" onClick={onClose} className="text-gray-400 hover:text-white">
+            <Button 
+              variant="ghost" 
+              onClick={onClose} 
+              disabled={loadingPlan !== null}
+              className="text-gray-400 hover:text-white"
+            >
               Maybe Later
             </Button>
           </div>

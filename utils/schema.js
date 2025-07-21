@@ -226,12 +226,15 @@ export const userSubscriptions = pgTable('user_subscriptions', {
 export const usageTracking = pgTable('usage_tracking', {
   id: serial('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  subscriptionId: integer('subscription_id').notNull().references(() => userSubscriptions.id, { onDelete: 'cascade' }),
+  subscriptionId: integer('subscription_id').references(() => userSubscriptions.id, { onDelete: 'cascade' }), // Remove .notNull() to allow freemium users
   sessionType: varchar('session_type', { length: 50 }).notNull(), // 'mock_interview', 'real_time_help'
   sessionId: varchar('session_id', { length: 255 }).notNull(), // Reference to MockInterview.mockId or other session ID
   duration: integer('duration'), // in minutes
   usedAt: timestamp('used_at').defaultNow(),
   billingMonth: varchar('billing_month', { length: 7 }).notNull(), // 'YYYY-MM' format
+  // Remove these two lines - they don't exist in the actual database
+  // createdAt: timestamp('created_at').defaultNow(),
+  // updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 export const subscriptionRelations = relations(subscriptionPlans, ({ many }) => ({

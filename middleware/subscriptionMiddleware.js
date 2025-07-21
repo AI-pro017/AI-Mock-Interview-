@@ -7,8 +7,8 @@ export async function checkSubscriptionLimits(userId, sessionType) {
     return {
       allowed: false,
       reason: canStart.reason,
-      subscription: null,
-      usage: null
+      subscription: canStart.subscription,
+      usage: canStart.usage
     };
   }
 
@@ -19,17 +19,21 @@ export async function checkSubscriptionLimits(userId, sessionType) {
   };
 }
 
-export async function trackSessionUsage(userId, sessionType, sessionId, duration) {
-  const subscription = await SubscriptionService.getUserSubscription(userId);
-  if (!subscription) {
-    return false;
+export async function trackSessionUsage(userId, sessionType, sessionId, duration = 0) {
+  console.log('🎯 trackSessionUsage called with:', { userId, sessionType, sessionId, duration });
+  
+  try {
+    const result = await SubscriptionService.trackUsage(
+      userId,
+      sessionType,
+      sessionId,
+      duration
+    );
+    
+    console.log('🎯 trackSessionUsage result:', result);
+    return result;
+  } catch (error) {
+    console.error('🎯 trackSessionUsage error:', error);
+    throw error;
   }
-
-  return await SubscriptionService.trackUsage(
-    userId,
-    subscription.id,
-    sessionType,
-    sessionId,
-    duration
-  );
 }

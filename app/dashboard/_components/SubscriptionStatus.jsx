@@ -38,6 +38,22 @@ export default function SubscriptionStatus() {
     }
   }, [pathname]);
 
+  // Listen for custom subscription update events
+  useEffect(() => {
+    const handleSubscriptionUpdate = () => {
+      console.log('📊 Subscription update event received, refreshing data...');
+      setRefreshing(true);
+      fetchSubscriptionData();
+    };
+
+    // Listen for custom events from copilot and other components
+    window.addEventListener('subscriptionUpdated', handleSubscriptionUpdate);
+    
+    return () => {
+      window.removeEventListener('subscriptionUpdated', handleSubscriptionUpdate);
+    };
+  }, []);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchSubscriptionData();

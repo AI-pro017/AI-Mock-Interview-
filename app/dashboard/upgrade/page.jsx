@@ -1,18 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Check, Star, Clock, MessageSquare, Users, Loader2 } from 'lucide-react';
+import { Check, Star, Clock, MessageSquare, Users, Loader2, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 
 const UpgradePage = () => {
-  // Change from single loading state to individual loading states
-  const [loadingPlan, setLoadingPlan] = useState(null); // Track which plan is loading
+  const [loadingPlan, setLoadingPlan] = useState(null);
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [usage, setUsage] = useState(null);
   const { toast } = useToast();
+
+  // Define plan hierarchy for comparison
+  const planHierarchy = ['freemium', 'starter', 'pro', 'unlimited'];
 
   const plans = [
     {
@@ -31,7 +33,6 @@ const UpgradePage = () => {
         'Basic AI Feedback',
         'Standard Question Bank',
       ],
-      cta: 'Current Plan',
       popular: false,
       isFreemium: true,
     },
@@ -52,7 +53,6 @@ const UpgradePage = () => {
         'Performance Analytics',
         'Email Support',
       ],
-      cta: 'Choose Starter',
       popular: false,
     },
     {
@@ -73,7 +73,6 @@ const UpgradePage = () => {
         'Priority Email Support',
         'Custom Question Banks',
       ],
-      cta: 'Choose Pro',
       popular: true,
     },
     {
@@ -96,7 +95,6 @@ const UpgradePage = () => {
         'Detailed Performance Reports',
         'Priority Support',
       ],
-      cta: 'Go Unlimited',
       popular: false,
     },
   ];
@@ -127,7 +125,6 @@ const UpgradePage = () => {
       return;
     }
 
-    // Set loading state for specific plan
     setLoadingPlan(planName);
     
     try {
@@ -158,9 +155,17 @@ const UpgradePage = () => {
         variant: "destructive",
       });
     } finally {
-      // Clear loading state
       setLoadingPlan(null);
     }
+  };
+
+  const getCurrentPlanIndex = () => {
+    const currentPlanName = currentSubscription?.plan?.name || 'freemium';
+    return planHierarchy.indexOf(currentPlanName);
+  };
+
+  const getPlanIndex = (planName) => {
+    return planHierarchy.indexOf(planName);
   };
 
   const isCurrentPlan = (planName) => {
@@ -168,26 +173,53 @@ const UpgradePage = () => {
     return currentPlanName === planName;
   };
 
-  // Check if a specific plan is loading
+  const isPlanDowngrade = (planName) => {
+    return getPlanIndex(planName) < getCurrentPlanIndex();
+  };
+
   const isPlanLoading = (planName) => {
     return loadingPlan === planName;
   };
 
-  const getUsageText = (sessionType) => {
-    if (!usage || !currentSubscription) return '';
-    
-    const usageData = usage[sessionType];
-    const limits = currentSubscription.plan;
-    
-    if (sessionType === 'mock_interview') {
-      if (limits.mockSessionsLimit === null) return 'Unlimited';
-      return `${usageData.count}/${limits.mockSessionsLimit} used`;
-    } else if (sessionType === 'real_time_help') {
-      if (limits.realTimeHelpLimit === null) return 'Unlimited';
-      return `${usageData.count}/${limits.realTimeHelpLimit} used`;
+  const getButtonConfig = (plan) => {
+    const isLoading = isPlanLoading(plan.name);
+    const isCurrent = isCurrentPlan(plan.name);
+    const isDowngrade = isPlanDowngrade(plan.name);
+
+    if (isLoading) {
+      return {
+        text: 'Processing...',
+        variant: 'default',
+        disabled: true,
+        icon: <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+      };
     }
-    
-    return '';
+
+    if (isCurrent) {
+      return {
+        text: 'Current Plan',
+        variant: 'outline',
+        disabled: true,
+        icon: <Check className="w-4 h-4 mr-2" />
+      };
+    }
+
+    if (isDowngrade) {
+      return {
+        text: 'Downgrade',
+        variant: 'ghost',
+        disabled: true,
+        icon: <ChevronUp className="w-4 h-4 mr-2 rotate-180" />
+      };
+    }
+
+    // This is an upgrade
+    return {
+      text: `Upgrade to ${plan.displayName}`,
+      variant: plan.popular ? 'default' : 'secondary',
+      disabled: false,
+      icon: <ChevronUp className="w-4 h-4 mr-2" />
+    };
   };
 
   return (
@@ -253,67 +285,65 @@ const UpgradePage = () => {
 
         {/* Plan Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
-          {plans.map((plan) => (
-            <Card key={plan.name} className={`flex flex-col h-full bg-gray-800 border-gray-700 ${plan.popular ? 'border-primary shadow-lg ring-2 ring-primary/20' : ''} ${isCurrentPlan(plan.name) ? 'ring-2 ring-green-500' : ''}`}>
-              {plan.popular && (
-                <div className="bg-primary text-primary-foreground py-1 px-4 text-sm font-semibold rounded-t-lg -mb-px flex items-center justify-center">
-                  <Star className="w-4 h-4 mr-2" />
-                  Most Popular
-                </div>
-              )}
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl text-white">{plan.displayName}</CardTitle>
-                <div className="text-4xl font-bold text-white">
-                  {plan.price}
-                  <span className="text-lg font-normal text-gray-400">{plan.priceSuffix}</span>
-                </div>
-                <CardDescription className="text-gray-400">{plan.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow">
-                <div className="grid grid-cols-1 gap-4 mb-6">
-                  <div className="flex items-center text-gray-300 text-sm">
-                    <MessageSquare className="w-4 h-4 mr-2 text-blue-400" />
-                    <span>{plan.mockSessions}</span>
+          {plans.map((plan) => {
+            const buttonConfig = getButtonConfig(plan);
+            
+            return (
+              <Card key={plan.name} className={`flex flex-col h-full bg-gray-800 border-gray-700 ${plan.popular ? 'border-primary shadow-lg ring-2 ring-primary/20' : ''} ${isCurrentPlan(plan.name) ? 'ring-2 ring-green-500' : ''}`}>
+                {plan.popular && (
+                  <div className="bg-primary text-primary-foreground py-1 px-4 text-sm font-semibold rounded-t-lg -mb-px flex items-center justify-center">
+                    <Star className="w-4 h-4 mr-2" />
+                    Most Popular
                   </div>
-                  <div className="flex items-center text-gray-300 text-sm">
-                    <Users className="w-4 h-4 mr-2 text-green-400" />
-                    <span>{plan.realTimeHelp}</span>
+                )}
+                <CardHeader className="text-center">
+                  <CardTitle className="text-2xl text-white">{plan.displayName}</CardTitle>
+                  <div className="text-4xl font-bold text-white">
+                    {plan.price}
+                    <span className="text-lg font-normal text-gray-400">{plan.priceSuffix}</span>
                   </div>
-                  <div className="flex items-center text-gray-300 text-sm">
-                    <Clock className="w-4 h-4 mr-2 text-purple-400" />
-                    <span>{plan.maxDuration}</span>
+                  <CardDescription className="text-gray-400">{plan.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  <div className="grid grid-cols-1 gap-4 mb-6">
+                    <div className="flex items-center text-gray-300 text-sm">
+                      <MessageSquare className="w-4 h-4 mr-2 text-blue-400" />
+                      <span>{plan.mockSessions}</span>
+                    </div>
+                    <div className="flex items-center text-gray-300 text-sm">
+                      <Users className="w-4 h-4 mr-2 text-green-400" />
+                      <span>{plan.realTimeHelp}</span>
+                    </div>
+                    <div className="flex items-center text-gray-300 text-sm">
+                      <Clock className="w-4 h-4 mr-2 text-purple-400" />
+                      <span>{plan.maxDuration}</span>
+                    </div>
                   </div>
-                </div>
 
-                <ul className="space-y-2">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start text-gray-300 text-sm">
-                      <Check className="w-4 h-4 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-              <CardFooter className="mt-auto">
-                <Button 
-                  className="w-full" 
-                  size="lg" 
-                  variant={plan.popular ? 'default' : plan.isFreemium ? 'outline' : 'secondary'}
-                  onClick={() => handleUpgrade(plan.name)}
-                  disabled={isPlanLoading(plan.name) || isCurrentPlan(plan.name)}
-                >
-                  {isPlanLoading(plan.name) ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    isCurrentPlan(plan.name) ? 'Current Plan' : plan.cta
-                  )}
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                  <ul className="space-y-2">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start text-gray-300 text-sm">
+                        <Check className="w-4 h-4 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+                <CardFooter className="mt-auto">
+                  <Button 
+                    className="w-full" 
+                    size="lg" 
+                    variant={buttonConfig.variant}
+                    onClick={() => handleUpgrade(plan.name)}
+                    disabled={buttonConfig.disabled}
+                  >
+                    {buttonConfig.icon}
+                    {buttonConfig.text}
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
         
         <div className="mt-12 text-center text-sm text-gray-400">
