@@ -14,7 +14,7 @@ export default function RootLayout({ children }) {
       <body className="bg-slate-900 text-slate-100 min-h-screen">
         <Provider>
           <ChatAssistant />
-          {children}
+        {children}
           <Toaster />
         </Provider>
       </body>

@@ -24,6 +24,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: profile.name,
           email: profile.email,
           image: profile.picture,
+          emailVerified: new Date(), // Set emailVerified for new Google users
+          disabled: false, // Set disabled = false by default
           experienceLevel: null,
           targetRoles: null,
           resumeUrl: null,
@@ -44,6 +46,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
         
+        // Check if user is disabled
+        if (user.disabled) {
+          return null; // Don't allow disabled users to sign in
+        }
+        
         if (!user.emailVerified) {
           return null;
         }
@@ -59,6 +66,36 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     })
   ],
   callbacks: {
+    async signIn({ user, account, profile, isNewUser }) {
+      // Check if user is disabled (for existing users)
+      if (!isNewUser && user?.email) {
+        try {
+          const existingUser = await db.select().from(users).where(eq(users.email, user.email)).limit(1);
+          
+          if (existingUser[0] && existingUser[0].disabled) {
+            console.log(`❌ Disabled user attempted sign-in: ${user.email}`);
+            return false; // Prevent sign-in for disabled users
+          }
+          
+          // Update emailVerified for Google users if it's null
+          if (account?.provider === 'google' && existingUser[0] && !existingUser[0].emailVerified) {
+            await db.update(users)
+              .set({ 
+                emailVerified: new Date(),
+                name: user.name || existingUser[0].name,
+                image: user.image || existingUser[0].image
+              })
+              .where(eq(users.email, user.email));
+            
+            console.log(`✅ Updated emailVerified for Google user: ${user.email}`);
+          }
+        } catch (error) {
+          console.error('Error checking user status:', error);
+        }
+      }
+      
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
@@ -66,6 +103,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.targetRoles = user.targetRoles;
         token.resumeUrl = user.resumeUrl;
         token.timezone = user.timezone;
+        token.disabled = user.disabled;
       }
       return token;
     },
@@ -76,9 +114,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.targetRoles = token.targetRoles;
         session.user.resumeUrl = token.resumeUrl;
         session.user.timezone = token.timezone;
+        session.user.disabled = token.disabled;
       }
       return session;
     },
+  },
+  events: {
+    async createUser({ user }) {
+      console.log(`🎉 New user created: ${user.email} (disabled: ${user.disabled})`);
+    },
+    async signIn({ user, account, isNewUser }) {
+      if (account?.provider === 'google') {
+        console.log(`🔐 Google sign-in: ${user.email}, isNewUser: ${isNewUser}`);
+      }
+    }
   },
   session: {
     strategy: "jwt",
