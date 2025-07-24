@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { db } from '@/utils/db';
+import { sessionDetails, users } from '@/utils/schema';
+import { eq, sql, and, gte } from 'drizzle-orm';
 import { neon } from '@neondatabase/serverless';
 
 export async function GET() {
@@ -10,10 +13,9 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check admin authorization
-    const sql = neon(process.env.NEXT_PUBLIC_DRIZZLE_DB_URL);
-    
-    const adminUser = await sql`
+    // Check admin authorization using raw SQL query
+    const sqlClient = neon(process.env.NEXT_PUBLIC_DRIZZLE_DB_URL);
+    const adminUser = await sqlClient`
       SELECT * FROM admin_users WHERE user_id = ${session.user.id} AND is_active = true
     `;
 
@@ -21,38 +23,38 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Get live sessions (sessions from last 30 minutes that might still be active)
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    // Get live sessions (active sessions from last 2 hours)
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
     
-    const liveSessions = await sql`
-      SELECT 
-        ut.id,
-        ut.session_id as "sessionId",
-        ut.session_type as "sessionType",
-        ut.duration,
-        ut.used_at as "usedAt",
-        u.email as "userEmail",
-        mi."jobPosition",
-        EXTRACT(EPOCH FROM (NOW() - ut.used_at)) / 60 as "minutesAgo"
-      FROM usage_tracking ut
-      JOIN users u ON ut.user_id = u.id
-      LEFT JOIN "mockInterview" mi ON ut.session_id = mi."mockId"
-      WHERE ut.used_at >= ${thirtyMinutesAgo.toISOString()}
-        AND (ut.duration IS NULL OR ut.duration = 0)
-      ORDER BY ut.used_at DESC
-      LIMIT 20
-    `;
+    const liveSessions = await db
+      .select({
+        id: sessionDetails.id,
+        sessionId: sessionDetails.sessionId,
+        sessionType: sessionDetails.sessionType,
+        jobPosition: sessionDetails.jobPosition,
+        jobLevel: sessionDetails.jobLevel,
+        industry: sessionDetails.industry,
+        status: sessionDetails.status,
+        startedAt: sessionDetails.startedAt,
+        totalQuestions: sessionDetails.totalQuestions,
+        questionsAnswered: sessionDetails.questionsAnswered,
+        userEmail: users.email,
+        userName: users.name,
+        duration: sql`EXTRACT(EPOCH FROM (NOW() - ${sessionDetails.startedAt})) / 60`,
+        transcriptLength: sql`LENGTH(COALESCE(${sessionDetails.transcript}, '[]'))`,
+        suggestionsCount: sql`jsonb_array_length(COALESCE(${sessionDetails.suggestions}::jsonb, '[]'::jsonb))`
+      })
+      .from(sessionDetails)
+      .innerJoin(users, eq(sessionDetails.userId, users.id))
+      .where(and(
+        eq(sessionDetails.status, 'active'),
+        gte(sessionDetails.startedAt, twoHoursAgo)
+      ))
+      .orderBy(sessionDetails.startedAt);
 
-    // Transform data for frontend
-    const transformedSessions = liveSessions.map(session => ({
-      ...session,
-      type: session.sessionType,
-      duration: Math.round(session.minutesAgo || 0)
-    }));
+    console.log(`✅ Found ${liveSessions.length} live sessions`);
 
-    console.log(`✅ Found ${transformedSessions.length} live sessions`);
-
-    return NextResponse.json(transformedSessions);
+    return NextResponse.json(liveSessions);
 
   } catch (error) {
     console.error('Live sessions fetch error:', error);

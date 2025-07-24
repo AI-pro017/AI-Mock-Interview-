@@ -36,6 +36,7 @@ export default function SubscriptionAnalytics() {
   const [revenueData, setRevenueData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30d');
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     fetchAnalytics();
@@ -55,6 +56,81 @@ export default function SubscriptionAnalytics() {
       console.error('Failed to fetch subscription analytics:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      
+      // Create comprehensive CSV data
+      const csvData = [];
+      
+      // Add overview metrics
+      csvData.push(['Subscription Analytics Report']);
+      csvData.push(['Generated:', new Date().toLocaleString()]);
+      csvData.push(['Time Range:', timeRange]);
+      csvData.push(['']); // Empty row
+      
+      // Overview metrics
+      csvData.push(['Overview Metrics']);
+      csvData.push(['Metric', 'Value']);
+      csvData.push(['Monthly Revenue', formatCurrency(analytics.monthlyRevenue || 0)]);
+      csvData.push(['Revenue Growth', formatPercentage(analytics.revenueGrowth || 0)]);
+      csvData.push(['Paid Subscribers', analytics.paidSubscribers || 0]);
+      csvData.push(['Subscriber Growth', formatPercentage(analytics.subscriberGrowth || 0)]);
+      csvData.push(['Conversion Rate', `${analytics.conversionRate || 0}%`]);
+      csvData.push(['Avg Revenue Per User', formatCurrency(analytics.arpu || 0)]);
+      csvData.push(['']); // Empty row
+      
+      // Plan distribution
+      csvData.push(['Plan Distribution']);
+      csvData.push(['Plan', 'Users', 'Monthly Revenue', 'Percentage']);
+      planDistribution.forEach(plan => {
+        csvData.push([
+          plan.displayName,
+          plan.userCount,
+          formatCurrency(plan.monthlyRevenue),
+          `${plan.percentage}%`
+        ]);
+      });
+      csvData.push(['']); // Empty row
+      
+      // Recent subscription changes
+      csvData.push(['Recent Subscription Changes']);
+      csvData.push(['User Email', 'Change Type', 'From Plan', 'To Plan', 'Revenue Impact', 'Date']);
+      revenueData.forEach(change => {
+        csvData.push([
+          change.userEmail,
+          change.type,
+          change.fromPlan,
+          change.toPlan,
+          formatCurrency(change.revenueImpact),
+          new Date(change.date).toLocaleDateString()
+        ]);
+      });
+      
+      // Convert to CSV string
+      const csvContent = csvData.map(row => 
+        row.map(cell => `"${cell}"`).join(',')
+      ).join('\n');
+      
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `subscription-analytics-${timeRange}-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('✅ Subscription analytics exported successfully');
+    } catch (error) {
+      console.error('❌ Export failed:', error);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -103,9 +179,15 @@ export default function SubscriptionAnalytics() {
               <SelectItem value="1y">Last year</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" className="border-gray-600">
-            <Download className="w-4 h-4 mr-2" />
-            Export
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleExport}
+            disabled={isExporting}
+            className="border-gray-600"
+          >
+            <Download className={`w-4 h-4 mr-2 ${isExporting ? 'animate-spin' : ''}`} />
+            {isExporting ? 'Exporting...' : 'Export'}
           </Button>
         </div>
       </div>

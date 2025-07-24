@@ -237,6 +237,37 @@ export const usageTracking = pgTable('usage_tracking', {
   // updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+export const sessionDetails = pgTable('session_details', {
+  id: serial('id').primaryKey(),
+  sessionId: varchar('session_id', { length: 255 }).notNull(), // Reference to usage_tracking.sessionId
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sessionType: varchar('session_type', { length: 50 }).notNull(), // 'mock_interview', 'real_time_help'
+  
+  // Session metadata
+  jobPosition: varchar('job_position', { length: 255 }),
+  jobLevel: varchar('job_level', { length: 100 }),
+  industry: varchar('industry', { length: 255 }),
+  
+  // Q&A Transcript (JSON format)
+  transcript: text('transcript'), // JSON string of Q&A pairs
+  
+  // Copilot suggestions (for real-time help sessions)
+  suggestions: text('suggestions'), // JSON string of suggestions shown
+  
+  // Session status
+  status: varchar('status', { length: 50 }).default('active'), // 'active', 'completed', 'abandoned'
+  startedAt: timestamp('started_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+  
+  // Performance metrics (for completed sessions)
+  totalQuestions: integer('total_questions'),
+  questionsAnswered: integer('questions_answered'),
+  averageResponseTime: integer('average_response_time'), // in seconds
+  
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 export const subscriptionRelations = relations(subscriptionPlans, ({ many }) => ({
   userSubscriptions: many(userSubscriptions),
 }));
@@ -250,4 +281,8 @@ export const userSubscriptionRelations = relations(userSubscriptions, ({ one, ma
 export const usageTrackingRelations = relations(usageTracking, ({ one }) => ({
   user: one(users, { fields: [usageTracking.userId], references: [users.id] }),
   subscription: one(userSubscriptions, { fields: [usageTracking.subscriptionId], references: [userSubscriptions.id] }),
+}));
+
+export const sessionDetailsRelations = relations(sessionDetails, ({ one }) => ({
+  user: one(users, { fields: [sessionDetails.userId], references: [users.id] }),
 }));

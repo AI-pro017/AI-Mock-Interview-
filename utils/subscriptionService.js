@@ -1,6 +1,6 @@
 import { db } from './db';
 import { subscriptionPlans, userSubscriptions, usageTracking } from './schema';
-import { eq, and, gte, lte, count, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, count, sql, desc } from 'drizzle-orm';
 
 export class SubscriptionService {
   // Add the missing canStartSession method
@@ -73,51 +73,43 @@ export class SubscriptionService {
     }
   }
 
-  // Add the missing createOrUpdateUserSubscription function
+  // Updated to create new subscription records instead of updating
   static async createOrUpdateUserSubscription(userId, planId, subscriptionData) {
     try {
-      // Check if user already has a subscription
-      const existingSubscription = await db
-        .select()
-        .from(userSubscriptions)
-        .where(eq(userSubscriptions.userId, userId))
-        .limit(1);
+      // Always mark existing subscriptions as cancelled (preserve history)
+      await db
+        .update(userSubscriptions)
+        .set({
+          status: 'cancelled',
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(userSubscriptions.userId, userId),
+          eq(userSubscriptions.status, 'active')
+        ));
 
-      if (existingSubscription[0]) {
-        // Update existing subscription
-        await db
-          .update(userSubscriptions)
-          .set({
-            planId,
-            stripeCustomerId: subscriptionData.customerId,
-            stripeSubscriptionId: subscriptionData.subscriptionId,
-            status: subscriptionData.status,
-            currentPeriodStart: subscriptionData.currentPeriodStart,
-            currentPeriodEnd: subscriptionData.currentPeriodEnd,
-            updatedAt: new Date(),
-          })
-          .where(eq(userSubscriptions.userId, userId));
-      } else {
-        // Create new subscription
-        await db.insert(userSubscriptions).values({
-          userId,
-          planId,
-          stripeCustomerId: subscriptionData.customerId,
-          stripeSubscriptionId: subscriptionData.subscriptionId,
-          status: subscriptionData.status,
-          currentPeriodStart: subscriptionData.currentPeriodStart,
-          currentPeriodEnd: subscriptionData.currentPeriodEnd,
-        });
-      }
+      // Always create new subscription record
+      const newSubscription = await db.insert(userSubscriptions).values({
+        userId,
+        planId,
+        stripeCustomerId: subscriptionData.customerId,
+        stripeSubscriptionId: subscriptionData.subscriptionId,
+        status: subscriptionData.status,
+        currentPeriodStart: subscriptionData.currentPeriodStart,
+        currentPeriodEnd: subscriptionData.currentPeriodEnd,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).returning();
 
-      return true;
+      console.log('✅ New subscription record created:', newSubscription[0].id);
+      return newSubscription[0];
     } catch (error) {
-      console.error('Error creating/updating subscription:', error);
+      console.error('Error creating subscription:', error);
       return false;
     }
   }
 
-  // Fix the getUserSubscription function ordering
+  // Updated to get the latest active subscription
   static async getUserSubscription(userId) {
     try {
       const subscription = await db
@@ -127,6 +119,7 @@ export class SubscriptionService {
           currentPeriodStart: userSubscriptions.currentPeriodStart,
           currentPeriodEnd: userSubscriptions.currentPeriodEnd,
           cancelAtPeriodEnd: userSubscriptions.cancelAtPeriodEnd,
+          createdAt: userSubscriptions.createdAt,
           plan: {
             id: subscriptionPlans.id,
             name: subscriptionPlans.name,
@@ -141,8 +134,11 @@ export class SubscriptionService {
         })
         .from(userSubscriptions)
         .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
-        .where(eq(userSubscriptions.userId, userId))
-        .orderBy(userSubscriptions.updatedAt) // Order by most recent update
+        .where(and(
+          eq(userSubscriptions.userId, userId),
+          eq(userSubscriptions.status, 'active')
+        ))
+        .orderBy(desc(userSubscriptions.createdAt)) // Get the most recent active subscription
         .limit(1);
 
       // If user has an active subscription, return it
@@ -159,11 +155,12 @@ export class SubscriptionService {
 
       if (freemiumPlan[0]) {
         return {
-          id: null, // No subscription ID for freemium
+          id: null, // No subscription record for freemium
           status: 'active',
           currentPeriodStart: null,
           currentPeriodEnd: null,
           cancelAtPeriodEnd: false,
+          createdAt: null,
           plan: {
             id: freemiumPlan[0].id,
             name: freemiumPlan[0].name,
@@ -180,59 +177,154 @@ export class SubscriptionService {
 
       return null;
     } catch (error) {
-      console.error('Error fetching user subscription:', error);
+      console.error('Error getting user subscription:', error);
       return null;
     }
   }
 
-  // Get user's usage for current billing period
+  // Get subscription history for a user
+  static async getUserSubscriptionHistory(userId) {
+    try {
+      const history = await db
+        .select({
+          id: userSubscriptions.id,
+          status: userSubscriptions.status,
+          createdAt: userSubscriptions.createdAt,
+          updatedAt: userSubscriptions.updatedAt,
+          currentPeriodStart: userSubscriptions.currentPeriodStart,
+          currentPeriodEnd: userSubscriptions.currentPeriodEnd,
+          plan: {
+            id: subscriptionPlans.id,
+            name: subscriptionPlans.name,
+            displayName: subscriptionPlans.displayName,
+            price: subscriptionPlans.price,
+          }
+        })
+        .from(userSubscriptions)
+        .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
+        .where(eq(userSubscriptions.userId, userId))
+        .orderBy(desc(userSubscriptions.createdAt));
+
+      return history;
+    } catch (error) {
+      console.error('Error getting subscription history:', error);
+      return [];
+    }
+  }
+
+  // Get revenue analytics from subscription history
+  static async getRevenueAnalytics(startDate, endDate) {
+    try {
+      const { neon } = await import('@neondatabase/serverless');
+      const sql = neon(process.env.NEXT_PUBLIC_DRIZZLE_DB_URL);
+
+      // Get all subscription records in date range (excluding freemium)
+      const subscriptions = await sql`
+        SELECT 
+          us.id,
+          us.user_id,
+          us.status,
+          us.created_at,
+          us.updated_at,
+          sp.name as plan_name,
+          sp.display_name as plan_display_name,
+          sp.price
+        FROM user_subscriptions us
+        JOIN subscription_plans sp ON us.plan_id = sp.id
+        WHERE us.created_at >= ${startDate.toISOString()}
+          AND us.created_at <= ${endDate.toISOString()}
+          AND sp.name != 'freemium'
+        ORDER BY us.created_at DESC
+      `;
+
+      // Calculate metrics
+      const totalRevenue = subscriptions.reduce((sum, sub) => sum + parseFloat(sub.price || 0), 0);
+      const totalSubscriptions = subscriptions.length;
+      const uniqueUsers = new Set(subscriptions.map(sub => sub.user_id)).size;
+      const avgRevenuePerUser = uniqueUsers > 0 ? totalRevenue / uniqueUsers : 0;
+
+      // Group by plan for breakdown
+      const planBreakdown = subscriptions.reduce((acc, sub) => {
+        const planName = sub.plan_display_name;
+        if (!acc[planName]) {
+          acc[planName] = { count: 0, revenue: 0 };
+        }
+        acc[planName].count++;
+        acc[planName].revenue += parseFloat(sub.price || 0);
+        return acc;
+      }, {});
+
+      return {
+        totalRevenue,
+        totalSubscriptions,
+        uniqueUsers,
+        avgRevenuePerUser,
+        planBreakdown,
+        subscriptions
+      };
+    } catch (error) {
+      console.error('Error getting revenue analytics:', error);
+      return {
+        totalRevenue: 0,
+        totalSubscriptions: 0,
+        uniqueUsers: 0,
+        avgRevenuePerUser: 0,
+        planBreakdown: {},
+        subscriptions: []
+      };
+    }
+  }
+
   static async getUserUsage(userId, subscriptionId) {
     try {
       const currentDate = new Date();
       const currentMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-      
-      // Get ALL usage for this user in the current billing month
-      // regardless of subscription ID, because usage should accumulate
-      // even if user upgrades mid-month from freemium to paid
+
       const usage = await db
         .select({
           sessionType: usageTracking.sessionType,
-          count: count(usageTracking.id),
-          totalDuration: sql`COALESCE(SUM(${usageTracking.duration}), 0)`,
+          count: count(),
+          totalDuration: sql`SUM(${usageTracking.duration})`,
         })
         .from(usageTracking)
         .where(
           and(
             eq(usageTracking.userId, userId),
             eq(usageTracking.billingMonth, currentMonth)
-            // Remove subscription ID filtering - get all usage for current month
           )
         )
         .groupBy(usageTracking.sessionType);
 
-      const usageMap = {
-        mock_interview: { count: 0, totalDuration: 0 },
-        real_time_help: { count: 0, totalDuration: 0 }
+      const result = {
+        mock_interview: { count: 0, duration: 0 },
+        real_time_help: { count: 0, duration: 0 },
       };
 
       usage.forEach(item => {
-        usageMap[item.sessionType] = {
-          count: item.count,
-          totalDuration: parseInt(item.totalDuration)
-        };
+        if (item.sessionType === 'mock_interview') {
+          result.mock_interview = {
+            count: Number(item.count),
+            duration: Number(item.totalDuration) || 0,
+          };
+        } else if (item.sessionType === 'real_time_help') {
+          result.real_time_help = {
+            count: Number(item.count),
+            duration: Number(item.totalDuration) || 0,
+          };
+        }
       });
 
-      return usageMap;
+      return result;
     } catch (error) {
-      console.error('Error fetching user usage:', error);
+      console.error('Error getting user usage:', error);
       return {
-        mock_interview: { count: 0, totalDuration: 0 },
-        real_time_help: { count: 0, totalDuration: 0 }
+        mock_interview: { count: 0, duration: 0 },
+        real_time_help: { count: 0, duration: 0 },
       };
     }
   }
 
-  // Check if user can perform an action based on their subscription limits
+  // Rest of the methods remain the same...
   static async checkSubscriptionLimits(userId, sessionType) {
     try {
       const subscription = await this.getUserSubscription(userId);
@@ -279,16 +371,10 @@ export class SubscriptionService {
     }
   }
 
-  // Update trackUsage method to include sessionId
   static async trackUsage(userId, sessionType, sessionId, duration = 0) {
     console.log('🔍 Starting trackUsage with params:', { userId, sessionType, sessionId, duration });
     
     try {
-      // Test database connection first
-      console.log('🔗 Testing database connection...');
-      const testQuery = await db.select({ count: sql`count(*)` }).from(usageTracking);
-      console.log('✅ Database connection OK, current usage records count:', testQuery[0]?.count);
-      
       const subscription = await this.getUserSubscription(userId);
       console.log('📋 User subscription:', subscription);
       
@@ -297,7 +383,6 @@ export class SubscriptionService {
       
       console.log('📅 Current month:', currentMonth);
 
-      // Use only the fields that exist in the actual database
       const insertData = {
         userId,
         subscriptionId: subscription?.id || null,
@@ -315,37 +400,13 @@ export class SubscriptionService {
       console.log('✅ Usage tracked successfully:', sessionType, 'for user', userId, 'session', sessionId);
       console.log('📊 Insert result:', result);
       
-      // Verify the insert worked by querying back
-      const verification = await db
-        .select()
-        .from(usageTracking)
-        .where(
-          and(
-            eq(usageTracking.userId, userId),
-            eq(usageTracking.sessionId, sessionId)
-          )
-        )
-        .limit(1);
-      
-      console.log('🔍 Verification query result:', verification);
-      
       return true;
     } catch (error) {
       console.error('❌ Error tracking usage:', error);
-      console.error('📋 Error details:', {
-        message: error.message,
-        code: error.code,
-        detail: error.detail,
-        constraint: error.constraint,
-        table: error.table,
-        column: error.column,
-      });
-      
       return false;
     }
   }
 
-  // Update usage duration - use usedAt field instead of createdAt
   static async updateUsageDuration(userId, sessionType, duration, sessionStartTime) {
     try {
       console.log('🔄 Updating usage duration:', { userId, sessionType, duration });
@@ -353,19 +414,17 @@ export class SubscriptionService {
       const currentDate = new Date();
       const currentMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
 
-      // Find the most recent usage record for this session using usedAt
       const result = await db
         .update(usageTracking)
         .set({ 
           duration,
-          // Don't try to update updatedAt since it doesn't exist
         })
         .where(
           and(
             eq(usageTracking.userId, userId),
             eq(usageTracking.sessionType, sessionType),
             eq(usageTracking.billingMonth, currentMonth),
-            gte(usageTracking.usedAt, sessionStartTime) // Use usedAt instead of createdAt
+            gte(usageTracking.usedAt, sessionStartTime)
           )
         );
 

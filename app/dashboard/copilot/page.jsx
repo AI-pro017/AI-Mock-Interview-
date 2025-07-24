@@ -10,6 +10,7 @@ import { useAI } from './hooks/useAI';
 import CodeHighlighter from './components/CodeHighlighter';
 import UpgradeModal from '@/components/ui/upgrade-modal';
 import { useRouter } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid';
 
 const InterviewCopilotPage = () => {
     const [deepgramToken, setDeepgramToken] = useState('');
@@ -55,6 +56,10 @@ const InterviewCopilotPage = () => {
         clearSessionContext,
         sessionContext
     } = useAI();
+
+    const [copilotSessionId, setCopilotSessionId] = useState(null);
+    const [copilotSessionTracked, setCopilotSessionTracked] = useState(false);
+    const [sessionSuggestions, setSessionSuggestions] = useState([]);
 
     useEffect(() => {
         const fetchToken = async () => {
@@ -301,6 +306,64 @@ const InterviewCopilotPage = () => {
         }
     }, []);
 
+    const startCopilotSessionTracking = async () => {
+        try {
+          const response = await fetch('/api/session-tracking', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              sessionType: 'interview_copilot',
+              jobPosition: 'Interview Copilot Session',
+              jobLevel: 'Various',
+              industry: 'Technology'
+            })
+          });
+  
+          if (response.ok) {
+            const data = await response.json();
+            setCopilotSessionId(data.sessionId);
+            setCopilotSessionTracked(true);
+            console.log('✅ Copilot session tracking started:', data.sessionId);
+          }
+        } catch (error) {
+          console.error('❌ Failed to start copilot session tracking:', error);
+        }
+    };
+    const endCopilotSession = async () => {
+    if (copilotSessionTracked && copilotSessionId && sessionStartTime) {
+        try {
+        const sessionDuration = (Date.now() - sessionStartTime) / (1000 * 60);
+        
+        await fetch('/api/session-tracking/end', {
+            method: 'POST',
+            headers: {
+            'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+            sessionId: copilotSessionId,
+            duration: sessionDuration,
+            suggestions: sessionSuggestions,
+            status: 'completed'
+            })
+        });
+
+        console.log('✅ Copilot session tracking ended:', copilotSessionId);
+        } catch (error) {
+        console.error('❌ Failed to end copilot session tracking:', error);
+        }
+    }
+    };
+
+    useEffect(() => {
+    return () => {
+        if (copilotSessionTracked) {
+        endCopilotSession();
+        }
+    };
+    }, [copilotSessionTracked, copilotSessionId]);
+  
     // Force refresh subscription status
     const refreshSubscriptionStatus = useCallback(() => {
         // Trigger a re-render of the header by navigating to the same page
@@ -355,12 +418,11 @@ const InterviewCopilotPage = () => {
         }
     }, [refreshSubscriptionStatus]);
 
-    // Enhanced capture start with subscription check
+    // UPDATED handleStartCapture function
     const handleStartCapture = useCallback(async () => {
         try {
             console.log('🔍 Checking subscription limits...');
             
-            // Check subscription limits first
             const response = await checkSubscriptionLimits();
             
             if (!response.allowed) {
@@ -372,17 +434,20 @@ const InterviewCopilotPage = () => {
 
             console.log('✅ Subscription limits OK, starting session...');
             
-            // Start session tracking
             const newSessionId = `copilot_${Date.now()}`;
             setSessionId(newSessionId);
             setSessionStartTime(Date.now());
             setSessionTracked(false);
             
+            // ADD: Start the new comprehensive session tracking
+            if (!copilotSessionTracked) {
+                await startCopilotSessionTracking();
+            }
+            
             console.log('🚀 Starting copilot session:', newSessionId);
             
             await startCapture();
             
-            // Track session start only once
             if (!sessionTracked) {
                 await trackSessionStart(newSessionId);
                 setSessionTracked(true);
@@ -391,37 +456,51 @@ const InterviewCopilotPage = () => {
         } catch (error) {
             console.error('❌ Error starting capture:', error);
         }
-    }, [startCapture, checkSubscriptionLimits, trackSessionStart, sessionTracked]);
+    }, [startCapture, checkSubscriptionLimits, trackSessionStart, sessionTracked, startCopilotSessionTracking, copilotSessionTracked]);
 
-    // Enhanced capture stop with duration update
+    // UPDATED handleStopCapture function  
     const handleStopCapture = useCallback(async () => {
         try {
             await stopCapture();
             
-            // Update session duration (don't create new record)
             if (sessionStartTime && sessionId) {
                 const sessionDuration = Date.now() - sessionStartTime;
                 await updateSessionDuration(sessionId, sessionDuration);
-                
                 console.log('🛑 Ended copilot session. Duration:', Math.round(sessionDuration / 60000), 'minutes');
             }
             
-            // Reset session state
+            // ADD: End the comprehensive session tracking
+            await endCopilotSession();
+            
             setSessionStartTime(null);
             setSessionId(null);
             setSessionTracked(false);
             
-            // Force refresh the header subscription status
-            // Dispatch a custom event to notify the header component
             window.dispatchEvent(new CustomEvent('subscriptionUpdated'));
             
         } catch (error) {
             console.error('❌ Error stopping capture:', error);
         }
-    }, [stopCapture, updateSessionDuration, sessionStartTime, sessionId]);
+    }, [stopCapture, updateSessionDuration, sessionStartTime, sessionId, endCopilotSession]);
 
-    // Remove periodic tracking - we only track start and update duration at end
-    // The periodic tracking was causing multiple records
+    // ADD: Track suggestions when they're generated
+    useEffect(() => {
+        if (suggestions.length > 0) {
+            const latestSuggestion = suggestions[suggestions.length - 1];
+            trackSuggestion(latestSuggestion.content);
+        }
+    }, [suggestions]);
+
+    // Update the AI suggestions handling to track suggestions
+    const trackSuggestion = (suggestion) => {
+      const newSuggestion = {
+        text: suggestion,
+        timestamp: new Date().toISOString(),
+        confidence: 0.9 // You can adjust this based on your AI confidence scores
+      };
+      
+      setSessionSuggestions(prev => [...prev, newSuggestion]);
+    };
 
     return (
         <div className="text-white h-full flex flex-col p-1 sm:p-2 lg:p-4 overflow-hidden">

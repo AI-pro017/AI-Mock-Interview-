@@ -1,6 +1,6 @@
 // Complete restructuring with fixes for all issues
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { db } from '@/utils/db';
 import { UserAnswer } from '@/utils/schema';
 import { getRandomInterviewer, getInterviewerByGender, getInterviewerByIndustry } from '@/utils/interviewerProfiles';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { v4 as uuidv4 } from 'uuid';
 
 export default function InterviewSession({ interview, useCameraInInterview }) {
   const router = useRouter();
@@ -32,9 +33,14 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   const [interviewerIndustry, setInterviewerIndustry] = useState("random");
   const [sessionTracked, setSessionTracked] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState(null); // Add this line
+  const [sessionId, setSessionId] = useState(null);
 
   const timerRef = useRef(null);
   const videoRef = useRef(null);
+  
+  // Add refs to store current session tracking values for timeout access
+  const sessionTrackedRef = useRef(false);
+  const sessionIdRef = useRef(null);
 
   const [selectedInterviewer, setSelectedInterviewer] = useState(() => {
     // Select interviewer and make sure it's fixed for the entire session
@@ -141,6 +147,10 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     if (mediaStream) {
       setRemainingTime(interview.duration * 60);
       setIsInterviewActive(true);
+      setSessionStartTime(Date.now());
+      
+      // Start session tracking
+      await startSessionTracking();
       
       // Only unmute mic when starting the interview if it should be unmuted
       if (!isMicMuted) {
@@ -156,7 +166,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   };
 
   // Add this new function to update session duration
-  const updateInterviewDuration = async (mockId, duration) => {
+  const updateInterviewDuration = useCallback(async (mockId, duration) => {
     try {
       const response = await fetch('/api/interview/update-usage', {
         method: 'POST',
@@ -175,9 +185,16 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     } catch (error) {
       console.error('❌ Failed to update mock interview session duration:', error);
     }
-  };
+  }, []);
 
-  const endInterview = async () => {
+  const endInterview = useCallback(async () => {
+    console.log('🔍 DEBUG: endInterview called');
+    console.log('🔍 DEBUG: sessionTracked (state):', sessionTracked);
+    console.log('🔍 DEBUG: sessionId (state):', sessionId);
+    console.log('🔍 DEBUG: sessionTracked (ref):', sessionTrackedRef.current);
+    console.log('🔍 DEBUG: sessionId (ref):', sessionIdRef.current);
+    console.log('🔍 DEBUG: sessionStartTime:', sessionStartTime);
+    
     setIsInterviewActive(false);
     
     if (timerRef.current) {
@@ -186,11 +203,79 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
     }
     
     try {
+      const sessionDuration = sessionStartTime ? (Date.now() - sessionStartTime) / (1000 * 60) : 0;
+      console.log('🔍 DEBUG: calculated sessionDuration:', sessionDuration);
+      
+      // End session tracking - USE REFS INSTEAD OF STATE FOR RELIABLE ACCESS
+      const currentSessionTracked = sessionTrackedRef.current;
+      const currentSessionId = sessionIdRef.current;
+      
+      if (currentSessionTracked && currentSessionId) {
+        console.log('🔍 DEBUG: Starting session tracking end process...');
+        
+        // Prepare transcript data
+        const transcript = conversation.map((item, index) => {
+          if (index % 2 === 0) {
+            // AI question
+            return {
+              question: item.text,
+              answer: conversation[index + 1]?.text || '',
+              timestamp: new Date().toISOString()
+            };
+          }
+          return null;
+        }).filter(Boolean);
+
+        console.log('🔍 DEBUG: Prepared transcript with', transcript.length, 'items');
+
+        try {
+          const response = await fetch('/api/session-tracking/end', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              sessionId: currentSessionId,
+              duration: sessionDuration,
+              transcript,
+              totalQuestions: Math.ceil(conversation.length / 2),
+              questionsAnswered: transcript.length,
+              status: 'completed'
+            })
+          });
+
+          if (response.ok) {
+            console.log('✅ Session tracking ended:', currentSessionId);
+            // Clear the refs after successful tracking
+            sessionTrackedRef.current = false;
+            sessionIdRef.current = null;
+          } else {
+            console.error('❌ Session tracking end failed:', response.status);
+          }
+        } catch (sessionTrackingError) {
+          console.error('❌ Session tracking end error:', sessionTrackingError);
+        }
+      } else {
+        console.log('🔍 DEBUG: Session tracking NOT ended because:');
+        console.log('  - sessionTracked (state):', sessionTracked);
+        console.log('  - sessionId (state):', sessionId);
+        console.log('  - sessionTracked (ref):', currentSessionTracked);
+        console.log('  - sessionId (ref):', currentSessionId);
+      }
+
       // Update session duration before ending (add this block)
       if (sessionStartTime) {
         const sessionDuration = Date.now() - sessionStartTime;
-        await updateInterviewDuration(interview.mockId, sessionDuration);
-        console.log('🛑 Ended mock interview session. Duration:', Math.round(sessionDuration / 60000), 'minutes');
+        console.log('🔍 DEBUG: Updating interview duration:', Math.round(sessionDuration / 60000), 'minutes');
+        
+        try {
+          await updateInterviewDuration(interview.mockId, sessionDuration);
+          console.log('🛑 Ended mock interview session. Duration:', Math.round(sessionDuration / 60000), 'minutes');
+        } catch (updateError) {
+          console.error('❌ Failed to update interview duration:', updateError);
+        }
+      } else {
+        console.log('🔍 DEBUG: No sessionStartTime, skipping duration update');
       }
 
       // First shut down the interview engine and camera
@@ -277,7 +362,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
         router.push(`/dashboard/interview/${interview.mockId}/feedback`);
       }, 3000);
     }
-  };
+  }, [sessionTracked, sessionId, sessionStartTime, conversation, interview.mockId, router, endConversation, cameraStream, updateInterviewDuration]);
 
   // Set up timer when interview becomes active
   useEffect(() => {
@@ -289,9 +374,17 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       timerRef.current = setInterval(() => {
         setRemainingTime(prev => {
           if (prev <= 1) {
+            console.log('🔍 DEBUG: Timer reached 0, ending interview due to timeout');
+            console.log('🔍 DEBUG: Current sessionTracked (state):', sessionTracked);
+            console.log('🔍 DEBUG: Current sessionId (state):', sessionId);
+            console.log('🔍 DEBUG: Current sessionTracked (ref):', sessionTrackedRef.current);
+            console.log('🔍 DEBUG: Current sessionId (ref):', sessionIdRef.current);
             clearInterval(timerRef.current);
             timerRef.current = null;
-            setTimeout(() => endInterview(), 100);
+            setTimeout(() => {
+              console.log('🔍 DEBUG: About to call endInterview from timeout');
+              endInterview();
+            }, 100);
             return 0;
           }
           return prev - 1;
@@ -446,6 +539,45 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
       console.error('Error tracking interview start:', error);
     }
   };
+
+  const startSessionTracking = useCallback(async () => {
+    try {
+      console.log('🔍 DEBUG: Starting session tracking for mockId:', interview.mockId);
+      
+      const response = await fetch('/api/session-tracking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionType: 'mock_interview',
+          jobPosition: interview.jobPosition,
+          jobLevel: interview.jobExperience,
+          industry: interview.industry,
+          mockId: interview.mockId
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('🔍 DEBUG: Session tracking response:', data);
+        setSessionId(data.sessionId);
+        setSessionTracked(true);
+        // Also update refs for timeout access
+        sessionIdRef.current = data.sessionId;
+        sessionTrackedRef.current = true;
+        console.log('✅ Session tracking started:', data.sessionId);
+        console.log('🔍 DEBUG: Set sessionId to:', data.sessionId);
+        console.log('🔍 DEBUG: Set sessionTracked to: true');
+      } else {
+        console.error('❌ Session tracking start failed:', response.status);
+        const errorData = await response.text();
+        console.error('❌ Error details:', errorData);
+      }
+    } catch (error) {
+      console.error('❌ Failed to start session tracking:', error);
+    }
+  }, [interview.mockId]);
 
   return (
     <div className="bg-gray-900 text-white">

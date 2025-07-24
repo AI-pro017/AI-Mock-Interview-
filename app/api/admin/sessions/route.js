@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { db } from '@/utils/db';
+import { sessionDetails, users, MockInterview } from '@/utils/schema';
+import { eq, desc, sql } from 'drizzle-orm';
 import { neon } from '@neondatabase/serverless';
 
 export async function GET() {
@@ -10,10 +13,9 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check admin authorization
-    const sql = neon(process.env.NEXT_PUBLIC_DRIZZLE_DB_URL);
-    
-    const adminUser = await sql`
+    // Check admin authorization using raw SQL query
+    const sqlClient = neon(process.env.NEXT_PUBLIC_DRIZZLE_DB_URL);
+    const adminUser = await sqlClient`
       SELECT * FROM admin_users WHERE user_id = ${session.user.id} AND is_active = true
     `;
 
@@ -21,26 +23,36 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    console.log('✅ Fetching sessions...');
+    console.log('✅ Fetching session history...');
 
-    // Get recent sessions from usage tracking with correct column names
-    const sessions = await sql`
-      SELECT 
-        ut.id,
-        ut.session_id as "sessionId",
-        ut.session_type as "sessionType",
-        ut.duration,
-        ut.used_at as "usedAt",
-        u.email as "userEmail",
-        mi."jobPosition"
-      FROM usage_tracking ut
-      JOIN users u ON ut.user_id = u.id
-      LEFT JOIN "mockInterview" mi ON ut.session_id = mi."mockId"
-      ORDER BY ut.used_at DESC
-      LIMIT 50
-    `;
+    // Get recent sessions with enhanced details
+    const sessions = await db
+      .select({
+        id: sessionDetails.id,
+        sessionId: sessionDetails.sessionId,
+        sessionType: sessionDetails.sessionType,
+        jobPosition: sessionDetails.jobPosition,
+        jobLevel: sessionDetails.jobLevel,
+        industry: sessionDetails.industry,
+        status: sessionDetails.status,
+        startedAt: sessionDetails.startedAt,
+        completedAt: sessionDetails.completedAt,
+        totalQuestions: sessionDetails.totalQuestions,
+        questionsAnswered: sessionDetails.questionsAnswered,
+        averageResponseTime: sessionDetails.averageResponseTime,
+        transcript: sessionDetails.transcript,
+        suggestions: sessionDetails.suggestions,
+        userEmail: users.email,
+        userName: users.name,
+        duration: sql`EXTRACT(EPOCH FROM (COALESCE(${sessionDetails.completedAt}, NOW()) - ${sessionDetails.startedAt})) / 60`
+      })
+      .from(sessionDetails)
+      .innerJoin(users, eq(sessionDetails.userId, users.id))
+      .where(eq(sessionDetails.status, 'completed'))
+      .orderBy(desc(sessionDetails.completedAt))
+      .limit(100);
 
-    console.log(`✅ Found ${sessions.length} sessions`);
+    console.log(`✅ Found ${sessions.length} completed sessions`);
 
     return NextResponse.json(sessions);
 
