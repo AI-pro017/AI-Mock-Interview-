@@ -70,10 +70,9 @@ export async function GET() {
     }
 
     try {
-      // Active sessions (mock interviews in last 24 hours) - using correct table name
+      // Active sessions (currently active sessions from sessionDetails table)
       const activeSessionsResult = await sql`
-        SELECT COUNT(*) as count FROM "mockInterview" 
-        WHERE "createdAt" >= ${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}
+        SELECT COUNT(*) as count FROM session_details 
       `;
       activeSessions = parseInt(activeSessionsResult[0]?.count || 0);
       console.log('🎤 Active sessions:', activeSessions);
@@ -82,10 +81,10 @@ export async function GET() {
     }
 
     try {
-      // Sessions today
+      // Sessions today (sessions started today from sessionDetails table)
       const sessionsTodayResult = await sql`
-        SELECT COUNT(*) as count FROM usage_tracking 
-        WHERE used_at >= ${today.toISOString()}
+        SELECT COUNT(*) as count FROM session_details 
+        WHERE started_at >= ${today.toISOString()}
       `;
       sessionsToday = parseInt(sessionsTodayResult[0]?.count || 0);
       console.log('📊 Sessions today:', sessionsToday);
