@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UserManagement from './components/UserManagement';
 import SessionMonitoring from './components/SessionMonitoring';
 import SubscriptionAnalytics from './components/SubscriptionAnalytics';
-import ContentManagement from './components/ContentManagement';
+// import ContentManagement from './components/ContentManagement'; // Temporarily disabled
 import SupportTools from './components/SupportTools';
 import ReportsExport from './components/ReportsExport';
 import AdminHeader from './components/AdminHeader';
@@ -211,10 +211,11 @@ export default function AdminDashboard() {
               <DollarSign className="w-4 h-4 mr-2" />
               Subscriptions
             </TabsTrigger>
-            <TabsTrigger value="content" className="data-[state=active]:bg-blue-600">
+            {/* Temporarily hide Content tab */}
+            {/* <TabsTrigger value="content" className="data-[state=active]:bg-blue-600">
               <FileText className="w-4 h-4 mr-2" />
               Content
-            </TabsTrigger>
+            </TabsTrigger> */}
             <TabsTrigger value="support" className="data-[state=active]:bg-blue-600">
               <MessageSquare className="w-4 h-4 mr-2" />
               Support
@@ -237,9 +238,10 @@ export default function AdminDashboard() {
             <SubscriptionAnalytics />
           </TabsContent>
 
-          <TabsContent value="content">
+          {/* Temporarily hide Content tab content */}
+          {/* <TabsContent value="content">
             <ContentManagement />
-          </TabsContent>
+          </TabsContent> */}
 
           <TabsContent value="support">
             <SupportTools />

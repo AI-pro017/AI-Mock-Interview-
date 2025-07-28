@@ -10,7 +10,9 @@ import {
   DollarSign,
   Activity,
   Filter,
-  Play
+  Play,
+  CheckCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +32,8 @@ export default function ReportsExport() {
   const [selectedReport, setSelectedReport] = useState('');
   const [dateRange, setDateRange] = useState('30d');
   const [exportFormat, setExportFormat] = useState('csv');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const reportTypes = [
     {
@@ -78,12 +82,17 @@ export default function ReportsExport() {
 
   const generateReport = async () => {
     if (!selectedReport) {
-      alert('Please select a report type');
+      setError('Please select a report type');
       return;
     }
 
     setLoading(true);
+    setError('');
+    setSuccess('');
+
     try {
+      console.log('🔍 Generating report:', { selectedReport, dateRange, exportFormat });
+      
       const response = await fetch('/api/admin/reports/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -104,9 +113,15 @@ export default function ReportsExport() {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+        
+        setSuccess(`Report "${reportTypes.find(r => r.id === selectedReport)?.name}" generated successfully!`);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to generate report');
       }
     } catch (error) {
       console.error('Failed to generate report:', error);
+      setError('Network error: Failed to generate report');
     } finally {
       setLoading(false);
     }
@@ -136,6 +151,21 @@ export default function ReportsExport() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Error and Success Messages */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-900/30 border border-red-700 rounded-lg flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400" />
+              <span className="text-red-300 text-sm">{error}</span>
+            </div>
+          )}
+          
+          {success && (
+            <div className="mb-4 p-3 bg-green-900/30 border border-green-700 rounded-lg flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-green-400" />
+              <span className="text-green-300 text-sm">{success}</span>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-2">
@@ -183,9 +213,9 @@ export default function ReportsExport() {
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
                   <SelectItem value="csv">CSV</SelectItem>
-                  <SelectItem value="xlsx">Excel</SelectItem>
-                  <SelectItem value="pdf">PDF</SelectItem>
                   <SelectItem value="json">JSON</SelectItem>
+                  <SelectItem value="xlsx">Excel (CSV format)</SelectItem>
+                  <SelectItem value="pdf">PDF (CSV format)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -194,7 +224,7 @@ export default function ReportsExport() {
               <Button 
                 onClick={generateReport}
                 disabled={loading || !selectedReport}
-                className="w-full bg-blue-600 hover:bg-blue-700"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -275,16 +305,43 @@ export default function ReportsExport() {
       {/* Recent Reports */}
       <Card className="bg-gray-800 border-gray-700">
         <CardHeader>
-          <CardTitle className="text-white">Recent Reports</CardTitle>
+          <CardTitle className="text-white">Report Information</CardTitle>
           <CardDescription className="text-gray-400">
-            Recently generated reports and downloads
+            Available report formats and data details
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-gray-400">
-            <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No recent reports generated</p>
-            <p className="text-sm">Generated reports will appear here for easy re-download</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-medium text-white mb-3">Supported Formats</h4>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">CSV</Badge>
+                  <span className="text-sm text-gray-400">Comma-separated values (recommended)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">JSON</Badge>
+                  <span className="text-sm text-gray-400">Structured data format</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">Excel</Badge>
+                  <span className="text-sm text-gray-400">CSV format (Excel compatible)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">PDF</Badge>
+                  <span className="text-sm text-gray-400">CSV format (PDF coming soon)</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h4 className="font-medium text-white mb-3">Data Accuracy</h4>
+              <div className="space-y-2 text-sm text-gray-400">
+                <p>• Reports are generated in real-time from the database</p>
+                <p>• Date ranges are inclusive of start and end dates</p>
+                <p>• All times are in UTC timezone</p>
+                <p>• Financial data includes active subscriptions only</p>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
