@@ -82,6 +82,9 @@ export const users = pgTable("users", {
   targetRoles: text('targetRoles'), // Can be a JSON string of roles
   resumeUrl: varchar('resumeUrl'),
   timezone: varchar('timezone'),
+  
+  // 🔒 ADD THE MISSING DISABLED COLUMN
+  disabled: boolean('disabled').default(false),
 });
 
 export const accounts = pgTable(

@@ -3,6 +3,7 @@ import { db } from '@/utils/db';
 import { UserProfile, WorkHistory, Education, Certifications } from '@/utils/schema';
 import { eq } from 'drizzle-orm';
 import { auth } from '@/auth';
+import { requireActiveUser } from '@/utils/auth-helpers';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -48,12 +49,16 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const session = await auth();
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 🔒 Add disabled user check
+    const userCheck = await requireActiveUser();
+    if (userCheck.error) {
+      return NextResponse.json(
+        { error: userCheck.message }, 
+        { status: userCheck.status }
+      );
     }
 
+    const session = await auth();
     const userEmail = session.user.email;
     const formData = await request.json();
 

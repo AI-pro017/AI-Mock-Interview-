@@ -48,6 +48,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         
         // Check if user is disabled
         if (user.disabled) {
+          console.log(`❌ Disabled user attempted credentials sign-in: ${user.email}`);
           return null; // Don't allow disabled users to sign in
         }
         
@@ -67,13 +68,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async signIn({ user, account, profile, isNewUser }) {
-      // Check if user is disabled (for existing users)
-      if (!isNewUser && user?.email) {
+      // For all sign-ins (including Google), check if user is disabled
+      if (user?.email) {
         try {
           const existingUser = await db.select().from(users).where(eq(users.email, user.email)).limit(1);
           
           if (existingUser[0] && existingUser[0].disabled) {
-            console.log(`❌ Disabled user attempted sign-in: ${user.email}`);
+            console.log(`❌ Disabled user attempted sign-in via ${account?.provider}: ${user.email}`);
             return false; // Prevent sign-in for disabled users
           }
           
@@ -90,13 +91,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             console.log(`✅ Updated emailVerified for Google user: ${user.email}`);
           }
         } catch (error) {
-          console.error('Error checking user status:', error);
+          console.error('Error checking user status during sign-in:', error);
+          return false; // Be safe and deny access if we can't check status
         }
       }
       
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
+      // When user data is available (initial sign-in), add it to token
       if (user) {
         token.id = user.id;
         token.experienceLevel = user.experienceLevel;
@@ -105,16 +108,51 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.timezone = user.timezone;
         token.disabled = user.disabled;
       }
+      
+      // For subsequent requests, check if user is still active
+      if (token?.id && !user) {
+        try {
+          const userResult = await db.select().from(users).where(eq(users.id, token.id)).limit(1);
+          const currentUser = userResult[0];
+          
+          if (currentUser?.disabled) {
+            console.log(`❌ User ${token.email} has been disabled, invalidating token`);
+            // Return empty token to invalidate session
+            return {};
+          }
+          
+          // Update token with latest user data
+          token.disabled = currentUser?.disabled;
+          token.experienceLevel = currentUser?.experienceLevel;
+          token.targetRoles = currentUser?.targetRoles;
+          token.resumeUrl = currentUser?.resumeUrl;
+          token.timezone = currentUser?.timezone;
+        } catch (error) {
+          console.error('Error checking user status in JWT callback:', error);
+        }
+      }
+      
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
+        // Check if token is empty (user was disabled)
+        if (!token.id) {
+          return null; // Invalidate session
+        }
+        
         session.user.id = token.id;
         session.user.experienceLevel = token.experienceLevel;
         session.user.targetRoles = token.targetRoles;
         session.user.resumeUrl = token.resumeUrl;
         session.user.timezone = token.timezone;
         session.user.disabled = token.disabled;
+        
+        // Additional check for disabled users
+        if (token.disabled) {
+          console.log(`❌ Disabled user attempting to use session: ${session.user.email}`);
+          return null; // Invalidate session for disabled users
+        }
       }
       return session;
     },
@@ -126,6 +164,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async signIn({ user, account, isNewUser }) {
       if (account?.provider === 'google') {
         console.log(`🔐 Google sign-in: ${user.email}, isNewUser: ${isNewUser}`);
+      } else if (account?.provider === 'credentials') {
+        console.log(`🔐 Credentials sign-in: ${user.email}`);
       }
     }
   },

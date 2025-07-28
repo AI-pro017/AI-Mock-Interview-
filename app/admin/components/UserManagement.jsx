@@ -14,7 +14,10 @@ import {
   X,
   Calendar,
   Users,
-  Activity
+  Activity,
+  Shield,
+  ShieldCheck,
+  UserCog
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +48,7 @@ export default function UserManagement() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [availablePlans, setAvailablePlans] = useState([]);
@@ -56,6 +60,10 @@ export default function UserManagement() {
   });
   const [planForm, setPlanForm] = useState({
     newPlanId: ''
+  });
+  const [adminForm, setAdminForm] = useState({
+    role: 'support',
+    permissions: ['all']
   });
 
   useEffect(() => {
@@ -114,10 +122,91 @@ export default function UserManagement() {
     }
   };
 
+  const fetchUserAdminStatus = async (userId) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/admin-permissions`);
+      if (response.ok) {
+        const adminData = await response.json();
+        return adminData;
+      }
+    } catch (error) {
+      console.error('Failed to fetch admin status:', error);
+    }
+    return { hasAdminPermissions: false };
+  };
+
   const handleViewDetails = async (user) => {
     setSelectedUser(user);
     await fetchUserDetails(user.id);
     setShowUserModal(true);
+  };
+
+  const handleManageAdminPermissions = async (user) => {
+    const adminStatus = await fetchUserAdminStatus(user.id);
+    setSelectedUser({...user, adminStatus});
+    setAdminForm({
+      role: adminStatus.role || 'support',
+      permissions: adminStatus.permissions || ['all']
+    });
+    setShowAdminModal(true);
+  };
+
+  const handleGrantAdminPermissions = async () => {
+    try {
+      const response = await fetch(`/api/admin/users/${selectedUser.id}/admin-permissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'grant',
+          role: adminForm.role,
+          permissions: adminForm.permissions
+        })
+      });
+
+      if (response.ok) {
+        setShowAdminModal(false);
+        fetchUsers();
+        // Show success message or notification here
+        console.log('Admin permissions granted successfully');
+      } else {
+        const error = await response.json();
+        console.error('Failed to grant admin permissions:', error);
+        // Show error message here
+      }
+    } catch (error) {
+      console.error('Failed to grant admin permissions:', error);
+    }
+  };
+
+  const handleRevokeAdminPermissions = (user) => {
+    setConfirmAction({
+      type: 'revoke_admin',
+      user: user,
+      title: 'Revoke Admin Permissions',
+      description: `Are you sure you want to revoke admin permissions for ${user.name || user.email}? They will lose access to the admin portal and all administrative functions.`,
+      confirmText: 'Revoke Permissions',
+      action: async () => {
+        try {
+          const response = await fetch(`/api/admin/users/${user.id}/admin-permissions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'revoke'
+            })
+          });
+          if (response.ok) {
+            fetchUsers();
+            console.log('Admin permissions revoked successfully');
+          } else {
+            const error = await response.json();
+            console.error('Failed to revoke admin permissions:', error);
+          }
+        } catch (error) {
+          console.error('Failed to revoke admin permissions:', error);
+        }
+      }
+    });
+    setShowConfirmDialog(true);
   };
 
   const handleDeleteUser = (user) => {
@@ -365,6 +454,15 @@ export default function UserManagement() {
     }
   };
 
+  const getAdminRoleBadgeColor = (role) => {
+    switch (role) {
+      case 'super_admin': return 'bg-red-600';
+      case 'admin': return 'bg-orange-600';
+      case 'support': return 'bg-blue-600';
+      default: return 'bg-gray-600';
+    }
+  };
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString();
   };
@@ -579,9 +677,16 @@ export default function UserManagement() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={user.disabled ? 'bg-red-500' : 'bg-green-500'}>
-                        {user.disabled ? 'Disabled' : 'Active'}
-                      </Badge>
+                      <div className="space-y-1">
+                        <Badge className={user.disabled ? 'bg-red-500' : 'bg-green-500'}>
+                          {user.disabled ? 'Disabled' : 'Active'}
+                        </Badge>
+                        {user.adminRole && (
+                          <Badge className={`${getAdminRoleBadgeColor(user.adminRole)} text-white text-xs`}>
+                            {user.adminRole.replace('_', ' ')}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-gray-300">
                       {formatDate(user.emailVerified)}
@@ -595,6 +700,15 @@ export default function UserManagement() {
                           title="View Details"
                         >
                           <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-blue-400 hover:text-blue-300"
+                          onClick={() => handleManageAdminPermissions(user)}
+                          title="Manage Admin Permissions"
+                        >
+                          <UserCog className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -620,6 +734,102 @@ export default function UserManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Admin Permissions Modal */}
+      <Dialog open={showAdminModal} onOpenChange={setShowAdminModal}>
+        <DialogContent className="bg-gray-800 border-gray-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Manage Admin Permissions</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Grant or modify admin permissions for {selectedUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedUser?.adminStatus?.hasAdminPermissions && (
+              <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm text-blue-300">Current Admin Status:</span>
+                  <Badge className={`${getAdminRoleBadgeColor(selectedUser.adminStatus.role)} text-white`}>
+                    {selectedUser.adminStatus.role?.replace('_', ' ')}
+                  </Badge>
+                </div>
+              </div>
+            )}
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Admin Role</label>
+              <Select value={adminForm.role} onValueChange={(value) => setAdminForm({...adminForm, role: value})}>
+                <SelectTrigger className="bg-gray-700 border-gray-600">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-700">
+                  <SelectItem value="support">Support - Can view user data and help with issues</SelectItem>
+                  <SelectItem value="admin">Admin - Full administrative access</SelectItem>
+                  <SelectItem value="super_admin">Super Admin - Complete system control</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="bg-gray-700 p-4 rounded-lg">
+              <h4 className="font-medium text-white mb-2">Role Permissions</h4>
+              <div className="text-sm text-gray-300 space-y-1">
+                {adminForm.role === 'support' && (
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>View user profiles and session data</li>
+                    <li>Add session credits</li>
+                    <li>Add support notes</li>
+                  </ul>
+                )}
+                {adminForm.role === 'admin' && (
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>All support permissions</li>
+                    <li>Manage user subscriptions</li>
+                    <li>Disable/enable user accounts</li>
+                    <li>Delete user accounts</li>
+                    <li>Grant support permissions</li>
+                  </ul>
+                )}
+                {adminForm.role === 'super_admin' && (
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>All admin permissions</li>
+                    <li>Manage all content</li>
+                    <li>Grant any admin permissions</li>
+                    <li>System configuration access</li>
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-between mt-6">
+            <div>
+              {selectedUser?.adminStatus?.hasAdminPermissions && (
+                <Button 
+                  variant="outline" 
+                  className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white"
+                  onClick={() => {
+                    setShowAdminModal(false);
+                    handleRevokeAdminPermissions(selectedUser);
+                  }}
+                >
+                  <Shield className="w-4 h-4 mr-2" />
+                  Revoke Permissions
+                </Button>
+              )}
+            </div>
+            <div className="space-x-2">
+              <Button variant="outline" onClick={() => setShowAdminModal(false)}>
+                Cancel
+              </Button>
+              <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleGrantAdminPermissions}>
+                <UserCog className="w-4 h-4 mr-2" />
+                {selectedUser?.adminStatus?.hasAdminPermissions ? 'Update Permissions' : 'Grant Permissions'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* User Detail Modal */}
       <Dialog open={showUserModal} onOpenChange={setShowUserModal}>
@@ -713,6 +923,17 @@ export default function UserManagement() {
                   >
                     <Gift className="w-4 h-4 mr-2" />
                     Add Credits
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="border-blue-600 text-blue-400"
+                    onClick={() => {
+                      setShowUserModal(false);
+                      handleManageAdminPermissions(selectedUser);
+                    }}
+                  >
+                    <UserCog className="w-4 h-4 mr-2" />
+                    Admin Permissions
                   </Button>
                 </div>
                 <div className="space-x-2">
@@ -913,7 +1134,7 @@ export default function UserManagement() {
         description={confirmAction?.description}
         confirmText={confirmAction?.confirmText}
         onConfirm={confirmAction?.action}
-        destructive={confirmAction?.type === 'delete' || confirmAction?.type === 'disable'}
+        destructive={confirmAction?.type === 'delete' || confirmAction?.type === 'disable' || confirmAction?.type === 'revoke_admin'}
       />
     </div>
   );

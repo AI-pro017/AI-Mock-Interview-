@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 import { eq } from 'drizzle-orm';
+import { requireActiveUser } from '@/utils/auth-helpers';
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -12,11 +13,16 @@ const openai = new OpenAI({
 
 export async function POST(req) {
     try {
-        const session = await auth();
-        if (!session?.user?.id) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        // 🔒 Add disabled user check
+        const userCheck = await requireActiveUser();
+        if (userCheck.error) {
+            return NextResponse.json(
+                { error: userCheck.message }, 
+                { status: userCheck.status }
+            );
         }
 
+        const session = await auth();
         const body = await req.json();
         const { 
             jobRole, jobDescription, jobExperience, industry, skills, 
@@ -166,6 +172,15 @@ export async function POST(req) {
 }
 
 export async function GET(req) {
+    // 🔒 Add disabled user check
+    const userCheck = await requireActiveUser();
+    if (userCheck.error) {
+        return NextResponse.json(
+            { error: userCheck.message }, 
+            { status: userCheck.status }
+        );
+    }
+
     const url = new URL(req.url);
     const id = url.searchParams.get('id');
     
@@ -175,9 +190,6 @@ export async function GET(req) {
     
     try {
         const session = await auth();
-        if (!session?.user?.id) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
         
         const interview = await db.select()
             .from(MockInterview)

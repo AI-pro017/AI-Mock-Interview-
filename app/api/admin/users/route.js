@@ -31,11 +31,11 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit')) || 50;
     const offset = (page - 1) * limit;
 
-    // Fetch users with correct column names including disabled status
+    // Fetch users with correct column names including disabled status and admin info
     let usersData = [];
     
     try {
-      // Get basic user data with correct column names
+      // Get basic user data with admin role information
       usersData = await sql`
         SELECT 
           u.id,
@@ -45,8 +45,12 @@ export async function GET(request) {
           u.image,
           u."experienceLevel",
           u."targetRoles",
-          COALESCE(u.disabled, false) as disabled
+          COALESCE(u.disabled, false) as disabled,
+          au.role as "adminRole",
+          au.permissions as "adminPermissions",
+          au.is_active as "adminIsActive"
         FROM users u
+        LEFT JOIN admin_users au ON u.id = au.user_id AND au.is_active = true
         ORDER BY u."emailVerified" DESC NULLS LAST
         LIMIT ${limit} OFFSET ${offset}
       `;

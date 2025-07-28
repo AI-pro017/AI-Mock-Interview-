@@ -2,14 +2,39 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
-import { Bell, UserCircle, LogOut, User } from 'lucide-react'
+import { Bell, UserCircle, LogOut, User, Shield } from 'lucide-react'
 import Link from 'next/link'
 import SubscriptionStatus from './SubscriptionStatus'
 
 function Header({ pageTitle }) {
     const { data: session } = useSession();
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [adminLoading, setAdminLoading] = useState(true);
     const dropdownRef = useRef(null);
+
+    // Check admin status when session changes
+    useEffect(() => {
+        if (session?.user?.id) {
+            checkAdminStatus();
+        } else {
+            setIsAdmin(false);
+            setAdminLoading(false);
+        }
+    }, [session]);
+
+    const checkAdminStatus = async () => {
+        try {
+            const response = await fetch('/api/admin/auth/check');
+            const data = await response.json();
+            setIsAdmin(data.authorized || false);
+        } catch (error) {
+            console.error('Error checking admin status:', error);
+            setIsAdmin(false);
+        } finally {
+            setAdminLoading(false);
+        }
+    };
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -61,6 +86,15 @@ function Header({ pageTitle }) {
                                 <User className="w-4 h-4 mr-2" />
                                 My Account
                             </Link>
+                            
+                            {/* Admin Portal Button - Only shown for admin users */}
+                            {!adminLoading && isAdmin && (
+                                <Link href="/admin" className="flex items-center w-full px-4 py-2 text-sm text-slate-300 hover:bg-slate-700">
+                                    <Shield className="w-4 h-4 mr-2" />
+                                    Admin Portal
+                                </Link>
+                            )}
+                            
                             <button
                                 onClick={() => signOut({ callbackUrl: '/' })}
                                 className="flex items-center w-full px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"

@@ -1,17 +1,23 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { SubscriptionService } from '@/utils/subscriptionService';
+import { requireActiveUser } from '@/utils/auth-helpers';
 
 // Add this line to fix the dynamic server usage error
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 🔒 Add disabled user check
+    const userCheck = await requireActiveUser();
+    if (userCheck.error) {
+      return NextResponse.json(
+        { error: userCheck.message }, 
+        { status: userCheck.status }
+      );
     }
 
+    const session = await auth();
     const subscription = await SubscriptionService.getUserSubscription(session.user.id);
     const usage = subscription ? await SubscriptionService.getUserUsage(session.user.id, subscription.id) : null;
 

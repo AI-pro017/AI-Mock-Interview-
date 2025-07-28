@@ -15,6 +15,7 @@ export default function Page() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
@@ -40,24 +41,48 @@ export default function Page() {
   const handleCredentialSignIn = async (e) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    const result = await signIn('credentials', {
-      redirect: false,
-      email,
-      password,
-      callbackUrl,
-    });
+    try {
+      // First, check if user is disabled before attempting sign-in
+      const userCheckResponse = await fetch('/api/auth/check-user-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
 
-    if (result?.error) {
-      setError('Invalid email or password. Please try again.');
-    } else if (result?.ok) {
-      router.push(callbackUrl);
+      if (userCheckResponse.ok) {
+        const userStatus = await userCheckResponse.json();
+        if (userStatus.disabled) {
+          setError('Your account has been disabled. Please contact support.');
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Proceed with normal sign-in
+      const result = await signIn('credentials', {
+        redirect: false,
+        email,
+        password,
+        callbackUrl,
+      });
+
+      if (result?.error) {
+        setError('Invalid email or password. Please try again.');
+      } else if (result?.ok) {
+        router.push(callbackUrl);
+      }
+    } catch (error) {
+      console.error('Sign-in error:', error);
+      setError('An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleGoogleSignIn = () => {
     try {
-
       signIn('google', { 
         callbackUrl,
         redirect: true
@@ -88,6 +113,7 @@ export default function Page() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={isLoading}
               className="bg-[#1a2234] border-[#2c3648] text-white focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -107,12 +133,17 @@ export default function Page() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={isLoading}
               className="bg-[#1a2234] border-[#2c3648] text-white focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           {error && <p className="text-sm text-red-400">{error}</p>}
-          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold">
-            Sign In with Email
+          <Button 
+            type="submit" 
+            disabled={isLoading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold disabled:opacity-50"
+          >
+            {isLoading ? 'Signing In...' : 'Sign In with Email'}
           </Button>
         </form>
         <div className="relative">
@@ -129,6 +160,7 @@ export default function Page() {
           variant="outline"
           className="w-full flex items-center justify-center gap-2 bg-[#1a2234] border-[#2c3648] hover:bg-[#2c3648] text-white"
           onClick={handleGoogleSignIn}
+          disabled={isLoading}
         >
           <FaGoogle className="text-red-500" />
           Sign In with Google
