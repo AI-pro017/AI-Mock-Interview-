@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { X, Sparkles, CheckCircle, ArrowRight } from 'lucide-react';
+import { Sparkles, CheckCircle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default function FirstTimeVisitModal() {
@@ -40,21 +40,11 @@ export default function FirstTimeVisitModal() {
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-md bg-gradient-to-br from-gray-900 via-blue-900/20 to-purple-900/20 border-gray-700 text-white">
         <DialogHeader>
-          <div className="flex justify-between items-start">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-6 h-6 text-blue-400" />
-              <DialogTitle className="text-xl font-bold text-white">
-                Welcome to AI Mock Interview!
-              </DialogTitle>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-              className="text-gray-400 hover:text-white h-8 w-8"
-            >
-              <X className="w-4 h-4" />
-            </Button>
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-6 h-6 text-blue-400" />
+            <DialogTitle className="text-xl font-bold text-white">
+              Welcome to AI Mock Interview!
+            </DialogTitle>
           </div>
           <DialogDescription className="text-gray-300 mt-2">
             Practice your first mock interview free and boost your confidence!
