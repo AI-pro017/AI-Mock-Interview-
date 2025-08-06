@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { 
   Shield, 
   LogOut, 
-  Settings, 
   User, 
   Bell,
   ChevronDown
@@ -69,10 +68,6 @@ export default function AdminHeader() {
               <DropdownMenuItem onClick={() => router.push('/dashboard')}>
                 <User className="w-4 h-4 mr-2" />
                 User Dashboard
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push('/admin/settings')}>
-                <Settings className="w-4 h-4 mr-2" />
-                Admin Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut} className="text-red-400">
