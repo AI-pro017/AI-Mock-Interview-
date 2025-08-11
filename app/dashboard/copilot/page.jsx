@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Bot, BrainCircuit, User as UserIcon, Loader, Monitor, MonitorOff, AlertTriangle, Send, MessageSquare, X, Volume2, VolumeX, HelpCircle, Info, Clock, Zap } from 'lucide-react';
+import { Bot, BrainCircuit, User as UserIcon, Loader, Monitor, MonitorOff, AlertTriangle, Send, MessageSquare, X, Volume2, VolumeX, HelpCircle, Info, Clock, Zap, Maximize2, Minimize2 } from 'lucide-react';
 import { useAudioCapture } from './hooks/useAudioCapture';
 import { useDeepgram } from './hooks/useDeepgram';
 import { useTranscriptManager } from './hooks/useTranscriptManager';
@@ -20,6 +20,7 @@ const InterviewCopilotPage = () => {
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [upgradeReason, setUpgradeReason] = useState('');
     const [leftPanelWidth, setLeftPanelWidth] = useState(45); // percentage
+    const [isRightExpanded, setIsRightExpanded] = useState(false);
     const [sessionStartTime, setSessionStartTime] = useState(null);
     const [sessionId, setSessionId] = useState(null);
     const [sessionTracked, setSessionTracked] = useState(false);
@@ -1045,7 +1046,7 @@ const InterviewCopilotPage = () => {
             {/* Desktop Layout (Side by side) */}
             <div ref={containerRef} className="hidden lg:flex flex-grow gap-4 min-h-0 w-full overflow-hidden">
                 {/* Left Column - 3 panels stacked */}
-                <div className="flex flex-col gap-4 min-h-0 h-[calc(100vh-80px)] overflow-hidden flex-shrink-0" style={{width: `${leftPanelWidth}%`}}>
+                <div className={`${isRightExpanded ? 'hidden' : 'flex'} flex-col gap-4 min-h-0 h-[calc(100vh-80px)] overflow-hidden flex-shrink-0`} style={{width: `${leftPanelWidth}%`}}>
                     {/* Top Left: Interview Copilot Component (Video) */}
                     <div className="h-[45%] bg-black rounded-lg overflow-hidden flex items-center justify-center relative min-h-0">
                         <video ref={videoRef} autoPlay muted className="w-full h-full object-contain" />
@@ -1190,7 +1191,7 @@ const InterviewCopilotPage = () => {
 
                 {/* Resizable divider - Desktop only */}
                 <div 
-                    className="w-1 bg-gray-600 hover:bg-blue-500 cursor-col-resize transition-colors relative group flex-shrink-0" 
+                    className={`${isRightExpanded ? 'hidden' : 'block'} w-1 bg-gray-600 hover:bg-blue-500 cursor-col-resize transition-colors relative group flex-shrink-0`} 
                     onMouseDown={handleMouseDown}
                     title="Drag to resize panels"
                 >
@@ -1216,12 +1217,27 @@ const InterviewCopilotPage = () => {
                                     )}
                                 </div>
                             </div>
-                            {isLoadingSuggestions && (
-                                <div className="flex items-center text-gray-400 flex-shrink-0">
-                                    <Loader className="w-5 h-5 mr-2 animate-spin" />
-                                    <span className="text-sm">Stage 1 generating...</span>
-                                </div>
-                            )}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                {isLoadingSuggestions && (
+                                    <div className="flex items-center text-gray-400">
+                                        <Loader className="w-5 h-5 mr-2 animate-spin" />
+                                        <span className="text-sm">Stage 1 generating...</span>
+                                    </div>
+                                )}
+                                <Button variant="outline" size="sm" className="bg-gray-800 border-gray-600 hover:bg-gray-700 text-white" onClick={() => setIsRightExpanded(prev => !prev)}>
+                                    {isRightExpanded ? (
+                                        <div className="flex items-center gap-1">
+                                            <Minimize2 className="w-4 h-4" />
+                                            <span className="hidden xl:inline">Collapse</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1">
+                                            <Maximize2 className="w-4 h-4" />
+                                            <span className="hidden xl:inline">Expand</span>
+                                        </div>
+                                    )}
+                                </Button>
+                            </div>
                         </div>
                     </div>
                     <div className="flex-grow p-4 space-y-4 overflow-y-auto">
@@ -1248,12 +1264,12 @@ const InterviewCopilotPage = () => {
                         )}
                         
                         {suggestions.map((s, i) => (
-                            <div key={i} className="bg-gray-700 p-4 rounded-lg overflow-hidden">
+                            <div key={i} className="bg-gray-700 p-4 rounded-lg">
                                 <h4 className="font-bold text-xl flex items-center mb-3">
                                     <BrainCircuit className="w-5 h-5 mr-2 text-green-400" />
                                     <span className="truncate">{s.type}</span>
                                 </h4>
-                                <div className="overflow-y-auto text-lg leading-relaxed">
+                                <div className="text-lg leading-relaxed">
                                     <CodeHighlighter content={s.content} />
                                 </div>
                             </div>

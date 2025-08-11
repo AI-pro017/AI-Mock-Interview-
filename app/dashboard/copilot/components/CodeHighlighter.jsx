@@ -39,7 +39,7 @@ const CodeHighlighter = ({ content }) => {
                                     margin: 0,
                                     padding: '16px',
                                     background: 'transparent',
-                                    fontSize: '14px',
+                                    fontSize: '16px',
                                     lineHeight: '1.5'
                                 }}
                                 showLineNumbers={false}
@@ -63,7 +63,7 @@ const CodeHighlighter = ({ content }) => {
     };
 
     return (
-        <div className="text-gray-300 leading-relaxed text-sm">
+        <div className="text-gray-300 leading-relaxed text-base md:text-lg">
             {parseContent(content)}
         </div>
     );
