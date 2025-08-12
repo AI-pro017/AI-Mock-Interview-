@@ -580,7 +580,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
   }, [interview.mockId]);
 
   return (
-    <div className="bg-gray-900 text-white">
+    <div className="bg-gray-900 text-white min-h-screen flex flex-col">
       {isAnalyzing ? (
         <div className="flex flex-col items-center justify-center h-screen">
           <div className="text-center mb-8">
@@ -597,7 +597,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
           </div>
         </div>
       ) : (
-        <div className="p-4">
+        <div className="p-4 container mx-auto flex-1 flex flex-col">
           {/* Header with interview info */}
           <div className="flex justify-between items-center mb-4">
             <div>
@@ -614,7 +614,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
           </div>
 
           {/* Main content area - full width */}
-          <div className="flex flex-col">
+          <div className="flex flex-col flex-1 min-h-0">
             {/* Video and conversation area */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               {/* Camera/video area */}
@@ -678,7 +678,7 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
             </div>
 
             {/* Conversation display - full width */}
-            <Card className="bg-gray-800 border-gray-700 overflow-hidden h-[calc(70vh-8rem)] mb-4">
+            <Card className="bg-gray-800 border-gray-700 overflow-hidden flex-1 min-h-[220px] mb-4">
               {isInterviewActive ? (
                 <ConversationDisplayWithAutoScroll
                   conversation={conversation}
@@ -698,8 +698,8 @@ export default function InterviewSession({ interview, useCameraInInterview }) {
               )}
             </Card>
 
-            {/* Bottom controls - compact row */}
-            <div className="flex flex-wrap gap-4 items-center justify-between bg-gray-800 p-4 rounded-lg">
+            {/* Bottom controls - sticky footer */}
+            <div className="sticky bottom-0 left-0 right-0 z-10 bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-gray-900/80 border-t border-gray-800 p-4 rounded-none flex flex-wrap gap-4 items-center justify-between">
               <div className="flex items-center gap-4">
                 {/* Voice speed control */}
                 <div className="flex items-center gap-2">

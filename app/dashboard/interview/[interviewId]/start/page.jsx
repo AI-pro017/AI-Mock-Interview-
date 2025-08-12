@@ -51,46 +51,50 @@ export default function InterviewStartPage() {
 
     if (!isSetupComplete) {
         return (
-            <div className="container mx-auto p-5 bg-gray-900 text-white">
-                <h1 className="text-2xl font-bold mb-6">Interview Setup</h1>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <Card className="p-6 bg-gray-800 border-gray-700">
-                            <h2 className="text-xl font-bold mb-4">Interview Details</h2>
-                            {interview && (
-                                <div className="space-y-4">
-                                    <div>
-                                        <span className="font-semibold">Position:</span> {interview.jobPosition}
+            <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+                <div className="container mx-auto flex-1 p-5">
+                    <h1 className="text-2xl font-bold mb-6">Interview Setup</h1>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <Card className="p-6 bg-gray-800 border-gray-700">
+                                <h2 className="text-xl font-bold mb-4">Interview Details</h2>
+                                {interview && (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <span className="font-semibold">Position:</span> {interview.jobPosition}
+                                        </div>
+                                        <div>
+                                            <span className="font-semibold">Experience Level:</span> {interview.jobExperience} years
+                                        </div>
+                                        <div>
+                                            <span className="font-semibold">Interview Style:</span> {interview.interviewStyle}
+                                        </div>
+                                        <div>
+                                            <span className="font-semibold">Focus:</span> {interview.focus}
+                                        </div>
+                                        <div>
+                                            <span className="font-semibold">Duration:</span> {interview.duration} minutes
+                                        </div>
                                     </div>
-                                    <div>
-                                        <span className="font-semibold">Experience Level:</span> {interview.jobExperience} years
-                                    </div>
-                                    <div>
-                                        <span className="font-semibold">Interview Style:</span> {interview.interviewStyle}
-                                    </div>
-                                    <div>
-                                        <span className="font-semibold">Focus:</span> {interview.focus}
-                                    </div>
-                                    <div>
-                                        <span className="font-semibold">Duration:</span> {interview.duration} minutes
-                                    </div>
-                                </div>
-                            )}
-                        </Card>
+                                )}
+                            </Card>
+                        </div>
+                        <CameraSelection 
+                            initialEnabled={useCameraInInterview} 
+                            onCameraToggle={handleCameraToggle} 
+                        />
                     </div>
-                    <CameraSelection 
-                        initialEnabled={useCameraInInterview} 
-                        onCameraToggle={handleCameraToggle} 
-                    />
                 </div>
-                <div className="mt-6 flex justify-center">
-                    <Button 
-                        size="lg" 
-                        onClick={handleStartInterview}
-                        className="bg-blue-600 hover:bg-blue-700"
-                    >
-                        Start Interview
-                    </Button>
+                <div className="sticky bottom-0 w-full border-t border-gray-800 bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-gray-900/80">
+                    <div className="container mx-auto p-4 flex justify-center">
+                        <Button 
+                            size="lg" 
+                            onClick={handleStartInterview}
+                            className="bg-blue-600 hover:bg-blue-700"
+                        >
+                            Start Interview
+                        </Button>
+                    </div>
                 </div>
             </div>
         );
