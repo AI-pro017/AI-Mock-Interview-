@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Bot, BrainCircuit, User as UserIcon, Loader, Monitor, MonitorOff, AlertTriangle, Send, MessageSquare, X, Volume2, VolumeX, HelpCircle, Info, Clock, Zap, Maximize2, Minimize2 } from 'lucide-react';
+import { Bot, BrainCircuit, Loader, Monitor, MonitorOff, AlertTriangle, Send, X, HelpCircle, Clock, Zap, Maximize2, Minimize2 } from 'lucide-react';
 import { useAudioCapture } from './hooks/useAudioCapture';
 import { useDeepgram } from './hooks/useDeepgram';
 import { useTranscriptManager } from './hooks/useTranscriptManager';
@@ -938,10 +938,9 @@ const InterviewCopilotPage = () => {
                     )}
                 </div>
 
-                {/* Mobile: Input and Transcription Combined - Much longer */}
-                <div className="bg-gray-800 rounded-lg shadow-lg flex flex-col min-h-[500px] mb-6">
-                    {/* Input Section */}
-                    <div className="p-4 border-b border-gray-700">
+                {/* Mobile: Input Only */}
+                <div className="bg-gray-800 rounded-lg shadow-lg flex flex-col mb-6">
+                    <div className="p-4">
                         {userOverride && (
                             <div className="mb-3 p-3 rounded-lg bg-green-600 relative">
                                 <button
@@ -954,7 +953,7 @@ const InterviewCopilotPage = () => {
                                 <p className="text-gray-200 text-sm">{userOverride.text}</p>
                             </div>
                         )}
-                        
+
                         <form onSubmit={handleUserInput} className="flex gap-3">
                             <input
                                 ref={inputRef}
@@ -978,68 +977,6 @@ const InterviewCopilotPage = () => {
                             </Button>
                         </form>
                     </div>
-
-                    {/* Transcription Section - Much more space */}
-                    <div className="flex-grow p-4">
-                        <div className="text-sm text-gray-400 mb-4">
-                            Live Transcription • {transcripts.length} transcripts
-                        </div>
-                        <div className="space-y-3">
-                            {transcripts.length === 0 && (
-                                <div className="text-gray-400 text-center py-12 text-base">
-                                    No transcripts yet. Start speaking...
-                                </div>
-                            )}
-                            {transcripts.map((block) => {
-                                const isUser = block.speaker === 'You';
-                                const textLength = block.text.length;
-                                // Dynamic width based on text length
-                                const widthClass = textLength <= 20 ? 'w-fit min-w-[120px] max-w-[70%]' : 
-                                                 textLength <= 50 ? 'max-w-[75%]' : 'max-w-[85%]';
-                                
-                                return (
-                                    <div key={block.id} className={`flex items-start gap-2 ${isUser ? 'justify-end' : ''}`}>
-                                        {!isUser && <UserIcon className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />}
-                                        <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
-                                            <div className={`p-3 rounded-lg ${widthClass} ${isUser ? 'bg-blue-600' : 'bg-gray-700'}`}>
-                                                <span className="font-semibold block text-sm">{block.speaker}</span>
-                                                <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">{block.text}</p>
-                                            </div>
-                                        </div>
-                                        {isUser && <UserIcon className="w-4 h-4 text-blue-300 mt-1 flex-shrink-0" />}
-                                    </div>
-                                );
-                            })}
-                            
-                            {/* User Override Block - appears after transcripts */}
-                            {userOverride && (
-                                <div className="flex items-start gap-2 justify-end">
-                                    <div className="flex flex-col items-end">
-                                        {(() => {
-                                            const overrideTextLength = userOverride.text.length;
-                                            const overrideWidthClass = overrideTextLength <= 20 ? 'w-fit min-w-[120px] max-w-[70%]' : 
-                                                                     overrideTextLength <= 50 ? 'max-w-[75%]' : 'max-w-[85%]';
-                                            return (
-                                                <div className={`p-3 rounded-lg ${overrideWidthClass} bg-green-600 relative`}>
-                                                    <button
-                                                        onClick={() => setUserOverride(null)}
-                                                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                                                    >
-                                                        <X className="w-2.5 h-2.5 text-white" />
-                                                    </button>
-                                                    <span className="font-semibold block text-sm">User Override</span>
-                                                    <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">{userOverride.text}</p>
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-                                    <MessageSquare className="w-4 h-4 text-green-300 mt-1 flex-shrink-0" />
-                                </div>
-                            )}
-                            
-                            <div ref={transcriptEndRef} />
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -1048,7 +985,7 @@ const InterviewCopilotPage = () => {
                 {/* Left Column - 3 panels stacked */}
                 <div className={`${isRightExpanded ? 'hidden' : 'flex'} flex-col gap-4 min-h-0 h-[calc(100vh-80px)] overflow-hidden flex-shrink-0`} style={{width: `${leftPanelWidth}%`}}>
                     {/* Top Left: Interview Copilot Component (Video) */}
-                    <div className="h-[45%] bg-black rounded-lg overflow-hidden flex items-center justify-center relative min-h-0">
+                    <div className="flex-1 bg-black rounded-lg overflow-hidden flex items-center justify-center relative min-h-0">
                         <video ref={videoRef} autoPlay muted className="w-full h-full object-contain" />
                         {!isCapturing && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-gray-500 p-1 xl:p-2 2xl:p-4 overflow-y-auto">
@@ -1118,7 +1055,8 @@ const InterviewCopilotPage = () => {
                         </div>
                     </div>
 
-                    {/* Bottom Left: Live Transcription */}
+                    {/* Bottom Left: Live Transcription - removed from display */}
+                    {/**
                     <div className="h-[40%] bg-gray-800 rounded-lg shadow-lg flex flex-col min-h-0 overflow-hidden">
                         <div className="p-1 xl:p-2 2xl:p-3 border-b border-gray-700 flex-shrink-0">
                             <h2 className="text-xs xl:text-sm 2xl:text-lg font-semibold text-blue-300">Live Transcription</h2>
@@ -1158,7 +1096,7 @@ const InterviewCopilotPage = () => {
                                 );
                             })}
                             
-                            {/* User Override Block - appears after transcripts */}
+                            REMOVED User Override Block
                             {userOverride && (
                                 <div className="flex items-start gap-1 xl:gap-2 justify-end">
                                     <div className="flex flex-col items-end min-w-0">
@@ -1187,6 +1125,7 @@ const InterviewCopilotPage = () => {
                             <div ref={transcriptEndRef} />
                         </div>
                     </div>
+                    **/}
                 </div>
 
                 {/* Resizable divider - Desktop only */}
