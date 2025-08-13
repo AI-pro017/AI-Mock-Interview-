@@ -6,6 +6,7 @@ import ChatAssistant from '@/components/ui/chat-assistant'
 export const metadata = {
   title: 'AI Mock Interview',
   description: 'Practice for your next interview with AI',
+  alternates: { canonical: '/' },
 };
 
 export default function RootLayout({ children }) {

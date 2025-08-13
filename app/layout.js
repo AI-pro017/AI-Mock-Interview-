@@ -5,6 +5,7 @@ import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import Provider from './Provider'
 import ChatAssistant from '@/components/ui/chat-assistant'
+import { siteConfig, defaultOpenGraph, defaultTwitter } from '@/lib/seo'
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -20,8 +21,21 @@ const geistMono = localFont({
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "AI Mock Interview | Land Your Dream Job",
-  description: "Practice your interview skills with an AI-powered mock interviewer. Get instant feedback and improve your performance.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+  title: {
+    default: siteConfig.title,
+    template: `%s | ${siteConfig.name}`
+  },
+  description: siteConfig.description,
+  openGraph: defaultOpenGraph,
+  twitter: defaultTwitter,
+  alternates: {
+    canonical: '/',
+  },
+  robots: {
+    index: true,
+    follow: true
+  },
   icons: {
     icon: '/favicon.jpg',
   },

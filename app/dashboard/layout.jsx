@@ -28,6 +28,7 @@ function DashboardLayout({ children }) {
     return (
         <SessionProvider>
             <div className="min-h-screen bg-[#0d1526]">
+                <link rel="canonical" href={process.env.NEXT_PUBLIC_SITE_URL ? `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard` : undefined} />
                 {/* Unified top header bar */}
                 <Header pageTitle={getPageTitle()} />
                 
