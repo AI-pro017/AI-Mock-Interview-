@@ -1,41 +1,80 @@
-// AI-Mock-Interview-/app/page.js
-'use client'; // Add this if not already present, for using hooks like useState, useEffect
+'use client';
 
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 import Image from "next/image";
-import { ArrowRight, Bot, ShieldCheck, Zap, CheckCircle } from 'lucide-react';
-import { useEffect, useState } from "react"; // Import useEffect and useState
-import FirstTimeVisitModal from "@/components/ui/first-time-visit-modal"; // Add this import
-import { Avatar } from "@/components/ui/avatar"; // Add Avatar component import
+import { ArrowRight, Bot, ShieldCheck, Zap, CheckCircle, Sparkles, Target, Users, Star, Play, Mic, Brain, TrendingUp, Rocket, Award, Globe, Clock, CheckCircle2 } from 'lucide-react';
+import { useEffect, useState } from "react";
+import FirstTimeVisitModal from "@/components/ui/first-time-visit-modal";
+import { Avatar } from "@/components/ui/avatar";
 
 export default function Home() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
-    // This ensures that the year is set on the client side after mounting,
-    // aligning with what the client sees, thus avoiding mismatch with server render
-    // if there was any discrepancy. For a static year, this complexity isn't strictly
-    // needed, but it's a robust way to handle dynamic client-side values.
     setCurrentYear(new Date().getFullYear());
   }, []);
 
   const features = [
     {
-      icon: <Bot size={32} className="text-blue-500" />,
-      title: "Realistic AI Interviews",
-      description: "Practice with an AI that asks relevant questions and understands your responses.",
+      icon: <Brain size={32} className="text-white" />,
+      title: "AI Interview Coach",
+      description: "Your personal AI mentor that adapts to your skill level and provides real-time guidance during interviews."
     },
     {
-      icon: <Zap size={32} className="text-green-500" />,
-      title: "Instant, Actionable Feedback",
-      description: "Receive immediate feedback on your answers, delivery, and body language.",
+      icon: <Target size={32} className="text-white" />,
+      title: "Smart Practice Sessions",
+      description: "Role-specific mock interviews with industry-standard questions and instant performance analytics."
     },
     {
-      icon: <ShieldCheck size={32} className="text-purple-500" />,
-      title: "Build Confidence",
-      description: "Our adaptive AI helps you improve your skills and build confidence for any interview.",
+      icon: <Sparkles size={32} className="text-white" />,
+      title: "Interview Copilot",
+      description: "Real-time suggestions, answer improvements, and confidence-building feedback as you practice."
+    }
+  ];
+
+  const benefits = [
+    {
+      icon: <Rocket className="w-6 h-6" />,
+      title: "10x Faster Learning",
+      description: "Accelerate your interview skills with AI-powered insights and targeted practice"
     },
+    {
+      icon: <Users className="w-6 h-6" />,
+      title: "Industry Experts",
+      description: "Access to questions and scenarios from top companies and hiring managers"
+    },
+    {
+      icon: <TrendingUp className="w-6 h-6" />,
+      title: "Progress Tracking",
+      description: "Monitor your improvement with detailed analytics and performance metrics"
+    },
+    {
+      icon: <Award className="w-6 h-6" />,
+      title: "Certification Ready",
+      description: "Prepare for technical certifications and advanced role interviews"
+    }
+  ];
+
+  const howItWorks = [
+    {
+      number: "01",
+      title: "Choose Your Path",
+      description: "Select your target role, industry, and experience level for personalized practice",
+      icon: <Target className="w-8 h-8" />
+    },
+    {
+      number: "02",
+      title: "AI-Powered Practice",
+      description: "Engage in realistic interviews with our advanced AI that adapts to your responses",
+      icon: <Bot className="w-8 h-8" />
+    },
+    {
+      number: "03",
+      title: "Get Instant Feedback",
+      description: "Receive detailed analysis, improvement suggestions, and confidence scores",
+      icon: <Sparkles className="w-8 h-8" />
+    }
   ];
 
   const testimonials = [
@@ -108,138 +147,260 @@ export default function Home() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0d1526] text-gray-300">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
       {/* Add the First Time Visit Modal */}
       <FirstTimeVisitModal />
       
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div className="absolute top-40 left-40 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
+      </div>
+
       {/* Navigation Bar */}
-      <nav className="w-full py-4 px-6 md:px-12 bg-[#111827]/80 backdrop-blur-sm sticky top-0 z-50 border-b border-gray-700">
+      <nav className="relative z-50 w-full py-6 px-6 md:px-12 bg-black/20 backdrop-blur-xl border-b border-white/10 sticky top-0">
         <div className="container mx-auto flex justify-between items-center">
-          <Link href="/" className="text-2xl font-bold text-white">
-            AI Mock Interview
+          <Link href="/" className="flex items-center space-x-3 group">
+            <div className="relative">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <Bot className="w-6 h-6 text-white" />
+              </div>
+              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                AI Mock Interview
+              </h1>
+              <p className="text-xs text-blue-300 font-medium">& Interview Copilot</p>
+            </div>
           </Link>
-          <div className="hidden md:flex space-x-6 items-center">
-            <Link href="#features" className="text-gray-400 hover:text-white">Features</Link>
-            <Link href="#how-it-works" className="text-gray-400 hover:text-white">How It Works</Link>
-            <Link href="#testimonials" className="text-gray-400 hover:text-white">Testimonials</Link>
+          
+          <div className="hidden md:flex space-x-8 items-center">
+            <Link href="#features" className="text-gray-300 hover:text-white transition-colors duration-300">Features</Link>
+            <Link href="#how-it-works" className="text-gray-300 hover:text-white transition-colors duration-300">How It Works</Link>
+            <Link href="#testimonials" className="text-gray-300 hover:text-white transition-colors duration-300">Success Stories</Link>
           </div>
-          <div className="space-x-4">
+          
+          <div className="flex items-center space-x-4">
             <Link href="/sign-in" passHref>
-              <Button variant="ghost" className="text-white hover:bg-gray-700">Sign In</Button>
+              <Button variant="ghost" className="text-white hover:bg-white/10 border border-white/20 backdrop-blur-sm">
+                Sign In
+              </Button>
             </Link>
             <Link href="/sign-up" passHref>
-              <Button className="bg-blue-600 text-white hover:bg-blue-700">Get Started</Button>
+              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-semibold shadow-2xl shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 transform hover:scale-105">
+                Start Free Trial
+                <Rocket className="w-4 h-4 ml-2" />
+              </Button>
             </Link>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="bg-[#0d1526]">
-        <div className="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12">
-          <div className="mr-auto place-self-center lg:col-span-7">
-            <h1 className="max-w-2xl mb-4 text-4xl font-extrabold tracking-tight leading-none md:text-5xl xl:text-6xl text-white">
-              Land Your Dream Job with AI
-            </h1>
-            <p className="max-w-2xl mb-6 font-light text-gray-400 lg:mb-8 md:text-lg lg:text-xl">
-              Our AI-powered mock interviews help you practice, get instant
-              feedback, and build the confidence you need to succeed.
-            </p>
-            <Link
-              href="/sign-up"
-              className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-white rounded-lg bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-800"
-            >
-                  Start Your Free Trial
-              <ArrowRight className="w-5 h-5 ml-2 -mr-1" />
+      <section className="relative z-10 pt-20 pb-32 px-6 md:px-12">
+        <div className="container mx-auto text-center max-w-6xl">
+          {/* Badge */}
+          <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 rounded-full px-6 py-3 mb-8 backdrop-blur-sm">
+            <Sparkles className="w-5 h-5 text-blue-400" />
+            <span className="text-blue-300 font-medium">AI-Powered Interview Mastery</span>
+          </div>
+
+          {/* Main Heading */}
+          <h1 className="text-5xl md:text-7xl font-bold mb-8 leading-tight">
+            <span className="bg-gradient-to-r from-white via-blue-200 to-purple-200 bg-clip-text text-transparent">
+              Master Any Interview
+            </span>
+            <br />
+            <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              with AI Copilot
+            </span>
+          </h1>
+
+          {/* Subtitle */}
+          <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-4xl mx-auto leading-relaxed">
+            Transform your interview skills with our AI-powered mock interviews and real-time coaching. 
+            Practice with industry experts, get instant feedback, and land your dream job.
+          </p>
+
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6 mb-16">
+            <Link href="/sign-up" passHref>
+              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-10 py-4 rounded-xl font-semibold text-lg shadow-2xl shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 transform hover:scale-105">
+                <Play className="w-5 h-5 mr-2" />
+                Start Free Trial
+              </Button>
+            </Link>
+            <Link href="#demo" passHref>
+              <Button variant="outline" className="border-2 border-white/30 text-white hover:bg-white/10 px-10 py-4 rounded-xl font-semibold text-lg backdrop-blur-sm transition-all duration-300">
+                <Mic className="w-5 h-5 mr-2" />
+                Watch Demo
+              </Button>
             </Link>
           </div>
-          <div className="hidden lg:mt-0 lg:col-span-5 lg:flex">
-            <Image 
-              src="/ai-interview-hero.png"
-              alt="AI mock interview illustration"
-              width={1000}
-              height={720}
-              className="rounded-lg"
-              style={{ color: 'transparent', visibility: 'visible' }}
-            />
-          </div>
-          </div>
-        </section>
 
-        {/* Features Section */}
-        <section id="features" className="py-20 bg-[#111827]">
-          <div className="container mx-auto px-6 md:px-12">
-            <div className="text-center max-w-2xl mx-auto">
-              <h2 className="text-3xl md:text-4xl font-bold text-white">
-                Everything You Need to Succeed
-              </h2>
-              <p className="mt-4 text-lg text-gray-400">
-                From realistic simulations to detailed performance analysis, we've got you covered.
-              </p>
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold text-blue-400 mb-2">50K+</div>
+              <div className="text-gray-400">Successful Interviews</div>
             </div>
-            <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
-              {features.map((feature, index) => (
-                <div key={index} className="flex flex-col p-8 bg-[#1a2234] rounded-xl shadow-lg hover:shadow-blue-500/20 transition-shadow border border-gray-700">
-                  <div className="flex-shrink-0">{feature.icon}</div>
-                  <div className="mt-4">
-                    <h3 className="text-xl font-semibold text-white">{feature.title}</h3>
-                    <p className="mt-2 text-gray-400">{feature.description}</p>
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold text-purple-400 mb-2">95%</div>
+              <div className="text-gray-400">Success Rate</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold text-green-400 mb-2">200+</div>
+              <div className="text-gray-400">Job Roles</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold text-pink-400 mb-2">24/7</div>
+              <div className="text-gray-400">AI Available</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="relative z-10 py-24 px-6 md:px-12">
+        <div className="container mx-auto">
+          <div className="text-center max-w-3xl mx-auto mb-20">
+            <div className="inline-flex items-center space-x-3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 rounded-full px-6 py-3 mb-8 backdrop-blur-sm">
+              <Sparkles className="w-5 h-5 text-blue-400" />
+              <span className="text-blue-300 font-medium">Platform Features</span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">
+              <span className="bg-gradient-to-r from-white via-blue-200 to-cyan-300 bg-clip-text text-transparent">
+                Everything You Need
+              </span>
+              <br />
+              <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+                to Succeed
+              </span>
+            </h2>
+            <p className="text-xl text-gray-300 leading-relaxed">
+              From AI-powered coaching to industry-specific practice, we've built the most comprehensive 
+              interview preparation platform ever created.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {features.map((feature, index) => (
+              <div key={index} className="group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur-xl opacity-20 group-hover:opacity-40 transition duration-500"></div>
+                <div className="relative p-8 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 hover:border-white/20 transition-all duration-500 hover:transform hover:scale-105 h-full flex flex-col">
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+                    {feature.icon}
                   </div>
+                  <h3 className="text-2xl font-bold text-white mb-4 flex-shrink-0">{feature.title}</h3>
+                  <p className="text-gray-300 leading-relaxed flex-grow">{feature.description}</p>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* How It Works Section */}
-        <section id="how-it-works" className="py-20 bg-[#0d1526]">
-          <div className="container mx-auto px-6 md:px-12">
-            <div className="text-center max-w-2xl mx-auto">
-              <h2 className="text-3xl md:text-4xl font-bold text-white">
-                Get Started in 3 Simple Steps
-              </h2>
+      {/* Benefits Section */}
+      <section className="relative z-10 py-24 px-6 md:px-12 bg-black/20">
+        <div className="container mx-auto">
+          <div className="text-center max-w-3xl mx-auto mb-20">
+            <div className="inline-flex items-center space-x-3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 rounded-full px-6 py-3 mb-8 backdrop-blur-sm">
+              <CheckCircle className="w-5 h-5 text-blue-400" />
+              <span className="text-blue-300 font-medium">Why We're Different</span>
             </div>
-            <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-12">
-                <div className="text-center">
-                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-blue-900/50 text-blue-400 mx-auto text-2xl font-bold">1</div>
-                    <h3 className="mt-6 text-xl font-semibold text-white">Sign Up</h3>
-                    <p className="mt-2 text-gray-400">Create your account in seconds.</p>
-                </div>
-                <div className="text-center">
-                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-blue-900/50 text-blue-400 mx-auto text-2xl font-bold">2</div>
-                    <h3 className="mt-6 text-xl font-semibold text-white">Start an Interview</h3>
-                    <p className="mt-2 text-gray-400">Choose your job role and start a mock interview.</p>
-                </div>
-                <div className="text-center">
-                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-blue-900/50 text-blue-400 mx-auto text-2xl font-bold">3</div>
-                    <h3 className="mt-6 text-xl font-semibold text-white">Receive Feedback</h3>
-                    <p className="mt-2 text-gray-400">Get instant, AI-powered feedback to improve.</p>
-                </div>
-            </div>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">
+              <span className="bg-gradient-to-r from-white via-blue-200 to-cyan-300 bg-clip-text text-transparent">
+                Why Choose
+              </span>
+              <br />
+              <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+                AI Mock Interview?
+              </span>
+            </h2>
           </div>
-        </section>
 
-        {/* Testimonials Section */}
-        <section id="testimonials" className="py-20 bg-[#111827] relative overflow-hidden">
-          {/* Background Pattern */}
-          <div className="absolute inset-0 opacity-5">
-            <div className="absolute inset-0" style={{
-              backgroundImage: `radial-gradient(circle at 25% 25%, #3b82f6 2px, transparent 2px)`,
-              backgroundSize: '50px 50px'
-            }}></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {benefits.map((benefit, index) => (
+              <div key={index} className="text-center group">
+                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <div className="text-white">{benefit.icon}</div>
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-3">{benefit.title}</h3>
+                <p className="text-gray-300 text-sm leading-relaxed">{benefit.description}</p>
+              </div>
+            ))}
           </div>
-          <div className="container mx-auto px-6 md:px-12 relative z-10">
-            <div className="text-center max-w-2xl mx-auto">
-              <h2 className="text-3xl md:text-4xl font-bold text-white">
-                Trusted by Job Seekers Worldwide
-              </h2>
-              <p className="mt-4 text-lg text-gray-400">
-                Join thousands of successful job seekers who transformed their careers with AI Mock Interview
-              </p>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" className="relative z-10 py-24 px-6 md:px-12">
+        <div className="container mx-auto">
+          <div className="text-center max-w-3xl mx-auto mb-20">
+            <div className="inline-flex items-center space-x-3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 rounded-full px-6 py-3 mb-8 backdrop-blur-sm">
+              <Rocket className="w-5 h-5 text-blue-400" />
+              <span className="text-blue-300 font-medium">Getting Started</span>
             </div>
-            <div className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {testimonials.map((testimonial, index) => (
-                <div key={index} className="p-6 bg-[#1a2234] rounded-xl shadow-lg border border-gray-700 hover:shadow-blue-500/10 transition-all duration-300 hover:border-blue-500/30">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">
+              <span className="bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                Get Started in
+              </span>
+              <br />
+              <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                3 Simple Steps
+              </span>
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+            {howItWorks.map((step, index) => (
+              <div key={index} className="text-center relative group">
+                {/* Connection Line */}
+                {index < howItWorks.length - 1 && (
+                  <div className="hidden md:block absolute top-16 left-1/2 w-full h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 transform -translate-y-1/2"></div>
+                )}
+                
+                <div className="relative">
+                  <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300 shadow-2xl shadow-blue-500/25">
+                    <span className="text-2xl font-bold text-white">{step.number}</span>
+                  </div>
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                    <div className="text-white">{step.icon}</div>
+                  </div>
+                  <h3 className="text-2xl font-semibold text-white mb-4">{step.title}</h3>
+                  <p className="text-gray-300 leading-relaxed">{step.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section id="testimonials" className="relative z-10 py-24 px-6 md:px-12 bg-black/20">
+        <div className="container mx-auto">
+          <div className="text-center max-w-3xl mx-auto mb-20">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">
+              <span className="bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                Trusted by Job Seekers
+              </span>
+              <br />
+              <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                Worldwide
+              </span>
+            </h2>
+            <p className="text-xl text-gray-300 leading-relaxed">
+              Join thousands of successful job seekers who transformed their careers with AI Mock Interview
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {testimonials.map((testimonial, index) => (
+              <div key={index} className="group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition duration-500"></div>
+                <div className="relative p-6 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 hover:border-white/20 transition-all duration-300 hover:transform hover:scale-105">
                   <div className="flex items-start space-x-4">
                     <Avatar 
                       src={testimonial.avatar} 
@@ -250,9 +411,7 @@ export default function Home() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center mb-2">
                         {[...Array(5)].map((_, i) => (
-                          <svg key={i} className="w-3 h-3 text-yellow-400 fill-current" viewBox="0 0 20 20">
-                            <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
-                          </svg>
+                          <Star key={i} className="w-3 h-3 text-yellow-400 fill-current" />
                         ))}
                       </div>
                       <p className="text-gray-300 italic text-sm leading-relaxed">"{testimonial.quote}"</p>
@@ -263,27 +422,137 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-              ))}
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-12 text-center">
+            <div className="inline-flex items-center space-x-2 text-gray-400 text-sm">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
+              <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
+              <span className="ml-2 text-gray-500">Showing {testimonials.length} of many success stories</span>
             </div>
-            <div className="mt-12 text-center">
-              <div className="inline-flex items-center space-x-2 text-gray-400 text-sm">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
-                <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
-                <span className="ml-2 text-gray-500">Showing {testimonials.length} of many success stories</span>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="relative z-10 py-24 px-6 md:px-12">
+        <div className="container mx-auto text-center">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-4xl md:text-5xl font-bold mb-8">
+              <span className="bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                Ready to Ace Your
+              </span>
+              <br />
+              <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                Next Interview?
+              </span>
+            </h2>
+            <p className="text-xl text-gray-300 mb-12 leading-relaxed">
+              Join thousands of professionals who have already transformed their interview skills 
+              and landed their dream jobs with AI Mock Interview & Interview Copilot.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
+              <Link href="/sign-up" passHref>
+                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-12 py-4 rounded-xl font-semibold text-lg shadow-2xl shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 transform hover:scale-105">
+                  <Rocket className="w-5 h-5 mr-2" />
+                  Start Free Trial
+                </Button>
+              </Link>
+              <Link href="#demo" passHref>
+                <Button variant="outline" className="border-2 border-white/30 text-white hover:bg-white/10 px-12 py-4 rounded-xl font-semibold text-lg backdrop-blur-sm transition-all duration-300">
+                  <Play className="w-5 h-5 mr-2" />
+                  Watch Demo
+                </Button>
+              </Link>
+            </div>
+
+            <div className="mt-8 flex items-center justify-center space-x-6 text-sm text-gray-400">
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                <span>No credit card required</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                <span>Free 7-day trial</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                <span>Cancel anytime</span>
               </div>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
       {/* Footer */}
-      <footer className="w-full py-10 px-6 md:px-12 bg-[#111827] border-t border-gray-700">
-        <div className="container mx-auto flex flex-col md:flex-row justify-between items-center">
-          <p className="text-gray-500">&copy; {currentYear} AI Mock Interview. All rights reserved.</p>
-          <div className="flex space-x-6 mt-4 md:mt-0">
-            <Link href="#features" className="text-gray-500 hover:text-white">Features</Link>
-            <Link href="/privacy" className="text-gray-500 hover:text-white">Privacy Policy</Link>
-            <Link href="/terms" className="text-gray-500 hover:text-white">Terms of Service</Link>
+      <footer className="relative z-10 w-full py-16 px-6 md:px-12 bg-black/40 border-t border-white/10">
+        <div className="container mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+            <div>
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <Bot className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">AI Mock Interview</h3>
+                  <p className="text-sm text-blue-300">& Interview Copilot</p>
+                </div>
+              </div>
+              <p className="text-gray-400 mb-6">
+                Transform your interview skills with AI-powered coaching and real-time feedback.
+              </p>
+              <div className="flex space-x-4">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <Globe className="w-5 h-5 text-white" />
+                </div>
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-white" />
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="text-lg font-semibold text-white mb-6">Product</h4>
+              <ul className="space-y-3">
+                <li><Link href="#features" className="text-gray-400 hover:text-white transition-colors">Features</Link></li>
+                <li><Link href="#how-it-works" className="text-gray-400 hover:text-white transition-colors">How It Works</Link></li>
+                <li><Link href="#pricing" className="text-gray-400 hover:text-white transition-colors">Pricing</Link></li>
+                <li><Link href="#demo" className="text-gray-400 hover:text-white transition-colors">Demo</Link></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="text-lg font-semibold text-white mb-6">Company</h4>
+              <ul className="space-y-3">
+                <li><Link href="/about" className="text-gray-400 hover:text-white transition-colors">About</Link></li>
+                <li><Link href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>
+                <li><Link href="/careers" className="text-gray-400 hover:text-white transition-colors">Careers</Link></li>
+                <li><Link href="/contact" className="text-gray-400 hover:text-white transition-colors">Contact</Link></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="text-lg font-semibold text-white mb-6">Support</h4>
+              <ul className="space-y-3">
+                <li><Link href="/help" className="text-gray-400 hover:text-white transition-colors">Help Center</Link></li>
+                <li><Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</Link></li>
+                <li><Link href="/terms" className="text-gray-400 hover:text-white transition-colors">Terms of Service</Link></li>
+                <li><Link href="/status" className="text-gray-400 hover:text-white transition-colors">Status</Link></li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center">
+            <p className="text-gray-400">&copy; {currentYear} AI Mock Interview & Interview Copilot. All rights reserved.</p>
+            <div className="flex space-x-6 mt-4 md:mt-0">
+              <Link href="#features" className="text-gray-400 hover:text-white transition-colors">Features</Link>
+              <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</Link>
+              <Link href="/terms" className="text-gray-400 hover:text-white transition-colors">Terms of Service</Link>
+            </div>
           </div>
         </div>
       </footer>
