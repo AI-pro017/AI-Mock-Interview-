@@ -24,6 +24,7 @@ const InterviewCopilotPage = () => {
     const [sessionStartTime, setSessionStartTime] = useState(null);
     const [sessionId, setSessionId] = useState(null);
     const [sessionTracked, setSessionTracked] = useState(false);
+    const [autoScrollEnabled, setAutoScrollEnabled] = useState(true); // Add toggle for auto-scroll
     const videoRef = useRef(null);
     const mobileVideoRef = useRef(null); // Separate ref for mobile
     const transcriptEndRef = useRef(null);
@@ -234,10 +235,28 @@ const InterviewCopilotPage = () => {
         generateSuggestions(lastBlock.text, transcripts);
     }, [transcripts, userOverride, generateSuggestions]);
 
-    // Add auto-scroll effect for AI suggestions
+    // Add timed auto-scroll effect for AI suggestions - gradual scrolling for stage 2
     useEffect(() => {
-        aiSuggestionsEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-    }, [suggestions]);
+        // Only scroll if auto-scroll is enabled and we have suggestions
+        if (!autoScrollEnabled || !suggestions || suggestions.length === 0) return;
+        
+        // Check if this is a stage 2 update (when isStage2Loading changes or we have multiple suggestions)
+        const isStage2Update = suggestions.length > 1 || isStage2Loading;
+        
+        // For stage 2, add a delay before scrolling to allow user to read stage 1 first
+        const scrollDelay = isStage2Update ? 3000 : 800; // 3 seconds for stage 2, 0.8 seconds for stage 1
+        
+        const scrollTimer = setTimeout(() => {
+            // Use smooth scrolling with a more gradual behavior
+            aiSuggestionsEndRef.current?.scrollIntoView({ 
+                behavior: "smooth", 
+                block: "nearest", // Use "nearest" instead of "end" for less jarring scroll
+                inline: "nearest"
+            });
+        }, scrollDelay);
+        
+        return () => clearTimeout(scrollTimer);
+    }, [suggestions, isStage2Loading, autoScrollEnabled]);
 
     // Resize functionality
     const handleMouseDown = useCallback((e) => {

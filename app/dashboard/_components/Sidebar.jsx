@@ -9,9 +9,11 @@ import {
   User,
   Shield,
   Bot,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
-const Sidebar = () => {
+const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
   const pathname = usePathname();
 
   const menuList = [
@@ -74,24 +76,41 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="hidden md:block h-screen fixed left-0 top-16 w-64 text-white bg-[#0d1526] border-r border-[#1e293b] border-t border-[#1e293b] z-50">
-      <div className="py-8">
-        {/* Menu items */}
-        <div className="px-4">
-          {menuList.map((item) => (
-            <Link href={item.path} key={item.id}>
-              <div
-                className={`flex items-center justify-start gap-3 p-3 mb-2 px-2 rounded-lg cursor-pointer transition-all
-                ${isActive(item.path) 
-                  ? 'bg-gray-700 text-white' 
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                }`}
-              >
-                <item.icon className="h-6 w-6 flex-shrink-0" />
-                <span className="font-medium">{item.name}</span>
-              </div>
-            </Link>
-          ))}
+    <div className={`hidden md:block h-screen fixed left-0 top-16 text-white bg-[#0d1526] border-r border-[#1e293b] border-t border-[#1e293b] z-50 transition-all duration-300 ${isCollapsed ? 'w-0 overflow-hidden' : 'w-64'}`}>
+      <div className="relative h-full">
+        {/* Collapse/Expand button - positioned at the bottom edge of sidebar */}
+        {!isCollapsed && (
+          <button
+            onClick={() => setIsCollapsed(true)}
+            className="absolute right-2 bottom-20 bg-gray-800 hover:bg-gray-700 text-white p-2 rounded-full transition-all duration-300 flex items-center justify-center border border-gray-600 shadow-xl hover:scale-110 z-[100]"
+            aria-label="Hide sidebar"
+            title="Hide sidebar"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4 -ml-2" />
+          </button>
+        )}
+        
+        <div className="py-8">
+          {/* Menu items */}
+          <div className="px-4">
+            {menuList.map((item) => (
+              <Link href={item.path} key={item.id}>
+                <div
+                  className={`flex items-center justify-start gap-3 p-3 mb-2 px-2 rounded-lg cursor-pointer transition-all whitespace-nowrap
+                  ${isActive(item.path) 
+                    ? 'bg-gray-700 text-white' 
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  }`}
+                >
+                  <item.icon className="h-6 w-6 flex-shrink-0" />
+                  <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0' : 'opacity-100'}`}>
+                    {item.name}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </div>
