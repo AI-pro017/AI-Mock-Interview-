@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 import Image from "next/image";
-import { ArrowRight, Bot, ShieldCheck, Zap, CheckCircle, Sparkles, Target, Users, Star, Play, Mic, Brain, TrendingUp, Rocket, Award, Globe, Clock, CheckCircle2 } from 'lucide-react';
+import {Bot, CheckCircle, Sparkles, Target, Users, Star, Play, Mic, Brain, TrendingUp, Rocket, Award, CheckCircle2 } from 'lucide-react';
 import { useEffect, useState } from "react";
 import FirstTimeVisitModal from "@/components/ui/first-time-visit-modal";
 import { Avatar } from "@/components/ui/avatar";
@@ -491,62 +491,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="relative z-10 w-full py-16 px-6 md:px-12 bg-black/40 border-t border-white/10">
         <div className="container mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
-            <div>
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                  <Bot className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">AI Mock Interview</h3>
-                  <p className="text-sm text-blue-300">& Interview Copilot</p>
-                </div>
-              </div>
-              <p className="text-gray-400 mb-6">
-                Transform your interview skills with AI-powered coaching and real-time feedback.
-              </p>
-              <div className="flex space-x-4">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Globe className="w-5 h-5 text-white" />
-                </div>
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-white" />
-                </div>
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="text-lg font-semibold text-white mb-6">Product</h4>
-              <ul className="space-y-3">
-                <li><Link href="#features" className="text-gray-400 hover:text-white transition-colors">Features</Link></li>
-                <li><Link href="#how-it-works" className="text-gray-400 hover:text-white transition-colors">How It Works</Link></li>
-                <li><Link href="#pricing" className="text-gray-400 hover:text-white transition-colors">Pricing</Link></li>
-                <li><Link href="#demo" className="text-gray-400 hover:text-white transition-colors">Demo</Link></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="text-lg font-semibold text-white mb-6">Company</h4>
-              <ul className="space-y-3">
-                <li><Link href="/about" className="text-gray-400 hover:text-white transition-colors">About</Link></li>
-                <li><Link href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>
-                <li><Link href="/careers" className="text-gray-400 hover:text-white transition-colors">Careers</Link></li>
-                <li><Link href="/contact" className="text-gray-400 hover:text-white transition-colors">Contact</Link></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="text-lg font-semibold text-white mb-6">Support</h4>
-              <ul className="space-y-3">
-                <li><Link href="/help" className="text-gray-400 hover:text-white transition-colors">Help Center</Link></li>
-                <li><Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</Link></li>
-                <li><Link href="/terms" className="text-gray-400 hover:text-white transition-colors">Terms of Service</Link></li>
-                <li><Link href="/status" className="text-gray-400 hover:text-white transition-colors">Status</Link></li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="pt-8 border-t border-white/10 space-y-4">
+          <div className="space-y-4">
             <div className="flex flex-col md:flex-row justify-between items-center">
               <div className="text-center md:text-left">
                 <p className="text-gray-400">&copy; {currentYear} AI Mock Interview & Interview Copilot. All rights reserved.</p>

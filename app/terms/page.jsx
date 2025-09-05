@@ -224,7 +224,7 @@ export default function TermsOfService() {
             </p>
             <div className="mt-4 p-4 bg-[#1a2234] rounded-lg border border-gray-700">
               <p className="text-gray-300">
-                <strong>Email:</strong> legal@aimockinterview.com<br />
+                <strong>Email:</strong> info@edgeitek.com<br />
                 <strong>Address:</strong> AI Mock Interview, Legal Team<br />
                 <strong>Response Time:</strong> We aim to respond to all legal inquiries within 5 business days
               </p>
