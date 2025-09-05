@@ -564,12 +564,9 @@ export default function Home() {
             <div className="text-center py-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg backdrop-blur-sm">
               <p className="text-gray-300 text-sm">
                 For inquiries, support, or business partnerships, contact us at:{' '}
-                <a 
-                  href="mailto:info@edgeitek.com" 
-                  className="text-blue-300 hover:text-blue-200 font-medium underline transition-colors duration-300"
-                >
+                <span className="text-blue-300 font-medium">
                   info@edgeitek.com
-                </a>
+                </span>
               </p>
             </div>
           </div>
