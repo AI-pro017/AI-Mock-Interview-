@@ -50,12 +50,15 @@ const InterviewCopilotPage = () => {
     const { transcripts, processTranscript, clearTranscripts, getSpeakerLabel } = useTranscriptManager();
     const { 
         suggestions, 
+        stage2Suggestions,
+        showStage2,
         isLoading: isLoadingSuggestions, 
         isStage2Loading,
         error: aiError, 
         generateSuggestions, 
         clearSuggestions,
         clearSessionContext,
+        toggleStage2,
         sessionContext
     } = useAI();
 
@@ -238,10 +241,10 @@ const InterviewCopilotPage = () => {
     // Add timed auto-scroll effect for AI suggestions - gradual scrolling for stage 2
     useEffect(() => {
         // Only scroll if auto-scroll is enabled and we have suggestions
-        if (!autoScrollEnabled || !suggestions || suggestions.length === 0) return;
+        if (!autoScrollEnabled || (!suggestions || suggestions.length === 0) && (!stage2Suggestions || stage2Suggestions.length === 0)) return;
         
-        // Check if this is a stage 2 update (when isStage2Loading changes or we have multiple suggestions)
-        const isStage2Update = suggestions.length > 1 || isStage2Loading;
+        // Check if this is a stage 2 update (when stage2Suggestions are available)
+        const isStage2Update = stage2Suggestions.length > 0 && showStage2;
         
         // For stage 2, add a delay before scrolling to allow user to read stage 1 first
         const scrollDelay = isStage2Update ? 3000 : 800; // 3 seconds for stage 2, 0.8 seconds for stage 1
@@ -256,7 +259,7 @@ const InterviewCopilotPage = () => {
         }, scrollDelay);
         
         return () => clearTimeout(scrollTimer);
-    }, [suggestions, isStage2Loading, autoScrollEnabled]);
+    }, [suggestions, stage2Suggestions, showStage2, isStage2Loading, autoScrollEnabled]);
 
     // Resize functionality
     const handleMouseDown = useCallback((e) => {
@@ -899,14 +902,56 @@ const InterviewCopilotPage = () => {
                             </div>
                         )}
                         
+                        {/* Display Stage 1 suggestions */}
                         {suggestions.map((s, i) => (
-                            <div key={i} className="bg-gray-700 p-6 rounded-lg">
+                            <div key={`stage1-${i}`} className="bg-gray-700 p-6 rounded-lg">
                                 <h4 className="font-bold text-xl flex items-center mb-4">
                                     <BrainCircuit className="w-6 h-6 mr-3 text-green-400" />
                                     {s.type}
                                 </h4>
                                 <div className="text-lg leading-relaxed">
                                     <CodeHighlighter content={s.content} />
+                                </div>
+                                
+                                {/* More button for Stage 1 suggestions */}
+                                {s.hasMore && !showStage2 && stage2Suggestions.length > 0 && (
+                                    <div className="mt-4 flex justify-end">
+                                        <button
+                                            onClick={toggleStage2}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                                        >
+                                            <span>More</span>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        
+                        {/* Display Stage 2 suggestions when toggled */}
+                        {showStage2 && stage2Suggestions.map((s, i) => (
+                            <div key={`stage2-${i}`} className="bg-gray-700 p-6 rounded-lg">
+                                <h4 className="font-bold text-xl flex items-center mb-4">
+                                    <BrainCircuit className="w-6 h-6 mr-3 text-blue-400" />
+                                    {s.type}
+                                </h4>
+                                <div className="text-lg leading-relaxed">
+                                    <CodeHighlighter content={s.content} />
+                                </div>
+                                
+                                {/* Less button to hide Stage 2 */}
+                                <div className="mt-4 flex justify-end">
+                                    <button
+                                        onClick={toggleStage2}
+                                        className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                                    >
+                                        <span>Less</span>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                         ))}
@@ -1221,14 +1266,56 @@ const InterviewCopilotPage = () => {
                             </div>
                         )}
                         
+                        {/* Display Stage 1 suggestions */}
                         {suggestions.map((s, i) => (
-                            <div key={i} className="bg-gray-700 p-4 rounded-lg">
+                            <div key={`stage1-${i}`} className="bg-gray-700 p-4 rounded-lg">
                                 <h4 className="font-bold text-xl flex items-center mb-3">
                                     <BrainCircuit className="w-5 h-5 mr-2 text-green-400" />
                                     <span className="truncate">{s.type}</span>
                                 </h4>
                                 <div className="text-lg leading-relaxed">
                                     <CodeHighlighter content={s.content} />
+                                </div>
+                                
+                                {/* More button for Stage 1 suggestions */}
+                                {s.hasMore && !showStage2 && stage2Suggestions.length > 0 && (
+                                    <div className="mt-4 flex justify-end">
+                                        <button
+                                            onClick={toggleStage2}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                                        >
+                                            <span>More</span>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        
+                        {/* Display Stage 2 suggestions when toggled */}
+                        {showStage2 && stage2Suggestions.map((s, i) => (
+                            <div key={`stage2-${i}`} className="bg-gray-700 p-4 rounded-lg">
+                                <h4 className="font-bold text-xl flex items-center mb-3">
+                                    <BrainCircuit className="w-5 h-5 mr-2 text-blue-400" />
+                                    <span className="truncate">{s.type}</span>
+                                </h4>
+                                <div className="text-lg leading-relaxed">
+                                    <CodeHighlighter content={s.content} />
+                                </div>
+                                
+                                {/* Less button to hide Stage 2 */}
+                                <div className="mt-4 flex justify-end">
+                                    <button
+                                        onClick={toggleStage2}
+                                        className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                                    >
+                                        <span>Less</span>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                         ))}

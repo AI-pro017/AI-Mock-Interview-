@@ -546,12 +546,31 @@ export default function Home() {
             </div>
           </div>
           
-          <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-400">&copy; {currentYear} AI Mock Interview & Interview Copilot. All rights reserved.</p>
-            <div className="flex space-x-6 mt-4 md:mt-0">
-              <Link href="#features" className="text-gray-400 hover:text-white transition-colors">Features</Link>
-              <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</Link>
-              <Link href="/terms" className="text-gray-400 hover:text-white transition-colors">Terms of Service</Link>
+          <div className="pt-8 border-t border-white/10 space-y-4">
+            <div className="flex flex-col md:flex-row justify-between items-center">
+              <div className="text-center md:text-left">
+                <p className="text-gray-400">&copy; {currentYear} AI Mock Interview & Interview Copilot. All rights reserved.</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Property of <span className="text-blue-300 font-medium">Edge IT Solutions LLC</span>
+                </p>
+              </div>
+              <div className="flex space-x-6 mt-4 md:mt-0">
+                <Link href="#features" className="text-gray-400 hover:text-white transition-colors">Features</Link>
+                <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</Link>
+                <Link href="/terms" className="text-gray-400 hover:text-white transition-colors">Terms of Service</Link>
+              </div>
+            </div>
+            
+            <div className="text-center py-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg backdrop-blur-sm">
+              <p className="text-gray-300 text-sm">
+                For inquiries, support, or business partnerships, contact us at:{' '}
+                <a 
+                  href="mailto:info@edgeitek.com" 
+                  className="text-blue-300 hover:text-blue-200 font-medium underline transition-colors duration-300"
+                >
+                  info@edgeitek.com
+                </a>
+              </p>
             </div>
           </div>
         </div>

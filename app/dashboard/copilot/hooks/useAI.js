@@ -4,9 +4,11 @@ import { useState, useCallback, useRef } from 'react';
 
 export const useAI = () => {
     const [suggestions, setSuggestions] = useState([]);
+    const [stage2Suggestions, setStage2Suggestions] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [isStage2Loading, setIsStage2Loading] = useState(false);
+    const [showStage2, setShowStage2] = useState(false);
     
     // Context retention
     const sessionContextRef = useRef([]);
@@ -90,16 +92,18 @@ export const useAI = () => {
                 throw new Error(stage1Data.error || 'Failed to get AI suggestions');
             }
 
-            // Display Stage 1 results immediately
+            // Display Stage 1 results immediately and reset stage 2
             setSuggestions(stage1Data.suggestions || []);
+            setStage2Suggestions([]);
+            setShowStage2(false);
             setIsLoading(false);
             
             // Mark this question as processed
             processedQuestionsRef.current.add(question.toLowerCase().trim());
 
-            // Calculate delay based on Stage 1 sample response length
-            const sampleResponse = stage1Data.suggestions?.find(s => s.type === '💬 Sample Response');
-            const responseLength = sampleResponse?.content?.length || 100;
+            // Calculate delay based on Stage 1 response length
+            const aiSuggestion = stage1Data.suggestions?.find(s => s.type === '💡 AI Suggestion');
+            const responseLength = aiSuggestion?.content?.length || 100;
             
             // Estimate reading time: ~200 characters per minute reading speed
             // Minimum 3 seconds, maximum 8 seconds
@@ -138,8 +142,8 @@ export const useAI = () => {
                         throw new Error(stage2Data.error || 'Failed to get detailed AI suggestions');
                     }
 
-                    // Replace suggestions with Stage 2 detailed version
-                    setSuggestions(stage2Data.suggestions || []);
+                    // Store Stage 2 suggestions separately (don't replace Stage 1)
+                    setStage2Suggestions(stage2Data.suggestions || []);
                     
                     // Update successful request tracker
                     lastSuccessfulRequestRef.current = requestKey;
@@ -199,6 +203,8 @@ export const useAI = () => {
         }
         
         setSuggestions([]);
+        setStage2Suggestions([]);
+        setShowStage2(false);
         setError(null);
         setIsLoading(false);
         setIsStage2Loading(false);
@@ -211,14 +217,22 @@ export const useAI = () => {
         processedQuestionsRef.current.clear();
     }, []);
 
+    // Function to toggle between stage 1 and stage 2
+    const toggleStage2 = useCallback(() => {
+        setShowStage2(prev => !prev);
+    }, []);
+
     return { 
         suggestions, 
+        stage2Suggestions,
+        showStage2,
         isLoading, 
         isStage2Loading,
         error, 
         generateSuggestions, 
         clearSuggestions,
         clearSessionContext,
+        toggleStage2,
         sessionContext: sessionContextRef.current
     };
 }; 

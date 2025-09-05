@@ -5,6 +5,25 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const CodeHighlighter = ({ content }) => {
+    // Function to parse markdown formatting in text
+    const parseMarkdown = (text) => {
+        // Parse **bold** text
+        const parts = text.split(/(\*\*.*?\*\*)/g);
+        
+        return parts.map((part, index) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                // Remove the ** markers and make it bold
+                const boldText = part.slice(2, -2);
+                return (
+                    <strong key={index} className="font-bold text-white">
+                        {boldText}
+                    </strong>
+                );
+            }
+            return part;
+        });
+    };
+
     // Function to parse content and identify code blocks
     const parseContent = (text) => {
         // Split by code blocks (```language...``` or ```...```)
@@ -52,10 +71,16 @@ const CodeHighlighter = ({ content }) => {
                     </div>
                 );
             } else {
-                // Regular text - preserve line breaks and format
+                // Regular text - parse markdown formatting and preserve line breaks
+                const lines = part.split('\n');
                 return (
                     <span key={index} className="whitespace-pre-wrap">
-                        {part}
+                        {lines.map((line, lineIndex) => (
+                            <span key={lineIndex}>
+                                {parseMarkdown(line)}
+                                {lineIndex < lines.length - 1 && '\n'}
+                            </span>
+                        ))}
                     </span>
                 );
             }

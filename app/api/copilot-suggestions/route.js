@@ -305,21 +305,48 @@ async function makeOpenAICallWithRetry(systemPrompt, userPrompt, maxRetries = RA
 function getFallbackSuggestions(stage) {
     return stage === 1 ? [
         { 
-            type: 'Key Points to Mention', 
-            content: 'Core experience, key achievements' 
-        },
-        { 
-            type: '💬 Sample Response', 
-            content: 'I successfully handled similar challenges using proven methodologies.' 
+            type: '💡 AI Suggestion', 
+            content: 'I have experience with similar challenges and can discuss specific methodologies and outcomes that demonstrate my problem-solving capabilities and technical expertise.',
+            hasMore: true
         }
     ] : [
         { 
-            type: 'Key Points to Mention', 
-            content: 'Detailed experience, quantifiable achievements, specific technologies, project outcomes' 
-        },
-        { 
-            type: '💬 Sample Response', 
-            content: 'At TechCorp, I led a 6-month platform overhaul as Senior Developer. Our legacy system had 8-second load times causing 40% cart abandonment. I assembled a 4-person team, chose React/Node.js architecture, and implemented microservices with Redis caching. We migrated 75,000 products using automated scripts, integrated Stripe payments, and deployed with zero downtime using blue-green deployment. Key technical challenges included data consistency during migration and real-time inventory sync, which I solved using event-driven architecture and optimistic locking. Results: 60% faster load times (8s to 3.2s), 25% higher conversion rates, $2M additional quarterly revenue. The main optimization was implementing database connection pooling and query optimization, reducing database load by 70%.' 
+            type: '💡 AI Suggestion', 
+            content: `**Technical Skills & Experience**
+• Proficiency in multiple programming languages and frameworks
+• Experience with cloud platforms and DevOps practices  
+• Database design and optimization expertise
+• API development and system integration skills
+
+**Technical Details**
+• Definition: Ordered, mutable collection; allows duplicates & mixed data types
+• Indexing & Slicing: Access by index, get sublists with bracket notation
+• Common Methods: append(), pop(), sort(), extend(), remove()
+• List Comprehensions: Compact, readable transformations
+• Performance: Backed by dynamic arrays; fast for append/iteration
+
+**Code Examples**
+Definition:
+my_list = [1, "hello", 3.5, True]
+
+Indexing & Slicing:
+my_list[0]  # 1
+my_list[-1]  # True  
+my_list[1:3]  # ['hello', 3.5]
+
+Common Methods:
+nums = [5, 2, 9]
+nums.append(7)  # [5, 2, 9, 7]
+nums.pop()  # removes last
+nums.sort()  # [2, 5, 7, 9]
+
+List Comprehension:
+squares = [x**2 for x in range(5)]  # [0,1,4,9,16]
+
+Nested & Flattening:
+nested = [[1,2],[3,4]]
+flat = [x for row in nested for x in row]  # [1,2,3,4]`,
+            hasMore: false
         }
     ];
 }
@@ -350,63 +377,58 @@ export async function POST(req) {
         let systemPrompt, userPrompt;
 
         if (stage === 1) {
-            // Stage 1: Quick, brief response
-            systemPrompt = `You are an interview assistant providing QUICK, BRIEF responses for immediate use during interviews.
+            // Stage 1: Consolidated, comprehensive response
+            systemPrompt = `You are an interview assistant providing CONSOLIDATED, comprehensive responses that focus on the typical role and give consolidated suggestions.
 
 CRITICAL: You MUST respond with VALID JSON only. No explanations, no markdown, no additional text.
 
-PERFORMANCE CRITICAL: This serves 500+ concurrent users. Response must be:
-- INSTANT and BRIEF (1-2 sentences max for sample response)
-- Immediately actionable
-- Ready to speak without reading
+NEW FORMAT: Do NOT include "Key Points To Mention" - provide only a single consolidated suggestion that focuses on the typical role requirements and gives a comprehensive answer.
 
 CONTEXT RETENTION: ${isFollowUp ? 'This is a FOLLOW-UP question' : 'This is a NEW question'}
 ${overlappingTopic ? `RELATED TO: "${overlappingTopic}"` : ''}
 
-RESPOND with brief suggestions in EXACT JSON format:
+RESPOND with consolidated suggestion in EXACT JSON format:
 
 {
   "suggestions": [
     {
-      "type": "Key Points to Mention",
-      "content": "[5-8 words max - core highlights only]"
-    },
-    {
-      "type": "💬 Sample Response",
-      "content": "[BRIEF 1-2 sentence answer. ${isFollowUp ? 'Build on previous context briefly.' : 'Direct short answer.'} Maximum 25 words. Ready to speak immediately.]"
+      "type": "💡 AI Suggestion",
+      "content": "[Provide a comprehensive, consolidated response that focuses on the typical role and requirements. For example, if asked about data engineer experience, focus on typical data engineer responsibilities like cloud-based data pipelines, Azure Databricks, PySpark, Delta Lake architecture, CDC logic, etc. Make it conversational and ready to speak, around 3-4 sentences that cover the main aspects of the role.]",
+      "hasMore": true
     }
   ]
 }
 
 BEHAVIORAL LOGIC:
 ${overlappingTopic ? `- Reference previous: "Building on what I mentioned about X..."` : ''}
-${isFollowUp ? '- Provide brief elaboration based on context' : '- Give concise, direct answer'}
-- Avoid repetition from session context
-- Focus on immediate, speakable response
+${isFollowUp ? '- Provide elaboration based on context while staying consolidated' : '- Give comprehensive but consolidated answer focusing on typical role aspects'}
+- Focus on typical role responsibilities and requirements
+- Make it conversational and natural
+- Around 3-4 sentences covering main role aspects
+- Always set hasMore: true for stage 1
 
 ${profileContext ? 'USER PROFILE:\n' + profileContext : ''}
 ${sessionContextText}`;
 
         } else {
-            // Stage 2: Detailed response with integrated deep dive tips
-            systemPrompt = `You are an interview assistant providing DETAILED, COMPREHENSIVE responses with integrated deep insights.
+            // Stage 2: Detailed response with organized sections and code examples
+            systemPrompt = `You are an interview assistant providing DETAILED, STRUCTURED responses with key points, code examples, and deep insights.
 
 CRITICAL: You MUST respond with VALID JSON only. No explanations, no markdown, no additional text.
 
-CONTEXT RETENTION: Enhance the brief response with comprehensive details
+NEW FORMAT: Provide a structured detailed response with organized sections using bullet points and code examples when relevant.
+
+CONTEXT RETENTION: Enhance the consolidated response with comprehensive details
 ${overlappingTopic ? `BUILDING ON: "${overlappingTopic}"` : ''}
 
-RESPOND with detailed suggestions in EXACT JSON format:
+RESPOND with detailed suggestion in EXACT JSON format:
 
 {
   "suggestions": [
     {
-      "type": "Key Points to Mention",
-      "content": "[10-15 words - comprehensive highlights with specific technical details]"
-    },
-    {
-      "type": "💬 Sample Response",
-      "content": "[COMPREHENSIVE detailed response. For technical questions: INCLUDE code examples, edge cases, optimizations, and best practices directly in the response. For behavioral: include full STAR method with metrics. For experience: include specific technologies, challenges, and measurable outcomes. ${isFollowUp ? 'Expand significantly on previous context with new technical depth.' : 'Complete detailed answer with examples and technical insights.'} Integrate deep dive tips naturally into the response. Ready to speak fluently with full context.]"
+      "type": "💡 AI Suggestion",
+      "content": "Provide a structured detailed response with organized sections. Start directly with the content - do NOT include any instruction text or formatting examples. Use this structure:\n\n**Topic Key Points**\n• Point 1 with specific details\n• Point 2 with technical specifics\n• Point 3 with practical applications\n\n**Technical Details** (if applicable)\n• Definition and core concepts\n• Common methods and approaches\n• Performance considerations\n• Best practices and pitfalls\n\n**Code Examples** (if applicable)\nExample 1:\ncode_here\n\nExample 2:\ncode_here\n\nFor non-technical questions, structure with relevant sections like Experience Details, Methodologies, Results/Metrics, etc. IMPORTANT: Start your response directly with the first section header - do not include any meta-instructions or formatting notes in your actual response.",
+      "hasMore": false
     }
   ]
 }
@@ -415,23 +437,26 @@ BEHAVIORAL LOGIC:
 ${overlappingTopic ? `- Connect deeply to previous topic: "Expanding on our earlier discussion about X, here's the technical depth..."` : ''}
 ${isFollowUp ? '- Provide comprehensive examples and technical details building on context' : '- Include complete technical context and advanced concepts'}
 - Use session history to avoid repetition but add new depth
+- Always structure with clear sections using **bold headers** and bullet points
 - For technical questions: Include code examples, performance considerations, edge cases
 - For behavioral: Include full situation, metrics, and lessons learned
 - For experience: Include specific technologies, architecture decisions, and business impact
+- Always set hasMore: false for stage 2
+
+CRITICAL: Your response must start directly with the first section header (e.g., "**Topic Key Points**"). Do NOT include any meta-instructions, formatting examples, or bracketed text like "[STRUCTURED DETAILED RESPONSE...]" in your actual response. Jump straight to the content.
 
 STRUCTURE SELECTION & INTEGRATION:
-- Experience: Describe → Explain → Highlight Achievements (with specific metrics)
-- Comparison: Define → Compare → Demonstrate with Code → Performance Analysis
-- Concept: Define → Explain → Show with Code → Best Practices & Edge Cases
-- Behavioral: Context → Action → Results → Lessons Learned
-- Problem-solving: Problem → Solution → Implementation → Optimization
+- Technical Topics: Key Points → Technical Details → Code Examples
+- Experience: Key Points → Experience Details → Technologies/Results
+- Behavioral: Key Points → Situation/Action → Results/Lessons
+- Comparison: Key Points → Definitions → Comparisons → Examples
 
 IMPORTANT FOR TECHNICAL QUESTIONS:
-- Always include working code examples in the sample response
+- Always include working code examples with proper syntax
 - Add performance considerations and optimization tips
 - Mention edge cases and how to handle them
 - Include best practices and common pitfalls
-- Integrate all deep dive insights naturally into the main response
+- Structure everything clearly with headers and bullet points
 
 ${profileContext ? 'USER PROFILE:\n' + profileContext : ''}
 ${sessionContextText}`;
