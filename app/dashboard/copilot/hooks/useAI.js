@@ -23,26 +23,37 @@ export const useAI = () => {
 
     // Two-stage suggestion generation
     const generateSuggestions = useCallback(async (question, history) => {
+        try {
         // Clear existing timeout for stage 2
         if (stage2TimeoutRef.current) {
             clearTimeout(stage2TimeoutRef.current);
         }
 
-        // Abort any existing requests
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
+        // Abort any existing requests safely
+        try {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        } catch (e) {
+            // Suppress abort errors
         }
-        if (stage2AbortControllerRef.current) {
-            stage2AbortControllerRef.current.abort();
+        
+        try {
+            if (stage2AbortControllerRef.current) {
+                stage2AbortControllerRef.current.abort();
+            }
+        } catch (e) {
+            // Suppress abort errors
         }
 
         // Create new abort controllers
         abortControllerRef.current = new AbortController();
         stage2AbortControllerRef.current = new AbortController();
 
-        // Check for duplicate requests
-        const requestKey = `${question}-${JSON.stringify(history)}`;
+        // Check for duplicate requests - only check the question, not the full history
+        const requestKey = question.trim().toLowerCase();
         if (lastSuccessfulRequestRef.current === requestKey) {
+            console.log("Skipping duplicate request for question:", question.substring(0, 50));
             return;
         }
         
@@ -65,6 +76,7 @@ export const useAI = () => {
 
         setIsLoading(true);
         setError(null);
+        setIsStage2Loading(false);
 
         try {
             // STAGE 1: Generate quick response immediately
@@ -172,6 +184,17 @@ export const useAI = () => {
             setIsStage2Loading(false);
         }
 
+        } catch (outerError) {
+            // Final catch-all to ensure no errors escape
+            if (outerError.name !== 'AbortError') {
+                console.error("Outer error in generateSuggestions:", outerError);
+                setError("An unexpected error occurred. Please try again.");
+                setSuggestions([]);
+            }
+            setIsLoading(false);
+            setIsStage2Loading(false);
+        }
+
     }, []);
 
     // Helper function to check if current question is a follow-up
@@ -194,12 +217,21 @@ export const useAI = () => {
             clearTimeout(stage2TimeoutRef.current);
         }
         
-        // Abort any ongoing requests
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
+        // Abort any ongoing requests safely
+        try {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        } catch (e) {
+            // Suppress abort errors
         }
-        if (stage2AbortControllerRef.current) {
-            stage2AbortControllerRef.current.abort();
+        
+        try {
+            if (stage2AbortControllerRef.current) {
+                stage2AbortControllerRef.current.abort();
+            }
+        } catch (e) {
+            // Suppress abort errors
         }
         
         setSuggestions([]);

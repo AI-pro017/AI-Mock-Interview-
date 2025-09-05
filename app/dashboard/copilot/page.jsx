@@ -80,6 +80,32 @@ const InterviewCopilotPage = () => {
         fetchToken();
     }, []);
 
+    // Global error handler to suppress AbortError notifications
+    useEffect(() => {
+        const handleUnhandledRejection = (event) => {
+            if (event.reason && event.reason.name === 'AbortError') {
+                // Prevent the error from being displayed as an unhandled promise rejection
+                event.preventDefault();
+                console.log('🔇 Suppressed AbortError from global handler');
+            }
+        };
+
+        const handleError = (event) => {
+            if (event.error && event.error.name === 'AbortError') {
+                event.preventDefault();
+                console.log('🔇 Suppressed AbortError from global error handler');
+            }
+        };
+
+        window.addEventListener('unhandledrejection', handleUnhandledRejection);
+        window.addEventListener('error', handleError);
+        
+        return () => {
+            window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+            window.removeEventListener('error', handleError);
+        };
+    }, []);
+
     const toggleCapture = useCallback(async () => {
         if (isCapturing) {
             console.log("Manual stop capture - clearing all data");
@@ -200,6 +226,8 @@ const InterviewCopilotPage = () => {
 
     // Enhanced logic: ONLY generate suggestions for client questions and user overrides
     useEffect(() => {
+        console.log(`🔄 Transcript change detected. Total transcripts: ${transcripts.length}`);
+        
         // If user has provided an override, don't auto-generate from transcripts
         if (userOverride) {
             console.log("User override active - skipping auto-generation");
@@ -213,6 +241,11 @@ const InterviewCopilotPage = () => {
             console.log("No transcripts available");
             return;
         }
+        
+        console.log(`📝 Latest transcript: "${lastBlock.text.substring(0, 100)}..." (Speaker: ${lastBlock.speaker})`);
+        console.log(`🔍 Last processed: "${lastProcessedTranscriptRef.current?.substring(0, 50) || 'None'}..."`);
+        console.log(`🎯 Is client speaker: ${isClientSpeaker(lastBlock.speaker)}, Is question: ${isQuestionBlock(lastBlock)}`);
+        console.log(`🔄 Already processed: ${lastProcessedTranscriptRef.current === lastBlock.text}`);
         
         // CRITICAL: Only generate suggestions for CLIENT speakers (not user responses)
         if (!isClientSpeaker(lastBlock.speaker)) {
@@ -235,6 +268,7 @@ const InterviewCopilotPage = () => {
         lastProcessedTranscriptRef.current = lastBlock.text;
         
         console.log(`✅ Generating AI suggestions for client question: "${lastBlock.text.substring(0, 50)}..."`);
+        console.log(`📊 Total transcripts: ${transcripts.length}, Speaker: ${lastBlock.speaker}`);
         generateSuggestions(lastBlock.text, transcripts);
     }, [transcripts, userOverride, generateSuggestions]);
 
