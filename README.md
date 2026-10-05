@@ -33,8 +33,8 @@ There is also a copilot mode for real interviews. It listens to your mic and the
 You will need Node.js 18 or newer, a Postgres database (Neon works well) and API keys for the services listed above.
 
 ```bash
-git clone https://github.com/AI-pro017/AI-Mock-Interview-.git
-cd AI-Mock-Interview-
+git clone https://github.com/AI-pro017/AI-Mock-Interview.git
+cd AI-Mock-Interview
 npm install
 ```
 
