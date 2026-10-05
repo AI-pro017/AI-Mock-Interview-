@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import questions from '../dashboard/_components/questions';
 import { db } from '@/utils/db';
 import { PersonalityFeedback } from '@/utils/schema';
-import { useUser } from '@clerk/nextjs';
+import { useSession } from 'next-auth/react';
 
 // Tell Next.js not to prerender this page
 export const dynamic = 'force-dynamic';
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 function PersonalityQuizContent() {
   const [answers, setAnswers] = useState(Array(questions.length).fill(null));
   const router = useRouter();
-  const { user } = useUser();
+  const { data: session } = useSession();
 
   const handleAnswerChange = (answer, questionIndex) => {
     const updatedAnswers = [...answers];
@@ -35,7 +35,7 @@ function PersonalityQuizContent() {
           db.insert(PersonalityFeedback).values({
             question: question.question,
             answer: answers[index],
-            userEmail: user ? user.emailAddresses?.[0]?.emailAddress : null,
+            userEmail: session?.user?.email ?? null,
             createdAt: new Date().toISOString(),
             index: index + 1
           })
