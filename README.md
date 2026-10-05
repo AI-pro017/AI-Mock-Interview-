@@ -94,7 +94,34 @@ utils/            Database schema, AI clients, Stripe and subscription helpers
 
 ## Deployment
 
-The app is ready to deploy on Vercel. Add the same environment variables in your Vercel project settings, and point your Stripe webhook to `/api/subscriptions/webhook`.
+The app is built for Vercel, but Git deployments are turned off. `vercel.json` sets
+`git.deploymentEnabled` to `false`, so pushing to `main` does not ship anything. Deploys are manual.
+
+Deploy with the Vercel CLI:
+
+```bash
+npm i -g vercel
+vercel link        # once, to connect this folder to the Vercel project
+vercel --prod      # build and deploy to production
+```
+
+Before the first deploy, copy every variable from `.env.example` into the Vercel project settings.
+The three app URLs default to localhost and have to point at your deployed domain:
+
+```
+NEXT_PUBLIC_SITE_URL=https://your-domain.com
+NEXT_PUBLIC_APP_URL=https://your-domain.com
+NEXT_PUBLIC_URL=https://your-domain.com
+```
+
+Point your Stripe webhook at `https://your-domain.com/api/subscriptions/webhook` and put its
+signing secret in `STRIPE_WEBHOOK_SECRET`.
+
+Migrations do not run during the Vercel build. When the schema changes, run `npm run db:push`
+against the production database yourself.
+
+To turn automatic deploys back on, set `deploymentEnabled` to `true` in `vercel.json`, or remove
+the `git` block entirely.
 
 ## License
 
