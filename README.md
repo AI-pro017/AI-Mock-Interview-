@@ -6,17 +6,18 @@ You set up an interview by choosing the role, difficulty, focus area, length and
 
 There is also a copilot mode for real interviews. It listens to your mic and the call audio, transcribes both sides live and suggests answers as the conversation goes.
 
-## Features
+## What it does
 
-- **Voice mock interviews.** Questions are tailored to the role you pick. The interviewer speaks through ElevenLabs, and your answers are transcribed with Deepgram. Each session gets an interviewer persona with its own name and style.
-- **Feedback and history.** Every session is scored with notes on each answer. Past interviews are saved so you can see your progress over time.
-- **Interview copilot.** Captures mic and tab audio, shows a live transcript and gives AI answer suggestions next to it.
-- **Profile and resume upload.** Upload a PDF or Word resume and the app fills in your profile from it.
-- **Personality quiz.** A short questionnaire that matches you to a work style.
-- **Job search.** Browse openings through the Adzuna API.
-- **Accounts.** Email and password sign up with email verification, Google sign in and password reset.
-- **Subscriptions.** Stripe checkout with Starter, Pro and Unlimited plans, each with its own usage limits.
-- **Admin panel.** Manage users, credits and plans, watch live sessions, edit questions, job roles and copilot prompts, and export reports.
+- Runs mock interviews by voice. The interviewer asks questions out loud using ElevenLabs, and your answers are transcribed with Deepgram.
+- Gives every session a different interviewer with their own name and personality, so practice doesn't feel the same each time.
+- Scores each interview and leaves notes on every answer. Your past interviews stay in your history so you can see if you're improving.
+- Helps during real interviews with the copilot. It listens to your mic and the call audio, shows a live transcript and suggests what to say.
+- Fills in your profile from an uploaded resume (PDF or Word).
+- Has a short personality quiz that suggests your work style.
+- Lets you search for jobs through the Adzuna API.
+- Supports email sign up with verification, Google sign in and password reset.
+- Handles paid plans through Stripe. There are Starter, Pro and Unlimited plans, each with its own usage limits.
+- Comes with an admin panel for managing users, credits and plans, watching live sessions, editing questions and prompts, and exporting reports.
 
 ## Tech stack
 
