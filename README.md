@@ -38,47 +38,13 @@ cd AI-Mock-Interview
 npm install
 ```
 
-Create a `.env.local` file in the project root:
+Copy the example env file and fill in your keys:
 
-```env
-# Database
-NEXT_PUBLIC_DRIZZLE_DB_URL=postgresql://...
-
-# Auth
-AUTH_SECRET=
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-
-# AI and voice
-OPENAI_API_KEY=
-NEXT_PUBLIC_GEMINI_API_KEY=
-DEEPGRAM_API_KEY=
-ELEVENLABS_API_KEY=
-
-# Email
-SENDGRID_API_KEY=
-SENDGRID_VERIFIED_SENDER=
-RESEND_API_KEY=
-
-# Stripe
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-STRIPE_STARTER_PRICE_ID=
-STRIPE_PRO_PRICE_ID=
-STRIPE_UNLIMITED_PRICE_ID=
-
-# App URLs
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_URL=http://localhost:3000
-
-# Optional
-NEXT_PUBLIC_ADZUNA_APP_ID=
-NEXT_PUBLIC_ADZUNA_APP_KEY=
-NEXT_PUBLIC_INTERVIEW_QUESTION_COUNT=5
+```bash
+cp .env.example .env.local
 ```
 
-You can generate `AUTH_SECRET` by running `npx auth secret`.
+`.env.example` lists every variable the app reads, grouped by service (database, auth, AI and voice, email, Stripe and app URLs). The Adzuna keys and question count at the bottom are optional. You can generate `AUTH_SECRET` by running `npx auth secret`.
 
 Create the tables and load the subscription plans:
 
